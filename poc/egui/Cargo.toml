@@ -1,0 +1,24 @@
+[package]
+name = "poc-egui"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[[bin]]
+name = "poc-egui"
+path = "src/main.rs"
+
+[lib]
+name = "poc_egui"
+path = "src/lib.rs"
+
+[dependencies]
+eframe = "0.36"
+egui = "0.36"
+png = "0.18"
+alacritty_terminal = "0.26"
+russh = "0.64"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }
+directories = "6"
+secrecy = "0.10"
+zeroize = "1"
