@@ -101,6 +101,89 @@ fn local_meta(md: &std::fs::Metadata) -> Meta {
     }
 }
 
+/// Lê um sidecar local: ausente → `None`; symlink, não regular ou grande demais → `None`
+/// (recusado); nunca abre através de symlink (`O_NOFOLLOW`).
+async fn read_small_local(path: &str) -> Result<Option<Vec<u8>>, TransferError> {
+    match tokio::fs::symlink_metadata(path).await {
+        Ok(md) if md.file_type().is_file() && md.len() <= 4096 => {}
+        Ok(_) => return Ok(None),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(None),
+        Err(e) => return Err(io_err(e)),
+    }
+    let mut o = tokio::fs::OpenOptions::new();
+    o.read(true);
+    #[cfg(unix)]
+    o.custom_flags(libc::O_NOFOLLOW);
+    match o.open(path).await {
+        Ok(mut f) => {
+            let mut b = Vec::new();
+            f.read_to_end(&mut b).await.map_err(io_err)?;
+            Ok(Some(b))
+        }
+        // Trocado por um symlink entre o lstat e o open (ELOOP): recusa.
+        #[cfg(unix)]
+        Err(e) if e.raw_os_error() == Some(libc::ELOOP) => Ok(None),
+        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
+        Err(e) => Err(io_err(e)),
+    }
+}
+
+/// Grava um sidecar local: temporário novo (`create_new`, 0600, nome `.…myssh-part-…`, que a
+/// varredura ignora) + `rename` sobre o destino. O rename substitui o nome: um symlink plantado
+/// no lugar do sidecar é trocado, nunca seguido.
+async fn write_small_local(path: &str, data: &[u8]) -> Result<(), TransferError> {
+    let tmp = format!(
+        "{path}{}{}",
+        crate::names::PART_MARK,
+        crate::engine::rand_token()
+    );
+    let mut o = tokio::fs::OpenOptions::new();
+    o.write(true).create_new(true);
+    #[cfg(unix)]
+    o.mode(0o600);
+    let r: Result<(), TransferError> = async {
+        let mut f = o.open(&tmp).await.map_err(io_err)?;
+        f.write_all(data).await.map_err(io_err)?;
+        f.flush().await.map_err(io_err)?;
+        drop(f);
+        tokio::fs::rename(&tmp, path).await.map_err(io_err)
+    }
+    .await;
+    if r.is_err() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    }
+    r
+}
+
+/// Modo `0666 & !umask` do usuário (sondado criando um arquivo vazio no diretório), usado ao
+/// publicar um temporário local `0600` quando `preserve_perms` está desligado.
+#[cfg(unix)]
+async fn user_default_mode(dir: &str) -> Option<u32> {
+    use std::os::unix::fs::PermissionsExt;
+    static MODE: std::sync::OnceLock<u32> = std::sync::OnceLock::new();
+    if let Some(m) = MODE.get() {
+        return Some(*m);
+    }
+    let probe = format!(
+        "{}/.myssh-umask{}{}",
+        dir.trim_end_matches('/'),
+        crate::names::PART_MARK,
+        crate::engine::rand_token()
+    );
+    let mut o = tokio::fs::OpenOptions::new();
+    o.write(true).create_new(true).mode(0o666);
+    let f = o.open(&probe).await.ok()?;
+    let mode = f
+        .metadata()
+        .await
+        .ok()
+        .map(|m| m.permissions().mode() & 0o777);
+    drop(f);
+    let _ = tokio::fs::remove_file(&probe).await;
+    let mode = mode?;
+    Some(*MODE.get_or_init(|| mode))
+}
+
 /// Lado de uma transferência.
 #[derive(Clone, Copy)]
 pub enum Side<'a> {
@@ -325,6 +408,14 @@ impl<'a> Side<'a> {
                 } else {
                     o.create_new(true);
                 }
+                // Temporário só do usuário (0600) enquanto incompleto; o modo final é aplicado
+                // ao publicar (`Side::default_final_mode`). Nunca segue symlink no último
+                // componente.
+                #[cfg(unix)]
+                {
+                    o.mode(0o600);
+                    o.custom_flags(libc::O_NOFOLLOW);
+                }
                 o.open(path).await.map(Writer::Local).map_err(io_err)
             }
             Side::Remote(s) => {
@@ -365,11 +456,7 @@ impl<'a> Side<'a> {
 
     pub async fn read_small(&self, path: &str) -> Result<Option<Vec<u8>>, TransferError> {
         match self {
-            Side::Local => match tokio::fs::read(path).await {
-                Ok(b) => Ok(Some(b)),
-                Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(None),
-                Err(e) => Err(io_err(e)),
-            },
+            Side::Local => read_small_local(path).await,
             Side::Remote(s) => {
                 // Evita ler um "sidecar" gigante: confere o tamanho antes.
                 match s.symlink_metadata(path).await {
@@ -389,14 +476,38 @@ impl<'a> Side<'a> {
 
     pub async fn write_small(&self, path: &str, data: &[u8]) -> Result<(), TransferError> {
         match self {
-            Side::Local => tokio::fs::write(path, data).await.map_err(io_err),
+            Side::Local => write_small_local(path, data).await,
             Side::Remote(s) => {
-                // `SftpSession::write` não cria o arquivo: abre com CREATE|TRUNCATE.
-                let mut f = s.create(path).await.map_err(sftp_err)?;
+                // Nunca escreve através de um link/arquivo pré-existente: remove o que houver
+                // (unlink não segue symlink) e cria com EXCLUDE (O_EXCL também não segue).
+                match s.symlink_metadata(path).await {
+                    Ok(_) => s.remove_file(path).await.map_err(sftp_err)?,
+                    Err(e) if is_no_such_file(&e) => {}
+                    Err(e) => return Err(sftp_err(e)),
+                }
+                let mut f = s
+                    .open_with_flags(
+                        path,
+                        OpenFlags::WRITE | OpenFlags::CREATE | OpenFlags::EXCLUDE,
+                    )
+                    .await
+                    .map_err(sftp_err)?;
                 f.write_all(data).await.map_err(io_err)?;
                 f.shutdown().await.map_err(io_err)
             }
         }
+    }
+
+    /// Modo a aplicar ao publicar quando o chamador não pediu `preserve_perms`: no lado local
+    /// (unix), o padrão do usuário (`0666 & !umask`), pois o temporário nasce `0600`; no remoto,
+    /// `None` (o servidor já aplicou o seu umask na criação).
+    pub async fn default_final_mode(&self, dir: &str) -> Option<u32> {
+        #[cfg(unix)]
+        if matches!(self, Side::Local) {
+            return user_default_mode(dir).await;
+        }
+        let _ = dir;
+        None
     }
 
     /// Aplica mtime (e atime) e, opcionalmente, permissões (já mascaradas a `0o777`).
@@ -458,5 +569,92 @@ impl<'a> Side<'a> {
                 Some(v.blocks_avail.saturating_mul(unit))
             }
         }
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    fn mode(p: &Path) -> u32 {
+        std::fs::metadata(p).unwrap().permissions().mode() & 0o777
+    }
+
+    #[tokio::test]
+    async fn sidecar_nao_segue_symlink_plantado() {
+        let d = tempfile::tempdir().unwrap();
+        let victim = d.path().join("vitima.txt");
+        std::fs::write(&victim, "intacto").unwrap();
+        let sc = d.path().join(".a.myssh-resume");
+        symlink(&victim, &sc).unwrap();
+        let sc_s = sc.to_str().unwrap();
+
+        // Escrita: troca o link por um arquivo regular, a vítima fica intacta.
+        Side::Local.write_small(sc_s, b"{\"v\":1}").await.unwrap();
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "intacto");
+        let md = std::fs::symlink_metadata(&sc).unwrap();
+        assert!(md.file_type().is_file(), "o link deve ter sido substituído");
+        assert_eq!(mode(&sc), 0o600);
+        assert_eq!(
+            Side::Local.read_small(sc_s).await.unwrap().unwrap(),
+            b"{\"v\":1}"
+        );
+        // Sem sobras do temporário.
+        let n = std::fs::read_dir(d.path()).unwrap().count();
+        assert_eq!(n, 2);
+
+        // Leitura: link para dentro ou fora é recusado.
+        std::fs::remove_file(&sc).unwrap();
+        symlink(&victim, &sc).unwrap();
+        assert_eq!(Side::Local.read_small(sc_s).await.unwrap(), None);
+        std::fs::remove_file(&sc).unwrap();
+        symlink(d.path().join("nao-existe"), &sc).unwrap();
+        assert_eq!(Side::Local.read_small(sc_s).await.unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn temporario_local_nasce_0600_e_nao_segue_symlink() {
+        let d = tempfile::tempdir().unwrap();
+        let t = d.path().join(".f.myssh-part-1");
+        let w = Side::Local
+            .open_write(t.to_str().unwrap(), false)
+            .await
+            .unwrap();
+        w.finish().await.unwrap();
+        assert_eq!(mode(&t), 0o600);
+
+        // Retomada sobre um symlink no lugar do temporário: recusada.
+        let victim = d.path().join("vitima");
+        std::fs::write(&victim, "x").unwrap();
+        let l = d.path().join(".f.myssh-part-2");
+        symlink(&victim, &l).unwrap();
+        assert!(
+            Side::Local
+                .open_write(l.to_str().unwrap(), true)
+                .await
+                .is_err()
+        );
+        // Criação nova sobre um symlink: recusada (O_EXCL).
+        assert!(
+            Side::Local
+                .open_write(l.to_str().unwrap(), false)
+                .await
+                .is_err()
+        );
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "x");
+    }
+
+    #[tokio::test]
+    async fn modo_final_padrao_segue_o_umask_do_usuario() {
+        let d = tempfile::tempdir().unwrap();
+        let m = Side::Local
+            .default_final_mode(d.path().to_str().unwrap())
+            .await
+            .unwrap();
+        assert_eq!(m & 0o111, 0, "arquivo comum, sem bits de execução: {m:o}");
+        assert_eq!(m & 0o600, 0o600, "dono lê e escreve: {m:o}");
+        assert_eq!(std::fs::read_dir(d.path()).unwrap().count(), 0);
+        assert_eq!(Side::Local.default_final_mode("/nao/existe").await, Some(m));
     }
 }

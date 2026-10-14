@@ -2979,6 +2979,7 @@ name = "myssh-transfer"
 version = "0.1.0"
 dependencies = [
  "filetime",
+ "libc",
  "myssh-core",
  "myssh-ssh",
  "myssh-store",

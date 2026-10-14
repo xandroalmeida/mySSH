@@ -13,6 +13,24 @@ pub enum PathError {
     Separator,
     #[error("nome contém NUL")]
     Nul,
+    #[error("nome com caracteres de controle ou invisíveis")]
+    Unsafe,
+}
+
+/// Caractere proibido em nomes: controle C0 (U+0000–U+001F), DEL, C1 (U+0080–U+009F), marcas e
+/// controles bidirecionais (U+061C, U+200E/F, U+202A–202E, U+2066–2069) e invisíveis
+/// (U+200B–200D, U+2060, U+FEFF). Enganam a extensão exibida ou injetam sequências de terminal.
+pub fn is_unsafe_name_char(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{061C}'
+                | '\u{200B}'..='\u{200F}'
+                | '\u{202A}'..='\u{202E}'
+                | '\u{2060}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+        )
 }
 
 /// Caminho relativo à raiz da sincronização, separado por `/`.
@@ -47,6 +65,9 @@ impl RelPath {
         }
         if name.contains('\0') {
             return Err(PathError::Nul);
+        }
+        if name.chars().any(is_unsafe_name_char) {
+            return Err(PathError::Unsafe);
         }
         Ok(())
     }
@@ -159,6 +180,44 @@ mod tests {
         let r = RelPath::root();
         for bad in ["", ".", "..", "a/b", "a\\b", "C:\\x", "x\0"] {
             assert!(r.join(bad).is_err(), "join deveria rejeitar {bad:?}");
+        }
+    }
+
+    #[test]
+    fn nomes_com_controle_bidi_e_invisiveis_rejeitados() {
+        let r = RelPath::root();
+        for bad in [
+            "a\u{1}b",
+            "a\nb",
+            "a\u{1b}[2Jb",
+            "a\u{7f}",
+            "a\u{85}b",
+            "a\u{9f}",
+            "fatura\u{202E}fdp.exe",
+            "a\u{202A}b",
+            "a\u{2066}b",
+            "a\u{2069}",
+            "a\u{200E}",
+            "a\u{200F}",
+            "a\u{061C}",
+            "a\u{200B}b",
+            "a\u{200C}",
+            "a\u{200D}",
+            "a\u{2060}",
+            "\u{FEFF}a",
+        ] {
+            assert_eq!(r.join(bad), Err(PathError::Unsafe), "join {bad:?}");
+            assert!(
+                RelPath::parse(&format!("ok/{bad}")).is_err(),
+                "parse {bad:?}"
+            );
+            assert!(
+                serde_json::from_str::<RelPath>(&serde_json::to_string(bad).unwrap()).is_err(),
+                "serde {bad:?}"
+            );
+        }
+        for ok in ["ação", "日本語", "a b", "e\u{301}", "😀", "a\u{a0}b"] {
+            assert!(r.join(ok).is_ok(), "{ok:?}");
         }
     }
 

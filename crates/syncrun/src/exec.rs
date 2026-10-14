@@ -100,7 +100,7 @@ impl<'a> Run<'a> {
             .filter(|j| j.kind == EntryKind::File && j.op != Op::Delete)
             .filter_map(|j| plan.items.iter().find(|p| p.path == j.path))
             .map(|p| p.src.map_or(0, |s| s.size))
-            .sum();
+            .fold(0u64, u64::saturating_add);
         Ok(Run {
             r,
             plan,
@@ -167,11 +167,11 @@ impl<'a> Run<'a> {
             .in_flight
             .values()
             .map(|f| f.bytes_done.min(f.size))
-            .sum();
+            .fold(0u64, u64::saturating_add);
         let ev = SyncEvent::Progress {
             items_done: self.done + self.failed + self.skipped,
             items_total: self.items_total,
-            bytes_done: self.bytes_completed + inflight,
+            bytes_done: self.bytes_completed.saturating_add(inflight),
             bytes_total: self.bytes_total,
             current: self.current.clone(),
         };
@@ -180,7 +180,7 @@ impl<'a> Run<'a> {
 
     async fn set_done(&mut self, path: &RelPath, op: Op, size: u64) {
         self.done += 1;
-        self.bytes_completed += size;
+        self.bytes_completed = self.bytes_completed.saturating_add(size);
         self.journal.mark(path, op, Status::Done);
         self.dirty = true;
         self.emit(SyncEvent::ItemDone {
@@ -194,7 +194,7 @@ impl<'a> Run<'a> {
 
     async fn set_failed(&mut self, path: &RelPath, op: Op, size: u64, msg: String) {
         self.failed += 1;
-        self.bytes_completed += size;
+        self.bytes_completed = self.bytes_completed.saturating_add(size);
         self.journal.mark(path, op, Status::Failed(msg.clone()));
         self.dirty = true;
         self.emit(SyncEvent::ItemFailed {

@@ -13,7 +13,7 @@ pub use plan::{
     PlanItem, PlanOptions, Side, SkipReason, Snapshot, Summary, UpdateReason,
     is_invalid_windows_name, plan,
 };
-pub use relpath::{PathError, RelPath};
+pub use relpath::{PathError, RelPath, is_unsafe_name_char};
 pub use tree::{Entry, EntryKind, FileTree, LocalTree, MemTree, TreeError};
 
 #[cfg(test)]

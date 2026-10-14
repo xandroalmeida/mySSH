@@ -4,7 +4,7 @@
 use crate::Kind;
 use crate::error::TransferError;
 use crate::names;
-use crate::side::{Meta, Side};
+use crate::side::{Meta, Reader, Side, Writer};
 use crate::sidecar::{RESUME_MIN_SIZE, Sidecar, TAIL_CHECK};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
@@ -77,6 +77,88 @@ pub fn rand_token() -> String {
             .unwrap_or(0),
     );
     format!("{:016x}", h.finish())
+}
+
+/// Fonte de blocos (arquivo local ou SFTP); abstração mínima para testar o teto de leitura.
+pub(crate) trait ChunkRead {
+    async fn read_chunk(&mut self, buf: &mut [u8]) -> Result<usize, TransferError>;
+}
+
+impl ChunkRead for Reader {
+    async fn read_chunk(&mut self, buf: &mut [u8]) -> Result<usize, TransferError> {
+        self.read(buf).await
+    }
+}
+
+/// Destino de blocos.
+pub(crate) trait ChunkWrite {
+    async fn write_chunk(&mut self, buf: &[u8]) -> Result<(), std::io::Error>;
+}
+
+impl ChunkWrite for Writer {
+    async fn write_chunk(&mut self, buf: &[u8]) -> Result<(), std::io::Error> {
+        self.write_all(buf).await
+    }
+}
+
+pub(crate) enum PumpFail {
+    /// Leitura, cancelamento ou origem alterada.
+    Other(TransferError),
+    /// Falha de escrita, com a posição atingida (para diagnosticar falta de espaço).
+    Write(std::io::Error, u64),
+}
+
+/// Lê no máximo `size - pos` bytes; ao atingir `size` lê mais 1 byte só para detectar uma origem
+/// que continua entregando dados (servidor que mentiu no `lstat` ou arquivo local crescendo):
+/// nesse caso `SourceChanged`, sem nunca entregar bytes além do declarado.
+pub(crate) async fn read_capped<R: ChunkRead>(
+    r: &mut R,
+    buf: &mut [u8],
+    pos: u64,
+    size: u64,
+) -> Result<usize, TransferError> {
+    let remaining = size.saturating_sub(pos);
+    if remaining == 0 {
+        let mut probe = [0u8; 1];
+        return match r.read_chunk(&mut probe).await? {
+            0 => Ok(0),
+            _ => Err(TransferError::SourceChanged),
+        };
+    }
+    let take = (buf.len() as u64).min(remaining) as usize;
+    r.read_chunk(&mut buf[..take]).await
+}
+
+/// Copia blocos de `reader` para `writer` a partir de `pos` até `size`. Devolve a posição final.
+pub(crate) async fn pump<R: ChunkRead, W: ChunkWrite>(
+    reader: &mut R,
+    writer: &mut W,
+    cancel: &CancellationToken,
+    mut pos: u64,
+    size: u64,
+    mut on_chunk: impl FnMut(u64),
+) -> Result<u64, PumpFail> {
+    let mut buf = vec![0u8; CHUNK];
+    loop {
+        let n = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(PumpFail::Other(TransferError::Cancelled)),
+            r = read_capped(reader, &mut buf, pos, size) => r.map_err(PumpFail::Other)?,
+        };
+        if n == 0 {
+            return Ok(pos);
+        }
+        let w = tokio::select! {
+            biased;
+            _ = cancel.cancelled() => return Err(PumpFail::Other(TransferError::Cancelled)),
+            r = writer.write_chunk(&buf[..n]) => r,
+        };
+        if let Err(e) = w {
+            return Err(PumpFail::Write(e, pos));
+        }
+        pos += n as u64;
+        on_chunk(n as u64);
+    }
 }
 
 /// Erros "brandos" (leitura/escrita do sidecar e limpeza) só interrompem se a conexão caiu.
@@ -228,34 +310,21 @@ async fn copy_inner(
         a.stats.bytes_resumed.fetch_add(offset, Ordering::Relaxed);
     }
 
-    // --- cópia em blocos
-    let mut buf = vec![0u8; CHUNK];
-    let mut pos = offset;
-    loop {
-        let n = tokio::select! {
-            biased;
-            _ = a.cancel.cancelled() => return Err(TransferError::Cancelled),
-            r = reader.read(&mut buf) => r?,
-        };
-        if n == 0 {
-            break;
-        }
-        let w = tokio::select! {
-            biased;
-            _ = a.cancel.cancelled() => return Err(TransferError::Cancelled),
-            r = writer.write_all(&buf[..n]) => r,
-        };
-        if let Err(e) = w {
+    // --- cópia em blocos (nunca além do tamanho declarado pelo lstat)
+    let pos = match pump(&mut reader, &mut writer, a.cancel, offset, size, |n| {
+        a.credit(n);
+        a.meter.transferred.fetch_add(n, Ordering::Relaxed);
+        a.stats.bytes_transferred.fetch_add(n, Ordering::Relaxed);
+    })
+    .await
+    {
+        Ok(p) => p,
+        Err(PumpFail::Other(e)) => return Err(e),
+        Err(PumpFail::Write(e, pos)) => {
             let te = TransferError::from_io(&e);
             return Err(refine(dst, &parent, size.saturating_sub(pos), te).await);
         }
-        pos += n as u64;
-        a.credit(n as u64);
-        a.meter.transferred.fetch_add(n as u64, Ordering::Relaxed);
-        a.stats
-            .bytes_transferred
-            .fetch_add(n as u64, Ordering::Relaxed);
-    }
+    };
     let fin = tokio::select! {
         biased;
         _ = a.cancel.cancelled() => return Err(TransferError::Cancelled),
@@ -291,6 +360,11 @@ async fn copy_inner(
         .then_some(src_meta.perms)
         .flatten()
         .map(|p| p & 0o777);
+    // Temporário local nasce 0600: sem `preserve_perms`, publica com o padrão do usuário.
+    let perms = match perms {
+        Some(p) => Some(p),
+        None => dst.default_final_mode(&parent).await,
+    };
     let mut warning = None;
     if let Err(e) = dst.set_times_perms(&tp, mtime, perms).await {
         if e.is_connection_lost() {
@@ -309,4 +383,79 @@ async fn copy_inner(
         let _ = dst.remove_file(&sc).await;
     }
     Ok(warning)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Servidor hostil: o `lstat` declarou pouco, mas o fluxo nunca acaba.
+    struct Endless {
+        served: u64,
+    }
+    impl ChunkRead for Endless {
+        async fn read_chunk(&mut self, buf: &mut [u8]) -> Result<usize, TransferError> {
+            buf.fill(7);
+            self.served += buf.len() as u64;
+            Ok(buf.len())
+        }
+    }
+
+    /// Fonte honesta com `len` bytes.
+    struct Honest {
+        left: u64,
+    }
+    impl ChunkRead for Honest {
+        async fn read_chunk(&mut self, buf: &mut [u8]) -> Result<usize, TransferError> {
+            let n = (buf.len() as u64).min(self.left) as usize;
+            buf[..n].fill(1);
+            self.left -= n as u64;
+            Ok(n)
+        }
+    }
+
+    #[derive(Default)]
+    struct Sink {
+        got: u64,
+    }
+    impl ChunkWrite for Sink {
+        async fn write_chunk(&mut self, buf: &[u8]) -> Result<(), std::io::Error> {
+            self.got += buf.len() as u64;
+            Ok(())
+        }
+    }
+
+    #[tokio::test]
+    async fn origem_que_entrega_mais_que_o_declarado_aborta_sem_gravar_excesso() {
+        let cancel = CancellationToken::new();
+        for size in [1u64, 100, CHUNK as u64, CHUNK as u64 + 5] {
+            let (mut r, mut w) = (Endless { served: 0 }, Sink::default());
+            let res = pump(&mut r, &mut w, &cancel, 0, size, |_| {}).await;
+            assert!(
+                matches!(res, Err(PumpFail::Other(TransferError::SourceChanged))),
+                "size={size}"
+            );
+            assert_eq!(w.got, size, "nunca grava além do declarado");
+            assert!(r.served <= size + 1, "lê no máximo 1 byte extra");
+        }
+        assert_eq!(
+            TransferError::SourceChanged.to_string(),
+            "origem alterada durante a transferência"
+        );
+    }
+
+    #[tokio::test]
+    async fn origem_honesta_e_retomada_copiam_exatamente() {
+        let cancel = CancellationToken::new();
+        for (size, pos) in [(0u64, 0u64), (10, 0), (CHUNK as u64 * 2 + 3, 0), (500, 200)] {
+            let (mut r, mut w) = (Honest { left: size - pos }, Sink::default());
+            let end = pump(&mut r, &mut w, &cancel, pos, size, |_| {}).await;
+            assert!(matches!(end, Ok(e) if e == size), "size={size}");
+            assert_eq!(w.got, size - pos);
+        }
+        // Origem menor que o declarado: devolve a posição atingida (o chamador compara).
+        let (mut r, mut w) = (Honest { left: 4 }, Sink::default());
+        let end = pump(&mut r, &mut w, &cancel, 0, 10, |_| {}).await;
+        assert!(matches!(end, Ok(4)));
+    }
 }

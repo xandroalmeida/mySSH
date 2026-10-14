@@ -72,18 +72,37 @@ pub(crate) enum Hasher {
 
 const CHUNK: usize = 256 * 1024;
 
-async fn digest<R: tokio::io::AsyncRead + Unpin>(mut r: R) -> Result<Vec<u8>, TreeError> {
+/// Hash de no máximo `size` bytes (o tamanho declarado pelo `lstat`). Se a origem continuar
+/// entregando dados além disso (servidor hostil ou arquivo crescendo), aborta em vez de ler sem
+/// fim; a leitura extra é de 1 byte, só para detectar.
+async fn digest<R: tokio::io::AsyncRead + Unpin>(
+    mut r: R,
+    size: u64,
+) -> Result<Vec<u8>, TreeError> {
     let mut h = Sha256::new();
     let mut buf = vec![0u8; CHUNK];
-    loop {
+    let mut left = size;
+    while left > 0 {
+        let take = (buf.len() as u64).min(left) as usize;
         let n = r
-            .read(&mut buf)
+            .read(&mut buf[..take])
             .await
             .map_err(|e| TreeError::Io(e.to_string()))?;
         if n == 0 {
-            break;
+            return Ok(h.finalize().to_vec());
         }
         h.update(&buf[..n]);
+        left -= n as u64;
+    }
+    let mut probe = [0u8; 1];
+    let extra = r
+        .read(&mut probe)
+        .await
+        .map_err(|e| TreeError::Io(e.to_string()))?;
+    if extra > 0 {
+        return Err(TreeError::Io(
+            "origem alterada durante a leitura (mais dados que o declarado)".into(),
+        ));
     }
     Ok(h.finalize().to_vec())
 }
@@ -120,7 +139,7 @@ impl Hasher {
                 let f = tokio::fs::File::open(&p)
                     .await
                     .map_err(|e| TreeError::Io(e.to_string()))?;
-                digest(f).await
+                digest(f, md.len()).await
             }
             Hasher::Remote(sftp, root) => {
                 let p = remote_path(root, rel).map_err(|e| TreeError::Io(e.to_string()))?;
@@ -135,7 +154,7 @@ impl Hasher {
                     .open(p)
                     .await
                     .map_err(|e| TreeError::Io(e.to_string()))?;
-                digest(f).await
+                digest(f, a.size.unwrap_or(0)).await
             }
         }
     }
@@ -153,6 +172,40 @@ pub(crate) fn kind_name(k: EntryKind) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Leitor que nunca termina (servidor que declarou pouco no `lstat`).
+    struct Endless(u64);
+    impl tokio::io::AsyncRead for Endless {
+        fn poll_read(
+            mut self: std::pin::Pin<&mut Self>,
+            _: &mut std::task::Context<'_>,
+            buf: &mut tokio::io::ReadBuf<'_>,
+        ) -> std::task::Poll<std::io::Result<()>> {
+            let n = buf.remaining();
+            buf.put_slice(&vec![9u8; n]);
+            self.0 += n as u64;
+            std::task::Poll::Ready(Ok(()))
+        }
+    }
+
+    #[tokio::test]
+    async fn digest_respeita_o_tamanho_declarado() {
+        // Mentiroso: aborta, lendo no máximo size + 1 byte.
+        for size in [0u64, 1, 10, CHUNK as u64 + 7] {
+            let mut r = Endless(0);
+            let e = digest(&mut r, size).await.unwrap_err();
+            assert!(e.to_string().contains("alterada"), "{e}");
+            assert!(r.0 <= size + CHUNK as u64, "leu {} para size {size}", r.0);
+        }
+        // Honesto: mesmo hash que o SHA-256 direto; arquivo que encolheu: hash do que veio.
+        let data = vec![5u8; 1000];
+        let ok = digest(&data[..], 1000).await.unwrap();
+        assert_eq!(ok, Sha256::digest(&data).to_vec());
+        let menor = digest(&data[..], 5000).await.unwrap();
+        assert_eq!(menor, ok);
+        // Maior que o declarado (por 1 byte): erro.
+        assert!(digest(&data[..], 999).await.is_err());
+    }
 
     #[test]
     fn caminhos_ficam_dentro_da_raiz() {

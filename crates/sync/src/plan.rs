@@ -267,13 +267,17 @@ impl Plan {
                 Action::Create => {
                     s.create += 1;
                     if is_file {
-                        s.bytes_to_transfer += it.src.map_or(0, |x| x.size);
+                        s.bytes_to_transfer = s
+                            .bytes_to_transfer
+                            .saturating_add(it.src.map_or(0, |x| x.size));
                     }
                 }
                 Action::Update { .. } => {
                     s.update += 1;
                     if is_file {
-                        s.bytes_to_transfer += it.src.map_or(0, |x| x.size);
+                        s.bytes_to_transfer = s
+                            .bytes_to_transfer
+                            .saturating_add(it.src.map_or(0, |x| x.size));
                     }
                     if it.action.needs_hash() {
                         s.needs_hash += 1;
@@ -282,7 +286,9 @@ impl Plan {
                 Action::Delete => {
                     s.delete += 1;
                     if is_file {
-                        s.bytes_to_delete += it.dst.map_or(0, |x| x.size);
+                        s.bytes_to_delete = s
+                            .bytes_to_delete
+                            .saturating_add(it.dst.map_or(0, |x| x.size));
                     }
                 }
                 Action::Conflict { .. } => s.conflict += 1,

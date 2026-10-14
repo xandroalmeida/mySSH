@@ -40,6 +40,57 @@ pub struct Plan {
 pub struct ScanOpts {
     pub os: LocalOs,
     pub case_insensitive: bool,
+    pub limits: ScanLimits,
+}
+
+/// Limites da varredura (servidor hostil pode devolver árvores profundas/enormes).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScanLimits {
+    /// Profundidade máxima de subdiretórios abaixo da raiz.
+    pub max_depth: usize,
+    /// Total máximo de entradas examinadas.
+    pub max_entries: u64,
+}
+
+pub const DEFAULT_MAX_DEPTH: usize = 64;
+pub const DEFAULT_MAX_ENTRIES: u64 = 1_000_000;
+
+impl Default for ScanLimits {
+    fn default() -> Self {
+        ScanLimits {
+            max_depth: DEFAULT_MAX_DEPTH,
+            max_entries: DEFAULT_MAX_ENTRIES,
+        }
+    }
+}
+
+impl ScanLimits {
+    /// `rel` (relativo à raiz) é um diretório que a varredura vai abrir.
+    pub fn check_depth(&self, rel: &str) -> Result<(), TransferError> {
+        let depth = if rel.is_empty() {
+            0
+        } else {
+            rel.split('/').count()
+        };
+        if depth > self.max_depth {
+            return Err(TransferError::ScanLimit(format!(
+                "profundidade máxima de {} níveis excedida",
+                self.max_depth
+            )));
+        }
+        Ok(())
+    }
+
+    /// `seen` entradas examinadas até agora.
+    pub fn check_entries(&self, seen: u64) -> Result<(), TransferError> {
+        if seen > self.max_entries {
+            return Err(TransferError::ScanLimit(format!(
+                "mais de {} entradas",
+                self.max_entries
+            )));
+        }
+        Ok(())
+    }
 }
 
 struct Ticker {
@@ -87,14 +138,18 @@ pub async fn scan(
 ) -> Result<Plan, TransferError> {
     job.scanning(0, 0);
     let plan = match req.direction {
-        Direction::Upload => scan_upload(job, req).await?,
+        Direction::Upload => scan_upload(job, req, opts).await?,
         Direction::Download => scan_download(job, req, sftp, opts).await?,
     };
     job.scanning(plan.files, plan.bytes);
     Ok(plan)
 }
 
-async fn scan_upload(job: &JobShared, req: &TransferRequest) -> Result<Plan, TransferError> {
+async fn scan_upload(
+    job: &JobShared,
+    req: &TransferRequest,
+    opts: &ScanOpts,
+) -> Result<Plan, TransferError> {
     let local = Side::Local;
     let root = req
         .local
@@ -136,11 +191,13 @@ async fn scan_upload(job: &JobShared, req: &TransferRequest) -> Result<Plan, Tra
         perms: meta.perms,
     });
     let mut tick = Ticker::new();
+    let mut seen = 0u64;
     let mut stack: Vec<(String, String)> = vec![(root, String::new())];
     while let Some((dir, rel)) = stack.pop() {
         if job.cancel.is_cancelled() {
             return Err(TransferError::Cancelled);
         }
+        opts.limits.check_depth(&rel)?;
         let mut rd = tokio::fs::read_dir(&dir)
             .await
             .map_err(|e| TransferError::from_io(&e))?;
@@ -152,6 +209,8 @@ async fn scan_upload(job: &JobShared, req: &TransferRequest) -> Result<Plan, Tra
         {
             entries.push(de);
         }
+        seen = seen.saturating_add(entries.len() as u64);
+        opts.limits.check_entries(seen)?;
         entries.sort_by_key(|e| e.file_name());
         let mut subdirs = Vec::new();
         for de in entries {
@@ -201,7 +260,7 @@ async fn scan_upload(job: &JobShared, req: &TransferRequest) -> Result<Plan, Tra
                     size: md.len(),
                 });
                 plan.files += 1;
-                plan.bytes += md.len();
+                plan.bytes = plan.bytes.saturating_add(md.len());
             } else {
                 plan.skipped += 1;
                 job.file_error(&disp(&plan, &crel), &TransferError::UnsupportedKind);
@@ -265,11 +324,13 @@ async fn scan_download(
         perms: meta.perms,
     });
     let mut tick = Ticker::new();
+    let mut seen = 0u64;
     let mut stack: Vec<(String, String)> = vec![(root, String::new())];
     while let Some((dir, rel)) = stack.pop() {
         if job.cancel.is_cancelled() {
             return Err(TransferError::Cancelled);
         }
+        opts.limits.check_depth(&rel)?;
         let rd = sftp
             .read_dir(dir.as_str())
             .await
@@ -277,6 +338,8 @@ async fn scan_download(
         let mut entries: Vec<(String, Meta)> = rd
             .map(|e| (e.file_name(), meta_from_attrs(&e.metadata())))
             .collect();
+        seen = seen.saturating_add(entries.len() as u64);
+        opts.limits.check_entries(seen)?;
         entries.sort_by(|a, b| a.0.cmp(&b.0));
 
         // Nomes inválidos: traversal (servidor hostil) e inválidos no SO local.
@@ -305,7 +368,7 @@ async fn scan_download(
         let groups = names::collisions(opts.os, opts.case_insensitive, &all);
         if !groups.is_empty() {
             for g in &groups {
-                plan.failed += g.len() as u64;
+                plan.failed = plan.failed.saturating_add(g.len() as u64);
                 job.file_error(
                     &disp(&plan, &child_rel(&rel, &g[0])),
                     &TransferError::CaseCollision(g.clone()),
@@ -337,7 +400,7 @@ async fn scan_download(
                         size: m.size,
                     });
                     plan.files += 1;
-                    plan.bytes += m.size;
+                    plan.bytes = plan.bytes.saturating_add(m.size);
                 }
                 Kind::Other => {
                     plan.skipped += 1;
@@ -351,4 +414,24 @@ async fn scan_download(
         }
     }
     Ok(plan)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn limites_de_profundidade_e_entradas() {
+        let l = ScanLimits::default();
+        assert_eq!((l.max_depth, l.max_entries), (64, 1_000_000));
+        let deep = |n: usize| vec!["d"; n].join("/");
+        assert!(l.check_depth("").is_ok());
+        assert!(l.check_depth(&deep(64)).is_ok());
+        let e = l.check_depth(&deep(65)).unwrap_err();
+        assert!(matches!(e, TransferError::ScanLimit(_)), "{e}");
+        assert!(e.to_string().contains("profundidade"), "{e}");
+        assert!(l.check_entries(1_000_000).is_ok());
+        let e = l.check_entries(1_000_001).unwrap_err();
+        assert!(e.to_string().contains("entradas"), "{e}");
+    }
 }

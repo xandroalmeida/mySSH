@@ -10,6 +10,14 @@ pub struct RemoteBrowser {
     sftp: Sftp,
 }
 
+/// Resultado de [`RemoteBrowser::list_with_report`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct Listing {
+    pub entries: Vec<RemoteEntry>,
+    /// Entradas ocultadas por nome inseguro, já sanitizadas para exibição (aviso na UI).
+    pub hidden_unsafe: Vec<String>,
+}
+
 pub(crate) async fn open_sftp(conn: &Arc<Connection>) -> Result<Sftp, TransferError> {
     conn.open_sftp().await.map_err(|m| {
         if conn.is_closed() || m.contains("conexão") {
@@ -32,21 +40,43 @@ impl RemoteBrowser {
         self.sftp.canonicalize(".").await.map_err(sftp_err)
     }
 
-    /// Lista o diretório (sem `.` e `..`; nomes inválidos/traversal são descartados). Diretórios
-    /// primeiro, depois por nome sem diferenciar caixa.
+    /// Lista o diretório (sem `.` e `..`). Entradas com nome de traversal/inválido **ou com nome
+    /// inseguro** (controle, bidi, invisíveis; ver [`names::is_unsafe_char`]) são **filtradas**
+    /// (decisão: a UI nunca recebe o nome cru, que poderia enganar a extensão exibida ou injetar
+    /// sequências de terminal). Use [`RemoteBrowser::list_with_report`] para saber quantas e
+    /// quais (nomes já sanitizados) foram ocultadas. Diretórios primeiro, depois por nome sem
+    /// diferenciar caixa.
     pub async fn list(&self, dir: &str) -> Result<Vec<RemoteEntry>, TransferError> {
+        Ok(self.list_with_report(dir).await?.entries)
+    }
+
+    /// Como [`RemoteBrowser::list`], mas informa as entradas ocultadas por nome inseguro.
+    pub async fn list_with_report(&self, dir: &str) -> Result<Listing, TransferError> {
         let rd = self.sftp.read_dir(dir).await.map_err(sftp_err)?;
-        let mut out: Vec<RemoteEntry> = rd
-            .filter(|e| names::validate_remote_name(&e.file_name()).is_ok())
-            .map(|e| entry_from_attrs(dir, &e.file_name(), &e.metadata()))
-            .collect();
+        let mut hidden = Vec::new();
+        let mut out: Vec<RemoteEntry> = Vec::new();
+        for e in rd {
+            let name = e.file_name();
+            if names::validate_remote_name(&name).is_err() {
+                continue;
+            }
+            if names::has_unsafe_chars(&name) {
+                hidden.push(names::display_name(&name));
+                continue;
+            }
+            out.push(entry_from_attrs(dir, &name, &e.metadata()));
+        }
         out.sort_by(|a, b| {
             (a.kind != Kind::Dir)
                 .cmp(&(b.kind != Kind::Dir))
                 .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
                 .then_with(|| a.name.cmp(&b.name))
         });
-        Ok(out)
+        hidden.sort();
+        Ok(Listing {
+            entries: out,
+            hidden_unsafe: hidden,
+        })
     }
 
     /// `lstat` de um caminho (`None` se não existir).

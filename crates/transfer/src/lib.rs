@@ -15,6 +15,14 @@
 //!   nomes remotos são validados contra traversal e contra regras do SO local; nomes que colidem
 //!   por caixa/normalização no destino viram erro explícito, nunca sobrescrita silenciosa.
 //! - Permissões só com `preserve_perms`, mascaradas a `0o777`.
+//! - Nomes com controle C0/C1/DEL, bidi ou invisíveis são recusados no destino local (qualquer SO)
+//!   e ocultados na listagem do navegador (ver `RemoteBrowser::list_with_report`).
+//! - Download nunca grava mais que o tamanho declarado no `lstat`: bytes extras → "origem
+//!   alterada" e o temporário é removido. A varredura tem limites de profundidade (64) e de
+//!   entradas (1.000.000), ajustáveis em `TransferManager::set_scan_limits`.
+//! - Temporários locais nascem `0600` (unix); ao publicar, o modo final é o da origem
+//!   (`preserve_perms`) ou o padrão do usuário (`0666 & !umask`). Sidecar `.myssh-resume` é
+//!   escrito via `create_new` + rename e nunca lido/escrito através de symlink.
 //!
 //! # Desvios/acréscimos ao contrato
 //! - `Cancelled` é o evento final de um cancelamento (não é seguido de `Finished`).
@@ -34,7 +42,7 @@ mod side;
 pub mod sidecar;
 mod tree;
 
-pub use browser::RemoteBrowser;
+pub use browser::{Listing, RemoteBrowser};
 pub use error::TransferError;
 pub use manager::{TransferManager, TransferStats};
 pub use names::LocalOs;
@@ -63,6 +71,15 @@ pub struct RemoteEntry {
     pub size: u64,
     pub mtime: Option<SystemTime>,
     pub perms: Option<u32>,
+}
+
+impl RemoteEntry {
+    /// Nome sanitizado para exibir na UI (caracteres de controle/bidi/invisíveis viram U+FFFD,
+    /// tamanho limitado). `RemoteBrowser::list` já filtra nomes inseguros; isto é a segunda
+    /// barreira para entradas montadas por outros caminhos.
+    pub fn display_name(&self) -> String {
+        names::display_name(&self.name)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
