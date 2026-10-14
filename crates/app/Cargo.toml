@@ -1,0 +1,28 @@
+[package]
+name = "myssh-app"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Aplicativo desktop mySSH (casca: perfis, abas, configurações)"
+publish = false
+
+[[bin]]
+name = "myssh"
+path = "src/main.rs"
+
+[dependencies]
+myssh-core = { path = "../core" }
+myssh-store = { path = "../store" }
+myssh-secrets = { path = "../secrets" }
+eframe = "0.36"
+egui = "0.36"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }
+directories = "6"
+rfd = "0.17"
+secrecy = "0.10"
+zeroize = "1"
+png = "0.18"
+
+[dev-dependencies]
+tempfile = "3"
+egui_kittest = { version = "0.36", features = ["wgpu", "eframe"] }
