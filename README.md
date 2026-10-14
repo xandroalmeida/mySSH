@@ -2,7 +2,7 @@
 
 Gerenciador desktop de sessões SSH escrito em Rust (macOS, Windows e Linux), com interface em pt-BR. Sem telemetria e sem verificação automática de atualização: a única rede usada é a das conexões que você iniciar.
 
-> Estado: versão 0.1.0, validada **apenas em macOS arm64**. Windows e Linux têm CI e empacotamento preparados, mas nunca foram executados (ver `docs/VALIDACAO.md`). Os pacotes são **sem assinatura**.
+> Estado: versão 0.1.0, validada em **macOS arm64** e **Linux x86_64** (Ubuntu 24.04, Wayland). Windows tem CI e empacotamento preparados, mas nunca foi executado (ver `docs/VALIDACAO.md`). Os pacotes são **sem assinatura**.
 
 ## Recursos
 - Perfis (pastas, tags, favoritos, ambiente DEV/HOMOLOGAÇÃO/PRODUÇÃO com faixa de aviso) em SQLite, e conexão rápida sem salvar.
@@ -27,7 +27,7 @@ Os dados dos renders são fictícios (servidor de teste local).
 Ver [`docs/USO.md`](docs/USO.md). Onde ficam os dados: [`docs/DADOS.md`](docs/DADOS.md).
 
 ## Compilar e executar
-Requer Rust estável (edição 2024). No Linux, instale as bibliotecas de janela/GPU (veja `.github/workflows/ci.yml`).
+Requer Rust estável (edição 2024). No Linux, instale as bibliotecas de janela/GPU com `make deps-linux` (Debian/Ubuntu; mesma lista de `.github/workflows/ci.yml`).
 ```
 cargo run -p myssh-app --release
 ```
@@ -56,13 +56,13 @@ O cargo-packager **não compila**: empacota o que já está em `target/release`.
 cargo build --release -p myssh-app
 cargo packager --release -p myssh-app --formats app,dmg      # macOS (testado)
 cargo packager --release -p myssh-app --formats nsis,wix     # Windows (não testado)
-cargo packager --release -p myssh-app --formats deb,appimage # Linux (não testado)
+cargo packager --release -p myssh-app --formats deb,appimage # Linux (ou make package-linux)
 ```
 Saída em `target/release/` (ou `--out-dir`). No macOS arm64: `mySSH.app` e `mySSH_0.1.0_aarch64.dmg` (~12 MB).
 O workflow `.github/workflows/release.yml` faz isso nos três SOs. **Os artefatos não são assinados nem notarizados**: no macOS o Gatekeeper avisará; veja "Primeira abertura" em `docs/USO.md`. No Windows, o SmartScreen avisará.
 
 ## Limitações conhecidas
-- Windows e Linux não validados; IME e teclas mortas não validados em teclado real; VoiceOver não validado.
+- Windows não validado; no Linux só Ubuntu 24.04/Wayland; IME e teclas mortas não validados em teclado real; VoiceOver não validado.
 - Sem continuidade de sessão por conta própria: reconectar abre uma nova sessão (use tmux/screen no servidor).
 - Dependência transitiva com advisory conhecido (RUSTSEC-2023-0071, RSA/Marvin): prefira chaves ed25519 (`docs/VALIDACAO.md`).
 - Rename remoto no SFTP não é atômico quando o destino existe; symlinks não são transferidos.
