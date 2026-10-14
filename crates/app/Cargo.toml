@@ -26,3 +26,17 @@ png = "0.18"
 [dev-dependencies]
 tempfile = "3"
 egui_kittest = { version = "0.36", features = ["wgpu", "eframe"] }
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1"
+
+# macOS: `cargo packager --release` (cargo-packager) gera o .app com icon.icns.
+[package.metadata.packager]
+product-name = "mySSH"
+identifier = "com.myssh.app"
+icons = ["assets/icon.icns", "assets/icon.ico", "assets/icon-256.png"]
+category = "DeveloperTool"
+
+# Linux (hicolor): instalar assets/icon-<N>.png em
+# /usr/share/icons/hicolor/<N>x<N>/apps/myssh.png e assets/myssh.desktop em
+# /usr/share/applications/.

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=mySSH
+Comment=Gerenciador de sessões SSH
+Exec=myssh
+Icon=myssh
+Terminal=false
+Categories=Network;RemoteAccess;System;
+Keywords=ssh;terminal;sftp;
+StartupWMClass=myssh

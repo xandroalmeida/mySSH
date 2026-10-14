@@ -1,0 +1,9 @@
+[package]
+name = "myssh-icon-tool"
+version = "0.1.0"
+edition = "2024"
+publish = false
+description = "Gera PNG/ICO/ICNS do ícone a partir dos SVGs (cargo run -p myssh-icon-tool)"
+
+[dependencies]
+resvg = "0.45"

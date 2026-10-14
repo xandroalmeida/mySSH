@@ -6,6 +6,7 @@ mod dialogs;
 mod env;
 mod form;
 mod i18n;
+mod icon;
 mod logic;
 mod paths;
 mod settings;
@@ -71,7 +72,8 @@ fn main() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default()
         .with_title(i18n::TITLE)
         .with_inner_size([1200.0, 800.0])
-        .with_min_inner_size([720.0, 480.0]);
+        .with_min_inner_size([720.0, 480.0])
+        .with_icon(Arc::new(icon::app_icon()));
     if demo.is_some() {
         // O macOS não redesenha janelas totalmente cobertas.
         viewport = viewport.with_always_on_top();
