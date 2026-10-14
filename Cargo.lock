@@ -2840,7 +2840,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-app"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "chrono",
  "directories",
@@ -2867,7 +2867,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-core"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "serde",
  "thiserror 2.0.21",
@@ -2876,14 +2876,14 @@ dependencies = [
 
 [[package]]
 name = "myssh-icon-tool"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "resvg",
 ]
 
 [[package]]
 name = "myssh-secrets"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "keyring",
  "myssh-core",
@@ -2895,7 +2895,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-ssh"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "myssh-core",
  "myssh-store",
@@ -2908,14 +2908,14 @@ dependencies = [
 
 [[package]]
 name = "myssh-sshconfig"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "myssh-core",
 ]
 
 [[package]]
 name = "myssh-store"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "myssh-core",
  "rusqlite",
@@ -2928,7 +2928,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-sync"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "globset",
  "serde",
@@ -2941,7 +2941,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-syncrun"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "filetime",
  "myssh-core",
@@ -2963,7 +2963,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-term"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "alacritty_terminal",
  "eframe",
@@ -2978,7 +2978,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-transfer"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "filetime",
  "libc",
