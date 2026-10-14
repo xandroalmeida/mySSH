@@ -159,17 +159,16 @@ impl Queue {
                 id,
                 path,
                 existing,
-                incoming,
                 responder,
             } => {
                 if self.sticky_rename.contains(&id) {
-                    responder.respond(ConflictDecision::Rename);
+                    responder.answer(ConflictDecision::Rename);
                 } else {
                     self.conflicts.push_back(PendingConflict {
                         id,
                         path,
                         existing,
-                        incoming,
+                        incoming: None,
                         responder,
                     });
                 }
@@ -220,7 +219,7 @@ impl Queue {
     /// Responde ao conflito da frente da fila.
     pub fn answer_front(&mut self, decision: ConflictDecision, sticky_rename: bool) {
         if let Some(c) = self.conflicts.pop_front() {
-            c.responder.respond(decision);
+            c.responder.answer(decision);
             if sticky_rename {
                 self.sticky_rename.insert(c.id);
                 // os já pendentes dessa transferência recebem a mesma resposta
@@ -228,7 +227,7 @@ impl Queue {
                 let mut rest = VecDeque::new();
                 for p in self.conflicts.drain(..) {
                     if p.id == id {
-                        p.responder.respond(ConflictDecision::Rename);
+                        p.responder.answer(ConflictDecision::Rename);
                     } else {
                         rest.push_back(p);
                     }
@@ -381,7 +380,6 @@ fn item_ui(ui: &mut egui::Ui, it: &mut Item, action: &mut Option<QueueAction>) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::mpsc::channel;
 
     fn tid(n: u64) -> TransferId {
         TransferId(n)
@@ -475,17 +473,21 @@ mod tests {
         assert_eq!(it.errors.len(), MAX_ERRORS_KEPT);
     }
 
-    fn conflict(q: &mut Queue, id: u64, path: &str) -> std::sync::mpsc::Receiver<ConflictDecision> {
-        let (tx, rx) = channel();
+    fn conflict(
+        q: &mut Queue,
+        id: u64,
+        path: &str,
+    ) -> tokio::sync::oneshot::Receiver<ConflictDecision> {
+        let (responder, rx) = ConflictResponder::channel();
         q.apply(TransferEvent::Conflict {
             id: tid(id),
             path: path.into(),
             existing: RemoteOrLocalMeta {
+                kind: Kind::File,
                 size: 1,
                 mtime: None,
             },
-            incoming: None,
-            responder: ConflictResponder(tx),
+            responder,
         });
         rx
     }
@@ -493,8 +495,8 @@ mod tests {
     #[test]
     fn conflitos_em_fila_e_resposta() {
         let mut q = Queue::default();
-        let r1 = conflict(&mut q, 1, "/a");
-        let r2 = conflict(&mut q, 1, "/b");
+        let mut r1 = conflict(&mut q, 1, "/a");
+        let mut r2 = conflict(&mut q, 1, "/b");
         assert_eq!(q.conflicts.len(), 2);
         q.answer_front(ConflictDecision::Skip, false);
         assert_eq!(r1.try_recv().unwrap(), ConflictDecision::Skip);
@@ -505,15 +507,15 @@ mod tests {
     #[test]
     fn renomear_em_todos_responde_os_proximos_sozinho() {
         let mut q = Queue::default();
-        let r1 = conflict(&mut q, 1, "/a");
-        let r2 = conflict(&mut q, 1, "/b");
-        let other = conflict(&mut q, 2, "/z");
+        let mut r1 = conflict(&mut q, 1, "/a");
+        let mut r2 = conflict(&mut q, 1, "/b");
+        let mut other = conflict(&mut q, 2, "/z");
         q.answer_front(ConflictDecision::Rename, true);
         assert_eq!(r1.try_recv().unwrap(), ConflictDecision::Rename);
         assert_eq!(r2.try_recv().unwrap(), ConflictDecision::Rename);
         assert!(other.try_recv().is_err());
         // novos conflitos da mesma transferência são respondidos na hora
-        let r3 = conflict(&mut q, 1, "/c");
+        let mut r3 = conflict(&mut q, 1, "/c");
         assert_eq!(r3.try_recv().unwrap(), ConflictDecision::Rename);
         assert_eq!(q.conflicts.len(), 1);
         // terminar a transferência descarta a memória e os pendentes

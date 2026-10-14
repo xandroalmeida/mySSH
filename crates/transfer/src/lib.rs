@@ -139,6 +139,12 @@ impl ConflictResponder {
         Self(Some(tx))
     }
 
+    /// Cria um responder e o receptor da resposta (para UIs/testes que simulam o motor).
+    pub fn channel() -> (Self, oneshot::Receiver<ConflictDecision>) {
+        let (tx, rx) = oneshot::channel();
+        (Self::new(tx), rx)
+    }
+
     pub fn answer(mut self, d: ConflictDecision) {
         if let Some(tx) = self.0.take() {
             let _ = tx.send(d);
@@ -187,4 +193,22 @@ pub enum TransferEvent {
     Cancelled {
         id: TransferId,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn responder_channel_entrega_a_decisao_e_soltar_fecha_o_canal() {
+        let (r, mut rx) = ConflictResponder::channel();
+        r.answer(ConflictDecision::Skip);
+        assert_eq!(rx.try_recv().unwrap(), ConflictDecision::Skip);
+        let (r, mut rx) = ConflictResponder::channel();
+        drop(r);
+        assert!(matches!(
+            rx.try_recv(),
+            Err(oneshot::error::TryRecvError::Closed)
+        ));
+    }
 }

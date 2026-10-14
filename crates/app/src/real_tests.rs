@@ -41,7 +41,7 @@ const SECRETS: [&str; 4] = [
 
 // ------------------------------------------------------------------ infraestrutura
 
-fn runtime() -> Arc<tokio::runtime::Runtime> {
+pub(crate) fn runtime() -> Arc<tokio::runtime::Runtime> {
     Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(2)
@@ -51,7 +51,7 @@ fn runtime() -> Arc<tokio::runtime::Runtime> {
     )
 }
 
-fn make_app(store: Store) -> App {
+pub(crate) fn make_app(store: Store) -> App {
     let mut app = App::new(
         runtime(),
         store,
@@ -64,19 +64,19 @@ fn make_app(store: Store) -> App {
     app
 }
 
-fn harness(app: App) -> Harness<'static, App> {
+pub(crate) fn harness(app: App) -> Harness<'static, App> {
     Harness::builder()
         .with_size(egui::vec2(1200.0, 800.0))
         .build_eframe(move |_| app)
 }
 
-fn target() -> (String, u16) {
+pub(crate) fn target() -> (String, u16) {
     let v = std::env::var("MYSSH_TEST_SSH").expect("defina MYSSH_TEST_SSH=host:porta");
     let (h, p) = v.rsplit_once(':').expect("host:porta");
     (h.to_string(), p.parse().expect("porta"))
 }
 
-fn keys_dir() -> PathBuf {
+pub(crate) fn keys_dir() -> PathBuf {
     PathBuf::from(
         std::env::var("MYSSH_TEST_KEYS").expect("defina MYSSH_TEST_KEYS=.../testenv/keys"),
     )
@@ -155,12 +155,12 @@ fn trust_target(app: &App) {
 /// O sshd do testenv aplica `PerSourcePenalties` (falha de autenticação e conexões que fecham
 /// antes de autenticar somam penalidade que decai com o tempo): testes que as provocam esperam
 /// no fim, para não afetar o seguinte.
-fn cooldown() {
+pub(crate) fn cooldown() {
     std::thread::sleep(Duration::from_secs(12));
 }
 
 /// Espera o servidor voltar a aceitar conexões.
-fn ready() {
+pub(crate) fn ready() {
     use std::io::Read;
     let (h, p) = target();
     for _ in 0..60 {
@@ -176,7 +176,7 @@ fn ready() {
     panic!("servidor de teste indisponível (penalidade do sshd?)");
 }
 
-fn profile(name: &str, auth: AuthMethod) -> Profile {
+pub(crate) fn profile(name: &str, auth: AuthMethod) -> Profile {
     let (h, p) = target();
     let mut pr = Profile::new(name, h, "tester");
     pr.port = p;
@@ -185,7 +185,7 @@ fn profile(name: &str, auth: AuthMethod) -> Profile {
     pr
 }
 
-fn add_profile(app: &mut App, p: &Profile) {
+pub(crate) fn add_profile(app: &mut App, p: &Profile) {
     app.store.create_profile(p).unwrap();
     app.reload();
 }
@@ -205,7 +205,7 @@ fn saved_password(app: &App, password: &str) -> CredentialId {
     cred.id
 }
 
-fn trust_server(app: &App) {
+pub(crate) fn trust_server(app: &App) {
     let (h, p) = target();
     app.store
         .trust(&HostEndpoint::new(&h, p), &server_key())
@@ -213,7 +213,12 @@ fn trust_server(app: &App) {
 }
 
 /// Avança frames até `cond` (as tarefas de rede reagem por canais).
-fn wait(h: &mut Harness<'static, App>, what: &str, secs: u64, cond: impl Fn(&App) -> bool) {
+pub(crate) fn wait(
+    h: &mut Harness<'static, App>,
+    what: &str,
+    secs: u64,
+    cond: impl Fn(&App) -> bool,
+) {
     let t0 = Instant::now();
     while !cond(h.state()) {
         if t0.elapsed() > Duration::from_secs(secs) {
@@ -225,7 +230,7 @@ fn wait(h: &mut Harness<'static, App>, what: &str, secs: u64, cond: impl Fn(&App
     h.run_steps(2);
 }
 
-fn dump(app: &App) -> String {
+pub(crate) fn dump(app: &App) -> String {
     app.tabs
         .iter()
         .map(|t| {
@@ -241,15 +246,15 @@ fn dump(app: &App) -> String {
         .join("\n")
 }
 
-fn status(app: &App, idx: usize) -> &'static str {
+pub(crate) fn status(app: &App, idx: usize) -> &'static str {
     app.tabs[idx].body.status().map_or("", |s| s.text)
 }
 
-fn screen(app: &App, idx: usize) -> String {
+pub(crate) fn screen(app: &App, idx: usize) -> String {
     app.tabs[idx].body.debug_screen()
 }
 
-fn click(h: &mut Harness<'static, App>, label: &str) {
+pub(crate) fn click(h: &mut Harness<'static, App>, label: &str) {
     h.get_by_label(label).click();
     h.run_steps(3);
 }
@@ -264,7 +269,7 @@ fn type_password(h: &mut Harness<'static, App>, text: &str) {
 }
 
 /// Digita uma linha no terminal ativo (eventos de teclado reais do egui).
-fn type_line(h: &mut Harness<'static, App>, line: &str) {
+pub(crate) fn type_line(h: &mut Harness<'static, App>, line: &str) {
     h.event(Event::Text(line.to_string()));
     h.run_steps(1);
     h.key_press(Key::Enter);
@@ -318,7 +323,7 @@ fn rss_mb() -> f64 {
         / 1024.0
 }
 
-fn percentile(v: &mut [f64], p: f64) -> f64 {
+pub(crate) fn percentile(v: &mut [f64], p: f64) -> f64 {
     if v.is_empty() {
         return 0.0;
     }
@@ -342,8 +347,9 @@ fn jump_host_recusado_indica_o_salto_no_erro() {
     add_profile(&mut app, &b);
     app.open_profile(b.id);
     let mut h = harness(app);
+    // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro do salto", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     assert!(h.state().tabs[1].body.is_closed());
     // O erro vem do salto 1 (e não de uma conexão direta ao destino ignorando o salto).
@@ -368,8 +374,9 @@ fn keyboard_interactive_sem_servidor_vai_ate_a_rede() {
     add_profile(&mut app, &p);
     app.open_profile(p.id);
     let mut h = harness(app);
+    // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro de rede", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     assert!(screen_or_error(h.state(), 1).contains("recusada"));
 }
@@ -405,8 +412,9 @@ fn cofre_bloqueado_pede_desbloqueio_e_depois_conecta() {
     });
     h.get_by_label(i18n::VAULT_LOCKED_TITLE);
     click(&mut h, i18n::UNLOCK_VAULT);
+    // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro de conexão", 10, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("Conexão recusada");
     assert!(!h.state().vault.is_locked());
@@ -593,7 +601,9 @@ fn real_host_key_alterada_bloqueia_e_esquecer_volta_ao_fluxo_desconhecido() {
         status(a, 1) == i18n::ST_AWAITING_TRUST && a.tabs[1].body.needs_modal()
     });
     click(&mut h, i18n::HK_REJECT);
-    wait(&mut h, "rejeitado", 15, |a| status(a, 1) == i18n::ST_ERROR);
+    wait(&mut h, "rejeitado", 15, |a| {
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+    });
     h.get_by_label_contains("host não confiável");
     assert!(h.state().store.list().unwrap().is_empty());
     drop(h);
@@ -617,7 +627,7 @@ fn real_senha_errada_mostra_erro_e_tentar_novamente_pergunta_de_novo() {
     type_password(&mut h, "senha-errada-xyz");
     click(&mut h, i18n::CONNECT);
     wait(&mut h, "erro de autenticação", 20, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("senha incorreta");
     assert!(h.state().tabs[1].body.is_closed());
@@ -723,7 +733,7 @@ fn real_chave_com_passphrase_perguntar_e_errada() {
     type_password(&mut h, "passphrase-errada");
     click(&mut h, i18n::CONNECT);
     wait(&mut h, "erro de passphrase", 20, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("passphrase incorreta");
     ready();
@@ -1045,7 +1055,7 @@ fn real_mfa_chave_mais_keyboard_interactive_cancelar() {
     });
     click(&mut h, i18n::CANCEL);
     wait(&mut h, "autenticação cancelada", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR
+        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
     });
     assert!(screen_or_error(h.state(), 1).contains("Autenticação cancelada"));
     // Tentar de novo e responder: conecta.

@@ -6,6 +6,8 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 
+use myssh_ssh::Connection;
+
 use super::contract::*;
 
 pub type BoxFut<T> = Pin<Box<dyn Future<Output = Result<T, TransferError>> + Send>>;
@@ -34,13 +36,87 @@ pub trait FilesBackend: Send {
 
 // ---------------------------------------------------------------------------------------------
 
+/// Navegação remota real (um `RemoteBrowser` com canal SFTP próprio).
+struct RealRemote(Arc<RemoteBrowser>);
+
+impl RemoteFs for RealRemote {
+    fn home(&self) -> BoxFut<String> {
+        let b = self.0.clone();
+        Box::pin(async move { b.home().await })
+    }
+
+    fn list(&self, dir: &str) -> BoxFut<Vec<RemoteEntry>> {
+        let (b, d) = (self.0.clone(), dir.to_string());
+        Box::pin(async move { b.list(&d).await })
+    }
+
+    fn mkdir(&self, path: &str) -> BoxFut<()> {
+        let (b, p) = (self.0.clone(), path.to_string());
+        Box::pin(async move { b.mkdir(&p).await })
+    }
+
+    fn rename(&self, from: &str, to: &str) -> BoxFut<()> {
+        let (b, f, t) = (self.0.clone(), from.to_string(), to.to_string());
+        Box::pin(async move { b.rename(&f, &t).await })
+    }
+
+    fn remove(&self, path: &str, recursive: bool) -> BoxFut<()> {
+        let (b, p) = (self.0.clone(), path.to_string());
+        Box::pin(async move { b.remove(&p, recursive).await })
+    }
+}
+
+/// Backend de produção: `RemoteBrowser` + `TransferManager` sobre a conexão da sessão.
+pub struct RealBackend {
+    remote: Arc<dyn RemoteFs>,
+    mgr: TransferManager,
+}
+
+/// Arquivos simultâneos na fila (padrão do contrato).
+pub const MAX_CONCURRENT: usize = 3;
+
+impl RealBackend {
+    /// Abre o canal SFTP do navegador (a fila abre os dela sob demanda).
+    pub async fn connect(
+        rt: &tokio::runtime::Handle,
+        conn: Arc<Connection>,
+        notify: Notify,
+    ) -> Result<Self, TransferError> {
+        let browser = RemoteBrowser::open(conn.clone()).await?;
+        Ok(Self {
+            remote: Arc::new(RealRemote(Arc::new(browser))),
+            mgr: TransferManager::new(rt, conn, MAX_CONCURRENT, notify),
+        })
+    }
+}
+
+impl FilesBackend for RealBackend {
+    fn remote(&self) -> Arc<dyn RemoteFs> {
+        self.remote.clone()
+    }
+    fn enqueue(&self, req: TransferRequest) -> TransferId {
+        self.mgr.enqueue(req)
+    }
+    fn cancel(&self, id: TransferId) {
+        self.mgr.cancel(id)
+    }
+    fn cancel_all(&self) {
+        self.mgr.cancel_all()
+    }
+    fn try_recv(&mut self) -> Option<TransferEvent> {
+        self.mgr.try_recv()
+    }
+    fn active(&self) -> usize {
+        self.mgr.active()
+    }
+}
+
 #[cfg(test)]
 pub use mem::{MemBackend, MemHandle, mem_entry};
 
 #[cfg(test)]
 mod mem {
     use std::collections::{BTreeMap, HashSet, VecDeque};
-    use std::sync::mpsc::{Receiver, channel};
     use std::sync::{Arc, Mutex};
     use std::time::SystemTime;
 
@@ -55,7 +131,7 @@ mod mem {
         pub active: HashSet<TransferId>,
         pub cancelled: Vec<TransferId>,
         pub cancel_all_calls: usize,
-        pub list_errors: BTreeMap<String, String>,
+        pub list_errors: BTreeMap<String, TransferError>,
         pub removed: Vec<(String, bool)>,
         pub next_id: u64,
         pub lists: usize,
@@ -116,15 +192,13 @@ mod mem {
             id: TransferId,
             path: &str,
             existing: RemoteOrLocalMeta,
-            incoming: Option<RemoteOrLocalMeta>,
-        ) -> Receiver<ConflictDecision> {
-            let (tx, rx) = channel();
+        ) -> tokio::sync::oneshot::Receiver<ConflictDecision> {
+            let (responder, rx) = ConflictResponder::channel();
             self.push(TransferEvent::Conflict {
                 id,
                 path: path.into(),
                 existing,
-                incoming,
-                responder: ConflictResponder(tx),
+                responder,
             });
             rx
         }
@@ -144,12 +218,12 @@ mod mem {
             v
         }
 
-        pub fn fail_list(&self, dir: &str, msg: &str) {
+        pub fn fail_list(&self, dir: &str, err: TransferError) {
             self.state
                 .lock()
                 .unwrap()
                 .list_errors
-                .insert(dir.into(), msg.into());
+                .insert(dir.into(), err);
         }
     }
 
@@ -186,11 +260,11 @@ mod mem {
             let mut s = self.0.state.lock().unwrap();
             s.lists += 1;
             if let Some(m) = s.list_errors.get(dir) {
-                return ok(Err(TransferError(m.clone())));
+                return ok(Err(m.clone()));
             }
             match s.dirs.get(dir) {
                 Some(v) => ok(Ok(v.clone())),
-                None => ok(Err(TransferError(format!("Diretório inexistente: {dir}")))),
+                None => ok(Err(TransferError::NotFound)),
             }
         }
 
@@ -207,7 +281,7 @@ mod mem {
                 .get_mut(&pf)
                 .and_then(|v| v.iter().position(|e| e.path == from).map(|i| v.remove(i)));
             let Some(mut e) = found else {
-                return ok(Err(TransferError("Item não encontrado.".into())));
+                return ok(Err(TransferError::NotFound));
             };
             e.path = to.to_string();
             e.name = to.rsplit('/').next().unwrap_or(to).to_string();
@@ -271,7 +345,7 @@ mod mem {
                 let mut s = self.h.state.lock().unwrap();
                 s.cancel_all_calls += 1;
                 let mut v: Vec<_> = s.active.iter().copied().collect();
-                v.sort();
+                v.sort_by_key(|i| i.0);
                 v
             };
             for id in ids {

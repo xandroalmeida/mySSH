@@ -111,6 +111,15 @@ pub trait TabBody {
     fn active_transfers(&self) -> usize {
         0
     }
+    /// Somente testes: o painel de arquivos da aba (ou do painel focado).
+    #[cfg(test)]
+    fn files_panel(&self) -> Option<&crate::files::FilesPanel> {
+        None
+    }
+    #[cfg(test)]
+    fn files_panel_mut(&mut self) -> Option<&mut crate::files::FilesPanel> {
+        None
+    }
     /// Mostra/oculta o painel de arquivos (atalho e botão).
     fn toggle_files(&mut self) {}
     /// Há sessão ativa: fechar exige confirmação.

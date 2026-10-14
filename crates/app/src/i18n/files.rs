@@ -41,6 +41,11 @@ pub const FILES_LOADING: &str = "Carregando…";
 pub const FILES_RETRY: &str = "Tentar novamente";
 pub const FILES_REMOTE_UNAVAILABLE: &str =
     "Navegação remota indisponível: o SFTP ainda não está ligado a esta sessão.";
+pub const FILES_REMOTE_OPENING: &str = "Abrindo o canal SFTP…";
+pub const FILES_NO_CONNECTION: &str = "Sem conexão: conecte a sessão para navegar no servidor.";
+pub fn files_sftp_failed(e: &str) -> String {
+    format!("Não foi possível abrir o SFTP: {e}")
+}
 pub const FILES_NOTHING_SELECTED: &str = "Selecione itens para transferir.";
 pub const FILES_NO_REMOTE_DIR: &str = "A pasta remota ainda não foi carregada.";
 pub const FILES_DROP_HINT: &str = "Solte aqui para enviar para a pasta remota";

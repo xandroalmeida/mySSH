@@ -574,9 +574,15 @@ impl TerminalTab {
         if !self.files_open {
             return;
         }
+        let conn = self.sess.as_ref().and_then(|s| s.connection());
         let panel = self
             .files
-            .get_or_insert_with(|| files::new_for_session(env));
+            .get_or_insert_with(|| files::new_for_session(env, conn.clone()));
+        if !panel.has_backend()
+            && let Some(c) = conn
+        {
+            panel.attach_connection(c);
+        }
         let max_h = (ui.available_height() * 0.8).max(200.0);
         let mut close = false;
         egui::Panel::bottom(Id::new(("files-panel", self.uid)))
@@ -1211,6 +1217,16 @@ impl TabBody for TerminalTab {
 
     fn active_transfers(&self) -> usize {
         self.files.as_ref().map_or(0, FilesPanel::active)
+    }
+
+    #[cfg(test)]
+    fn files_panel(&self) -> Option<&FilesPanel> {
+        self.files.as_ref()
+    }
+
+    #[cfg(test)]
+    fn files_panel_mut(&mut self) -> Option<&mut FilesPanel> {
+        self.files.as_mut()
     }
 
     fn toggle_files(&mut self) {
