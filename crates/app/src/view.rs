@@ -97,6 +97,14 @@ impl App {
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
+                        .add(egui::Button::new(i18n::ABOUT_BUTTON).frame(false))
+                        .on_hover_text(i18n::ABOUT_BUTTON_HELP)
+                        .clicked()
+                    {
+                        self.open_about();
+                    }
+                    ui.separator();
+                    if ui
                         .add_enabled(sessions > 0, egui::Button::new(i18n::END_ALL))
                         .on_hover_text(i18n::END_ALL_HELP)
                         .on_disabled_hover_text(i18n::END_ALL_NONE)

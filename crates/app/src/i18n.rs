@@ -2,9 +2,11 @@
 
 use crate::shortcuts::Action;
 
+mod about;
 mod files;
 mod m2b;
 mod sync;
+pub use about::*;
 pub use files::*;
 pub use m2b::*;
 pub use sync::*;

@@ -56,6 +56,10 @@ impl App {
                 let next = self.profile_dialog(ctx, &mut d);
                 (Dialog::Profile(d), next)
             }
+            Dialog::About(mut st) => {
+                let next = crate::about::show(ctx, &mut st, self.data_dir.as_deref());
+                (Dialog::About(st), next)
+            }
             Dialog::Settings => {
                 let next = self.settings_dialog(ctx);
                 (Dialog::Settings, next)

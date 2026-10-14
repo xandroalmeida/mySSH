@@ -1,5 +1,6 @@
 //! mySSH: casca da aplicação desktop (perfis, abas, configurações).
 
+mod about;
 mod app;
 mod config_io;
 #[cfg(any(test, debug_assertions, feature = "demo"))]

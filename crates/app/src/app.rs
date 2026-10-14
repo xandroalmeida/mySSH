@@ -104,6 +104,8 @@ pub enum Dialog {
         pane: PaneId,
     },
     ConfirmEndAll,
+    /// Janela "Sobre" (informações de versão, créditos, licenças).
+    About(crate::about::AboutState),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1120,6 +1122,10 @@ impl App {
     }
 
     // --------------------------------------------------------- hosts confiáveis
+
+    pub fn open_about(&mut self) {
+        self.dialog = Dialog::About(crate::about::AboutState::new());
+    }
 
     pub fn open_settings(&mut self) {
         self.refresh_trusted();
