@@ -27,6 +27,7 @@ impl TabKind {
 }
 
 /// Serviços e configurações que as abas recebem a cada frame (nada é copiado para dentro delas).
+#[derive(Clone)]
 pub struct TabEnv<'a> {
     pub rt: &'a tokio::runtime::Handle,
     pub store: &'a Arc<Store>,
@@ -38,6 +39,26 @@ pub struct TabEnv<'a> {
     pub input_blocked: bool,
     /// Conecta sozinha ao abrir (desligado em demos e testes sem rede).
     pub auto_connect: bool,
+    /// Tema global escuro (o tema do perfil é resolvido sobre ele).
+    pub dark: bool,
+    /// Faixa/borda de aviso em abas de produção.
+    pub prod_warning: bool,
+    /// Paleta do terminal escolhida pelo perfil; `None` = a global (claro/escuro).
+    /// Preenchido por `with_profile_theme` para cada aba/painel.
+    pub theme: Option<myssh_term::TermTheme>,
+}
+
+impl TabEnv<'_> {
+    /// Cópia do ambiente com o tema (paleta e fonte) do perfil aplicado.
+    pub fn with_profile_theme(&self, kind: &TabKind) -> Self {
+        let mut e = self.clone();
+        if let TabKind::Terminal { profile, .. } = kind {
+            let r = crate::theming::resolve(&profile.theme, self.dark, self.font_size);
+            e.font_size = r.font_size;
+            e.theme = r.palette_overridden.then_some(r.term);
+        }
+        e
+    }
 }
 
 /// Pedidos da aba para o app.
@@ -47,6 +68,8 @@ pub enum TabEvent {
     ProfileChanged,
     /// Abrir a lista de hosts confiáveis (Configurações).
     OpenTrustedHosts,
+    /// O usuário pediu para fechar um painel dividido (pelo botão do painel).
+    ClosePane(crate::split::PaneId),
 }
 
 /// Indicador de estado na barra de abas: ícone + texto (nunca só cor).
@@ -91,6 +114,17 @@ pub trait TabBody {
     }
     /// O teclado está capturado pelo terminal (muda a regra de atalhos; ver `shortcuts`).
     fn has_terminal_focus(&self) -> bool {
+        false
+    }
+    /// Aba dividida em painéis (`None` nas demais).
+    fn as_split(&mut self) -> Option<&mut crate::split_body::SplitBody> {
+        None
+    }
+    fn as_split_ref(&self) -> Option<&crate::split_body::SplitBody> {
+        None
+    }
+    /// A aba desenha o próprio aviso de ambiente e as bordas (painéis divididos).
+    fn manages_chrome(&self) -> bool {
         false
     }
     /// Somente testes: texto da tela do terminal.

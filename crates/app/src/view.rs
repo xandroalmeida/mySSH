@@ -11,6 +11,8 @@ use crate::env;
 use crate::i18n;
 use crate::logic::{FolderSel, folder_path, group_by_folder, matches};
 use crate::shortcuts::{self, Action};
+use crate::split::Dir;
+use crate::split_body::env_banner;
 use crate::tabs::{TabBody, TabKind};
 
 const SEARCH_ID: &str = "sidebar-search";
@@ -62,6 +64,12 @@ impl App {
     // ------------------------------------------------------------ barra superior
 
     fn top_panel(&mut self, ui: &mut egui::Ui) {
+        let can_split = self.can_split();
+        let splitting = self.tabs.iter().any(|t| {
+            Some(t.id) == self.active && t.body.as_split_ref().is_some_and(|s| s.pane_count() > 1)
+        });
+        let sessions = self.active_sessions();
+        let locked = self.vault.is_locked();
         egui::Panel::top("toolbar").show(ui, |ui| {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
@@ -78,13 +86,45 @@ impl App {
                         error: None,
                     });
                 }
+                ui.add_enabled_ui(can_split, |ui| {
+                    ui.menu_button(i18n::SPLIT, |ui| self.split_menu(ui, splitting));
+                });
+                if ui.button(i18n::IMPORT_SSH).clicked() {
+                    self.open_import_ssh();
+                }
                 if ui.button(i18n::SETTINGS).clicked() {
                     self.open_settings();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if self.vault.is_locked() {
-                        ui.colored_label(warn_color(ui), i18n::VAULT_LOCKED_BADGE);
-                    } else if self.vault_mode == VaultMode::SessionOnly {
+                    if ui
+                        .add_enabled(sessions > 0, egui::Button::new(i18n::END_ALL))
+                        .on_hover_text(i18n::END_ALL_HELP)
+                        .on_disabled_hover_text(i18n::END_ALL_NONE)
+                        .clicked()
+                    {
+                        self.request_end_all();
+                    }
+                    ui.separator();
+                    if locked {
+                        let b = egui::Button::new(
+                            RichText::new(i18n::VAULT_LOCKED_BADGE).color(warn_color(ui)),
+                        );
+                        if ui
+                            .add(b)
+                            .on_hover_text(i18n::VAULT_UNLOCK_BTN_HELP)
+                            .clicked()
+                        {
+                            let ctx = ui.ctx().clone();
+                            self.unlock_vault(&ctx);
+                        }
+                    } else if ui
+                        .button(i18n::VAULT_OPEN_BADGE)
+                        .on_hover_text(i18n::VAULT_LOCK_BTN_HELP)
+                        .clicked()
+                    {
+                        self.lock_vault();
+                    }
+                    if self.vault_mode == VaultMode::SessionOnly {
                         ui.weak(i18n::VAULT_SESSION_BADGE);
                     }
                 });
@@ -111,6 +151,56 @@ impl App {
             }
             ui.add_space(2.0);
         });
+    }
+
+    fn split_menu(&mut self, ui: &mut egui::Ui, splitting: bool) {
+        let entries = [
+            (Dir::Vertical, i18n::SPLIT_SIDE, Action::SplitSide),
+            (Dir::Horizontal, i18n::SPLIT_STACK, Action::SplitStack),
+        ];
+        for (dir, name, action) in entries {
+            ui.label(RichText::new(name).strong());
+            if ui
+                .button(format!(
+                    "  {}    {}",
+                    i18n::SPLIT_SAME,
+                    shortcuts::label(action)
+                ))
+                .clicked()
+            {
+                self.split_active(dir, None);
+                ui.close();
+            }
+            if ui.button(format!("  {}", i18n::SPLIT_OTHER)).clicked() {
+                self.open_split_picker(dir);
+                ui.close();
+            }
+            ui.separator();
+        }
+        if ui
+            .add_enabled(
+                splitting,
+                egui::Button::new(format!(
+                    "{}    {}",
+                    i18n::SPLIT_CLOSE_PANE,
+                    shortcuts::label(Action::ClosePane)
+                )),
+            )
+            .clicked()
+        {
+            if let Some(id) = self.active {
+                let pane = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == id)
+                    .and_then(|t| t.body.as_split_ref())
+                    .map(|s| s.focused_id());
+                if let Some(pane) = pane {
+                    self.request_close_pane(id, pane);
+                }
+            }
+            ui.close();
+        }
     }
 
     fn notice_panel(&mut self, ui: &mut egui::Ui) {
@@ -345,7 +435,16 @@ impl App {
                     ui.horizontal(|ui| {
                         for t in &self.tabs {
                             let active = self.active == Some(t.id);
-                            let r = ui.selectable_label(active, tab_job(ui, &t.kind, &*t.body));
+                            // em abas divididas, o estilo segue o painel focado
+                            let style_kind =
+                                t.body.as_split_ref().map_or(&t.kind, |s| s.focused_kind());
+                            let r = ui.selectable_label(active, tab_job(ui, style_kind, &*t.body));
+                            if let Some(a) = tab_accent(style_kind) {
+                                ui.painter().line_segment(
+                                    [r.rect.left_bottom(), r.rect.right_bottom()],
+                                    Stroke::new(3.0, a),
+                                );
+                            }
                             let r = match t.body.status() {
                                 Some(b) => r.on_hover_text(format!("{} {}", b.icon, b.text)),
                                 None => r,
@@ -374,6 +473,9 @@ impl App {
             let (tabs, env_services) = self.tabs_and_env(&ctx);
             match tabs.iter_mut().find(|t| Some(t.id) == active) {
                 Some(t) => {
+                    let manages = t.body.manages_chrome();
+                    let accent = tab_accent(&t.kind);
+                    let tab_env = env_services.with_profile_theme(&t.kind);
                     let (profile_info, environment) = match &t.kind {
                         TabKind::Terminal { profile, .. } => (
                             Some(format!("{}@{}", profile.username, profile.host)),
@@ -384,7 +486,7 @@ impl App {
                     let st = env::style(environment)
                         .filter(|_| environment != Environment::Production || prod_warning);
                     let border = match st {
-                        Some(s) if environment == Environment::Production => {
+                        Some(s) if environment == Environment::Production && !manages => {
                             Stroke::new(3.0, s.fill)
                         }
                         _ => Stroke::NONE,
@@ -393,29 +495,28 @@ impl App {
                         .stroke(border)
                         .inner_margin(4.0)
                         .show(ui, |ui| {
+                            if manages {
+                                // painéis divididos: cada painel desenha seu aviso e borda
+                                t.body.ui(ui, &env_services);
+                                return;
+                            }
+                            if let Some(a) = accent {
+                                let (r, _) = ui.allocate_exact_size(
+                                    egui::vec2(ui.available_width(), 3.0),
+                                    egui::Sense::hover(),
+                                );
+                                ui.painter().rect_filled(r, 1.0, a);
+                                ui.add_space(2.0);
+                            }
                             if let (Some(s), Some(info)) = (st, profile_info) {
-                                egui::Frame::new()
-                                    .fill(s.fill)
-                                    .inner_margin(egui::Margin::symmetric(8, 5))
-                                    .show(ui, |ui| {
-                                        ui.set_width(ui.available_width());
-                                        ui.label(
-                                            RichText::new(format!(
-                                                "{} {}  ·  {info}",
-                                                s.icon, s.label
-                                            ))
-                                            .strong()
-                                            .color(s.text),
-                                        );
-                                    });
-                                ui.add_space(4.0);
+                                env_banner(ui, s, &info);
                             }
                             if t.body.fills_space() {
-                                t.body.ui(ui, &env_services);
+                                t.body.ui(ui, &tab_env);
                             } else {
                                 egui::ScrollArea::vertical()
                                     .auto_shrink([false, false])
-                                    .show(ui, |ui| t.body.ui(ui, &env_services));
+                                    .show(ui, |ui| t.body.ui(ui, &tab_env));
                             }
                         });
                 }
@@ -446,6 +547,17 @@ pub fn warn_color(ui: &egui::Ui) -> Color32 {
         Color32::from_rgb(255, 200, 80)
     } else {
         Color32::from_rgb(160, 90, 0)
+    }
+}
+
+/// Cor de destaque do perfil da aba, se houver.
+fn tab_accent(kind: &TabKind) -> Option<Color32> {
+    match kind {
+        TabKind::Terminal { profile, .. } => profile
+            .theme
+            .accent
+            .map(|[r, g, b]| Color32::from_rgb(r, g, b)),
+        TabKind::Welcome => None,
     }
 }
 

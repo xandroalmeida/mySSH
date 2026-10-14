@@ -18,7 +18,11 @@ use crate::logic::{
 };
 use crate::settings::Settings;
 use crate::shortcuts::{self, Action};
-use crate::tabs::{Tab, TabEnv, TabEvent, TabKind, make_body};
+use crate::split::{Dir, PaneId};
+use crate::split_body::{MAX_PANES, SplitBody, refresh_kind_theme};
+use crate::ssh_import::{self, Preview, SaveReport};
+use crate::suspend::SuspendDetector;
+use crate::tabs::{Tab, TabBody, TabEnv, TabEvent, TabKind, make_body};
 
 /// Mensagens de tarefas em segundo plano (keyring, diálogo de arquivo) para a thread de UI.
 pub enum Msg {
@@ -29,6 +33,12 @@ pub enum Msg {
     },
     Unlocked(Result<(), SecretError>),
     KeyPicked(PathBuf),
+    /// Arquivo ssh config lido e interpretado (ou erro em pt-BR).
+    SshConfigLoaded(Result<Preview, String>),
+    SshConfigSaved(Result<SaveReport, String>),
+    /// Resultado da exportação da configuração (texto do aviso; vazio = cancelado).
+    ConfigExported(Result<String, String>),
+    ConfigImported(Result<myssh_store::ImportReport, String>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -85,6 +95,44 @@ pub enum Dialog {
     ConfirmQuit,
     /// Esquecer a chave confiável de um host (volta às Configurações depois).
     ConfirmForget(HostEndpoint),
+    /// Importação de `~/.ssh/config` (escolha, prévia e gravação).
+    ImportSsh(Box<ImportDialog>),
+    /// Escolha do perfil da nova sessão ao dividir.
+    Split(SplitDialog),
+    ConfirmClosePane {
+        tab: u64,
+        pane: PaneId,
+    },
+    ConfirmEndAll,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ImportStage {
+    Intro,
+    Loading,
+    Preview,
+    Saving,
+}
+
+pub struct ImportDialog {
+    pub stage: ImportStage,
+    pub preview: Preview,
+    pub error: Option<String>,
+}
+
+impl ImportDialog {
+    pub fn new() -> Self {
+        Self {
+            stage: ImportStage::Intro,
+            preview: Preview::default(),
+            error: None,
+        }
+    }
+}
+
+pub struct SplitDialog {
+    pub dir: Dir,
+    pub choice: Option<ProfileId>,
 }
 
 pub struct Pending {
@@ -127,6 +175,9 @@ pub struct App {
     pub(crate) trusted_error: Option<String>,
     pub(crate) scroll_to_trusted: bool,
     pub(crate) demo: Option<Demo>,
+    suspend: SuspendDetector,
+    /// Importar/exportar configuração em andamento (evita cliques repetidos).
+    pub(crate) config_busy: bool,
 }
 
 impl App {
@@ -177,6 +228,8 @@ impl App {
             trusted_error: None,
             scroll_to_trusted: false,
             demo,
+            suspend: SuspendDetector::default(),
+            config_busy: false,
         };
         app.reload();
         app.open_tab(TabKind::Welcome);
@@ -199,6 +252,13 @@ impl App {
             .is_some_and(|s| !self.profiles.iter().any(|p| p.id == s))
         {
             self.selected = None;
+        }
+        // O tema editado vale também para as abas/painéis já abertos do perfil.
+        for t in &mut self.tabs {
+            refresh_kind_theme(&mut t.kind, &self.profiles);
+            if let Some(sp) = t.body.as_split() {
+                sp.refresh_themes(&self.profiles);
+            }
         }
     }
 
@@ -299,6 +359,26 @@ impl App {
                     }
                 }
                 Msg::SecretPut { op, result } => self.on_secret_put(ctx, op, result),
+                Msg::SshConfigLoaded(r) => self.on_import_loaded(r),
+                Msg::SshConfigSaved(r) => self.on_import_saved(r),
+                Msg::ConfigExported(r) => {
+                    self.config_busy = false;
+                    match r {
+                        Ok(text) | Err(text) if !text.is_empty() => self.set_notice(text),
+                        _ => {}
+                    }
+                }
+                Msg::ConfigImported(r) => {
+                    self.config_busy = false;
+                    match r {
+                        Ok(rep) => {
+                            self.reload();
+                            self.set_notice(i18n::cfg_imported(rep.profiles, rep.folders));
+                        }
+                        Err(e) if !e.is_empty() => self.set_notice(e),
+                        Err(_) => {}
+                    }
+                }
             }
         }
     }
@@ -478,19 +558,317 @@ impl App {
 
     // ------------------------------------------------------------------ abas
 
-    pub fn open_tab(&mut self, kind: TabKind) {
-        let jump_name = match &kind {
+    fn new_body(&self, kind: &TabKind) -> Box<dyn TabBody> {
+        let jump_name = match kind {
             TabKind::Terminal { profile, .. } => profile
                 .jump
                 .and_then(|j| self.profile(j))
                 .map(|j| j.name.clone()),
             TabKind::Welcome => None,
         };
+        make_body(kind, jump_name)
+    }
+
+    pub fn open_tab(&mut self, kind: TabKind) {
         let id = self.next_tab;
         self.next_tab += 1;
-        let body = make_body(&kind, jump_name);
+        let body = self.new_body(&kind);
         self.tabs.push(Tab { id, kind, body });
         self.active = Some(id);
+    }
+
+    // --------------------------------------------------------- painéis divididos
+
+    fn active_tab_mut(&mut self) -> Option<&mut Tab> {
+        let id = self.active?;
+        self.tabs.iter_mut().find(|t| t.id == id)
+    }
+
+    /// Tipo (perfil) do painel focado da aba ativa, se for uma aba de terminal.
+    pub fn focused_kind(&self) -> Option<TabKind> {
+        let t = self.tabs.iter().find(|t| Some(t.id) == self.active)?;
+        let kind = match t.body.as_split_ref() {
+            Some(sp) => sp.focused_kind().clone(),
+            None => t.kind.clone(),
+        };
+        matches!(kind, TabKind::Terminal { .. }).then_some(kind)
+    }
+
+    /// Divide o painel focado da aba ativa. `profile` = `None` repete o perfil do painel focado.
+    pub fn split_active(&mut self, dir: Dir, profile: Option<ProfileId>) {
+        let Some(base) = self.focused_kind() else {
+            return self.set_notice(i18n::SPLIT_ONLY_TERMINAL);
+        };
+        let kind = match profile.and_then(|id| self.profile(id).cloned()) {
+            Some(p) => TabKind::Terminal {
+                profile: Box::new(p),
+                saved: true,
+            },
+            None => base,
+        };
+        let body = self.new_body(&kind);
+        let Some(tab) = self.active_tab_mut() else {
+            return;
+        };
+        if tab.body.as_split().is_none() {
+            let old = std::mem::replace(&mut tab.body, Box::new(crate::tabs::WelcomeBody));
+            tab.body = Box::new(SplitBody::new(tab.kind.clone(), old));
+        }
+        let ok = tab
+            .body
+            .as_split()
+            .is_some_and(|sp| sp.split(dir, kind, body).is_some());
+        if !ok {
+            self.set_notice(i18n::SPLIT_LIMIT);
+        }
+    }
+
+    pub fn can_split(&self) -> bool {
+        self.focused_kind().is_some()
+            && self
+                .tabs
+                .iter()
+                .find(|t| Some(t.id) == self.active)
+                .and_then(|t| t.body.as_split_ref())
+                .is_none_or(|sp| sp.pane_count() < MAX_PANES)
+    }
+
+    pub fn open_split_picker(&mut self, dir: Dir) {
+        if self.focused_kind().is_some() {
+            self.dialog = Dialog::Split(SplitDialog { dir, choice: None });
+        } else {
+            self.set_notice(i18n::SPLIT_ONLY_TERMINAL);
+        }
+    }
+
+    /// Pede para fechar um painel; sessão ativa pede confirmação. Último painel = fecha a aba.
+    pub fn request_close_pane(&mut self, tab: u64, pane: PaneId) {
+        let Some(t) = self.tabs.iter().find(|t| t.id == tab) else {
+            return;
+        };
+        let Some(sp) = t.body.as_split_ref() else {
+            return self.request_close_tab(tab);
+        };
+        if sp.pane_count() <= 1 {
+            return self.request_close_tab(tab);
+        }
+        if sp.is_pane_busy(pane) {
+            self.dialog = Dialog::ConfirmClosePane { tab, pane };
+        } else {
+            self.close_pane(tab, pane);
+        }
+    }
+
+    pub fn close_pane(&mut self, tab: u64, pane: PaneId) {
+        let Some(t) = self.tabs.iter_mut().find(|t| t.id == tab) else {
+            return;
+        };
+        let empty = t.body.as_split().is_some_and(|sp| sp.close_pane(pane));
+        if empty {
+            self.close_tab(tab);
+        }
+    }
+
+    pub fn cycle_pane(&mut self) {
+        if let Some(sp) = self.active_tab_mut().and_then(|t| t.body.as_split()) {
+            sp.cycle_focus();
+        }
+    }
+
+    // ------------------------------------------------------------ sessões e cofre
+
+    /// Sessões ativas (abas e painéis).
+    pub fn active_sessions(&self) -> usize {
+        self.tabs
+            .iter()
+            .map(|t| match t.body.as_split_ref() {
+                Some(sp) => sp
+                    .pane_ids()
+                    .into_iter()
+                    .filter(|p| sp.is_pane_busy(*p))
+                    .count(),
+                None => usize::from(t.body.is_busy()),
+            })
+            .sum()
+    }
+
+    pub fn request_end_all(&mut self) {
+        if self.active_sessions() == 0 {
+            self.set_notice(i18n::END_ALL_NONE);
+        } else {
+            self.dialog = Dialog::ConfirmEndAll;
+        }
+    }
+
+    /// Desconecta todas as sessões (as abas continuam abertas). Não mexe no cofre.
+    pub fn end_all_sessions(&mut self) {
+        for t in &mut self.tabs {
+            t.body.close();
+        }
+        self.set_notice(i18n::END_ALL_DONE);
+    }
+
+    pub fn lock_vault(&mut self) {
+        self.vault.lock();
+        self.set_notice(i18n::VAULT_LOCKED_NOTICE);
+    }
+
+    // -------------------------------------------------- importação do ssh config
+
+    /// Abre o diálogo de importação (etapa de escolha do arquivo).
+    pub fn open_import_ssh(&mut self) {
+        self.dialog = Dialog::ImportSsh(Box::new(ImportDialog::new()));
+    }
+
+    /// Lê o arquivo em segundo plano (`None` = `~/.ssh/config`).
+    pub fn start_import_load(&mut self, ctx: &egui::Context, path: Option<PathBuf>) {
+        if let Dialog::ImportSsh(d) = &mut self.dialog {
+            d.stage = ImportStage::Loading;
+            d.error = None;
+        }
+        let existing = self.profiles.clone();
+        let (tx, ctx) = (self.tx.clone(), ctx.clone());
+        self.rt.spawn_blocking(move || {
+            let r = path
+                .or_else(ssh_import::default_path)
+                .ok_or_else(|| i18n::IMPORT_ERR_NO_HOME.to_string())
+                .and_then(|p| ssh_import::load_with_env(&p))
+                .map(|raw| ssh_import::build_preview(raw, &existing));
+            let _ = tx.send(Msg::SshConfigLoaded(r));
+            ctx.request_repaint();
+        });
+    }
+
+    /// Escolhe o arquivo com o seletor do sistema e o lê.
+    pub fn pick_import_file(&self, ctx: &egui::Context) {
+        let (tx, ctx) = (self.tx.clone(), ctx.clone());
+        let start = crate::paths::ssh_dir();
+        let existing = self.profiles.clone();
+        self.rt.spawn(async move {
+            let mut dlg = rfd::AsyncFileDialog::new().set_title(i18n::IMPORT_PICK_TITLE);
+            if let Some(d) = start {
+                dlg = dlg.set_directory(d);
+            }
+            let Some(f) = dlg.pick_file().await else {
+                return;
+            };
+            let path = f.path().to_path_buf();
+            let r = tokio::task::spawn_blocking(move || {
+                ssh_import::load_with_env(&path)
+                    .map(|raw| ssh_import::build_preview(raw, &existing))
+            })
+            .await
+            .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()));
+            let _ = tx.send(Msg::SshConfigLoaded(r));
+            ctx.request_repaint();
+        });
+    }
+
+    fn on_import_loaded(&mut self, r: Result<Preview, String>) {
+        let Dialog::ImportSsh(d) = &mut self.dialog else {
+            return;
+        };
+        match r {
+            Ok(p) => {
+                d.preview = p;
+                d.stage = ImportStage::Preview;
+            }
+            Err(e) => {
+                d.error = Some(e);
+                d.stage = ImportStage::Intro;
+            }
+        }
+    }
+
+    /// Grava os candidatos marcados (em segundo plano).
+    pub fn confirm_import(&mut self, ctx: &egui::Context) {
+        let Dialog::ImportSsh(d) = &mut self.dialog else {
+            return;
+        };
+        if d.stage != ImportStage::Preview {
+            return;
+        }
+        let profiles = d.preview.prepare();
+        if profiles.is_empty() {
+            return;
+        }
+        d.stage = ImportStage::Saving;
+        let (store, tx, ctx) = (self.store.clone(), self.tx.clone(), ctx.clone());
+        self.rt.spawn_blocking(move || {
+            let _ = tx.send(Msg::SshConfigSaved(ssh_import::save(&store, profiles)));
+            ctx.request_repaint();
+        });
+    }
+
+    fn on_import_saved(&mut self, r: Result<SaveReport, String>) {
+        match r {
+            Ok(rep) => {
+                if matches!(self.dialog, Dialog::ImportSsh(_)) {
+                    self.dialog = Dialog::None;
+                }
+                self.reload();
+                self.set_notice(i18n::import_done(rep.imported));
+            }
+            Err(e) => {
+                if let Dialog::ImportSsh(d) = &mut self.dialog {
+                    d.stage = ImportStage::Preview;
+                    d.error = Some(format!("{}{e}", i18n::IMPORT_ERR_SAVE));
+                }
+            }
+        }
+    }
+
+    // ------------------------------------------ exportar / importar configuração
+
+    pub fn export_config(&mut self, ctx: &egui::Context) {
+        if self.config_busy {
+            return;
+        }
+        self.config_busy = true;
+        let (store, tx, ctx) = (self.store.clone(), self.tx.clone(), ctx.clone());
+        self.rt.spawn(async move {
+            let dlg = rfd::AsyncFileDialog::new()
+                .set_title(i18n::CFG_EXPORT_TITLE)
+                .set_file_name(i18n::CFG_EXPORT_NAME)
+                .add_filter("JSON", &["json"]);
+            let msg = match dlg.save_file().await {
+                None => Err(String::new()),
+                Some(f) => {
+                    let path = f.path().to_path_buf();
+                    tokio::task::spawn_blocking(move || crate::config_io::export_to(&store, &path))
+                        .await
+                        .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()))
+                }
+            };
+            let _ = tx.send(Msg::ConfigExported(msg));
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn import_config(&mut self, ctx: &egui::Context) {
+        if self.config_busy {
+            return;
+        }
+        self.config_busy = true;
+        let (store, tx, ctx) = (self.store.clone(), self.tx.clone(), ctx.clone());
+        self.rt.spawn(async move {
+            let dlg = rfd::AsyncFileDialog::new()
+                .set_title(i18n::CFG_IMPORT_TITLE)
+                .add_filter("JSON", &["json"]);
+            let r = match dlg.pick_file().await {
+                None => Err(String::new()),
+                Some(f) => {
+                    let path = f.path().to_path_buf();
+                    tokio::task::spawn_blocking(move || {
+                        crate::config_io::import_from(&store, &path)
+                    })
+                    .await
+                    .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()))
+                }
+            };
+            let _ = tx.send(Msg::ConfigImported(r));
+            ctx.request_repaint();
+        });
     }
 
     pub fn open_profile(&mut self, id: ProfileId) {
@@ -555,6 +933,21 @@ impl App {
             }
             Action::NewProfile => self.new_profile_dialog(),
             Action::FocusSearch => self.focus_search = true,
+            Action::SplitSide => self.split_active(Dir::Vertical, None),
+            Action::SplitStack => self.split_active(Dir::Horizontal, None),
+            Action::ClosePane => {
+                let target = self.active.and_then(|tab| {
+                    let t = self.tabs.iter().find(|t| t.id == tab)?;
+                    let pane = t.body.as_split_ref().map(SplitBody::focused_id);
+                    Some((tab, pane))
+                });
+                match target {
+                    Some((tab, Some(pane))) => self.request_close_pane(tab, pane),
+                    Some((tab, None)) => self.request_close_tab(tab),
+                    None => {}
+                }
+            }
+            Action::NextPane => self.cycle_pane(),
         }
     }
 
@@ -567,13 +960,24 @@ impl App {
         }
     }
 
+    /// Reação à suspensão detectada: bloqueia o cofre (se configurado). Não encerra sessões.
+    pub(crate) fn on_suspend(&mut self, suspended: bool) {
+        if suspended && self.settings.vault_lock_on_suspend && !self.vault.is_locked() {
+            self.vault.lock();
+            self.set_notice(i18n::VAULT_LOCKED_SUSPEND);
+        }
+    }
+
     /// Cofre: atividade, bloqueio por inatividade. Barato (mutex), seguro na UI.
     pub fn vault_housekeeping(&mut self, ctx: &egui::Context) {
+        // Primeiro a suspensão: ao acordar, o cofre fecha antes de qualquer uso neste quadro.
+        let suspended = self.suspend.observe_now();
+        self.on_suspend(suspended);
         if ctx.input(|i| !i.events.is_empty()) {
             self.vault.touch();
         }
         self.vault.tick(Instant::now());
-        if self.settings.vault_lock_minutes > 0 {
+        if self.settings.vault_lock_minutes > 0 || self.settings.vault_lock_on_suspend {
             ctx.request_repaint_after(Duration::from_secs(5));
         }
     }
@@ -642,6 +1046,9 @@ impl App {
             confirm_paste: self.settings.confirm_multiline_paste,
             input_blocked,
             auto_connect: self.auto_connect,
+            dark: ctx.theme() == egui::Theme::Dark,
+            prod_warning: self.settings.prod_warning,
+            theme: None,
         };
         (&mut self.tabs, env)
     }
@@ -672,18 +1079,22 @@ impl App {
 
     /// Pedidos das abas (recarregar perfis, abrir hosts confiáveis).
     pub fn process_tab_events(&mut self) {
-        let events: Vec<TabEvent> = self
+        let events: Vec<(u64, TabEvent)> = self
             .tabs
             .iter_mut()
-            .flat_map(|t| t.body.take_events())
+            .flat_map(|t| {
+                let id = t.id;
+                t.body.take_events().into_iter().map(move |e| (id, e))
+            })
             .collect();
-        for e in events {
+        for (tab, e) in events {
             match e {
                 TabEvent::ProfileChanged => self.reload(),
                 TabEvent::OpenTrustedHosts => {
                     self.open_settings();
                     self.scroll_to_trusted = true;
                 }
+                TabEvent::ClosePane(pane) => self.request_close_pane(tab, pane),
             }
         }
     }

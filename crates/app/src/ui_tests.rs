@@ -41,18 +41,18 @@ fn app_with(store: Arc<dyn SecretStore>, mode: VaultMode) -> App {
     app
 }
 
-fn memory_app() -> App {
+pub(crate) fn memory_app() -> App {
     app_with(Arc::new(MemoryStore::new()), VaultMode::SessionOnly)
 }
 
-fn harness(app: App) -> Harness<'static, App> {
+pub(crate) fn harness(app: App) -> Harness<'static, App> {
     Harness::builder()
         .with_size(egui::vec2(1200.0, 800.0))
         .build_eframe(move |_| app)
 }
 
 /// Avança frames até `cond` (tarefas em segundo plano reagem via canal).
-fn wait_until(h: &mut Harness<'static, App>, what: &str, cond: impl Fn(&App) -> bool) {
+pub(crate) fn wait_until(h: &mut Harness<'static, App>, what: &str, cond: impl Fn(&App) -> bool) {
     let start = Instant::now();
     while !cond(h.state()) {
         assert!(start.elapsed() < Duration::from_secs(10), "timeout: {what}");
@@ -61,7 +61,7 @@ fn wait_until(h: &mut Harness<'static, App>, what: &str, cond: impl Fn(&App) -> 
     }
 }
 
-fn form(name: &str) -> ProfileForm {
+pub(crate) fn form(name: &str) -> ProfileForm {
     let mut f = ProfileForm::blank();
     f.name = name.into();
     f.host = "srv.local".into();
@@ -69,7 +69,7 @@ fn form(name: &str) -> ProfileForm {
     f
 }
 
-fn submit(h: &mut Harness<'static, App>, f: ProfileForm) {
+pub(crate) fn submit(h: &mut Harness<'static, App>, f: ProfileForm) {
     let ctx = h.ctx.clone();
     let app = h.state_mut();
     app.dialog = Dialog::Profile(Box::new(ProfileDialog::new(f)));

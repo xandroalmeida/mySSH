@@ -447,11 +447,14 @@ impl TerminalTab {
         }
         sess.set_input_enabled(!env.input_blocked);
         sess.set_confirm_multiline(env.confirm_paste);
-        let theme = if ui.visuals().dark_mode {
-            TermTheme::dark()
-        } else {
-            TermTheme::light()
-        };
+        // Paleta do perfil (se houver); senão a do tema global.
+        let theme = env.theme.clone().unwrap_or_else(|| {
+            if ui.visuals().dark_mode {
+                TermTheme::dark()
+            } else {
+                TermTheme::light()
+            }
+        });
         let style = TermStyle::new(FontId::monospace(env.font_size), theme);
         let r = myssh_term::show(ui, sess, &style);
         if let Some(text) = r.paste_needs_confirm {

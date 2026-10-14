@@ -1,8 +1,10 @@
 //! mySSH: casca da aplicação desktop (perfis, abas, configurações).
 
 mod app;
+mod config_io;
 mod demo;
 mod dialogs;
+mod dialogs_extra;
 mod env;
 mod form;
 mod i18n;
@@ -11,14 +13,23 @@ mod logic;
 mod paths;
 mod settings;
 mod shortcuts;
+mod split;
+mod split_body;
+mod ssh_import;
+mod suspend;
 mod tabs;
 mod terminal_tab;
+mod theming;
 mod view;
 
 #[cfg(test)]
 mod real_tests;
 #[cfg(test)]
 mod ui_tests;
+#[cfg(test)]
+mod ui_tests_m2b;
+#[cfg(test)]
+mod ui_tests_m2b_shots;
 
 use std::sync::Arc;
 

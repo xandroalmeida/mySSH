@@ -44,6 +44,8 @@ pub struct Settings {
     pub vault_lock_minutes: u32,
     /// Faixa/borda de aviso em abas de produção.
     pub prod_warning: bool,
+    /// Bloquear o cofre ao detectar suspensão do computador (ver `suspend`).
+    pub vault_lock_on_suspend: bool,
 }
 
 pub const FONT_MIN: f32 = 8.0;
@@ -58,6 +60,7 @@ impl Default for Settings {
             confirm_multiline_paste: true,
             vault_lock_minutes: 15,
             prod_warning: true,
+            vault_lock_on_suspend: true,
         }
     }
 }
@@ -67,6 +70,7 @@ const K_FONT: &str = "terminal.font_size";
 const K_PASTE: &str = "terminal.confirm_multiline_paste";
 const K_LOCK: &str = "vault.lock_minutes";
 const K_PROD: &str = "ui.prod_warning";
+const K_SUSPEND: &str = "vault.lock_on_suspend";
 
 impl Settings {
     /// Lê valores via `get`; chaves ausentes ou inválidas caem no padrão.
@@ -89,6 +93,9 @@ impl Settings {
             prod_warning: get(K_PROD)
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(d.prod_warning),
+            vault_lock_on_suspend: get(K_SUSPEND)
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(d.vault_lock_on_suspend),
         }
     }
 
@@ -96,13 +103,14 @@ impl Settings {
         Self::from_getter(|k| store.get_setting(k).ok().flatten())
     }
 
-    pub fn pairs(&self) -> [(&'static str, String); 5] {
+    pub fn pairs(&self) -> [(&'static str, String); 6] {
         [
             (K_THEME, self.theme.key().to_string()),
             (K_FONT, format!("{}", self.terminal_font_size)),
             (K_PASTE, self.confirm_multiline_paste.to_string()),
             (K_LOCK, self.vault_lock_minutes.to_string()),
             (K_PROD, self.prod_warning.to_string()),
+            (K_SUSPEND, self.vault_lock_on_suspend.to_string()),
         ]
     }
 
@@ -147,6 +155,15 @@ mod tests {
         assert!(s.confirm_multiline_paste);
         assert_eq!(s.vault_lock_minutes, LOCK_MAX_MINUTES);
         assert!(!s.prod_warning);
+        assert!(!s.vault_lock_on_suspend);
+    }
+
+    #[test]
+    fn tema_sistema_segue_o_so() {
+        assert_eq!(ThemePref::System.to_egui(), egui::ThemePreference::System);
+        assert_eq!(ThemePref::Light.to_egui(), egui::ThemePreference::Light);
+        assert_eq!(ThemePref::Dark.to_egui(), egui::ThemePreference::Dark);
+        assert_eq!(Settings::default().theme, ThemePref::System);
     }
 
     #[test]
@@ -158,6 +175,7 @@ mod tests {
             confirm_multiline_paste: false,
             vault_lock_minutes: 0,
             prod_warning: false,
+            vault_lock_on_suspend: false,
         };
         s.save(&store).unwrap();
         assert_eq!(Settings::load(&store), s);

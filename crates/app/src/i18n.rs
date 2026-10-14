@@ -2,6 +2,9 @@
 
 use crate::shortcuts::Action;
 
+mod m2b;
+pub use m2b::*;
+
 pub const TITLE: &str = "mySSH";
 pub const STORE_FALLBACK: &str = "Não foi possível abrir o banco de dados local: perfis e configurações não serão salvos nesta execução.";
 
@@ -71,6 +74,10 @@ pub fn shortcut_name(a: Action) -> &'static str {
         Action::CloseTab => "fechar aba",
         Action::NewProfile => "novo perfil",
         Action::FocusSearch => "buscar perfis",
+        Action::SplitSide => "dividir painel lado a lado (mesmo perfil)",
+        Action::SplitStack => "dividir painel empilhado (mesmo perfil)",
+        Action::ClosePane => "fechar painel",
+        Action::NextPane => "próximo painel",
     }
 }
 

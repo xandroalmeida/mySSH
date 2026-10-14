@@ -2,7 +2,7 @@
 
 use myssh_core::{
     AuthMethod, Credential, CredentialId, CredentialKind, Environment, FolderId, Profile,
-    ProfileError, ProfileId,
+    ProfileError, ProfileId, ThemeOverride,
 };
 use myssh_secrets::{SecretString, new_secret_ref};
 use myssh_store::Folder;
@@ -104,6 +104,8 @@ pub struct ProfileForm {
     pub favorite: bool,
     pub environment: Environment,
     pub jump: Option<ProfileId>,
+    /// Tema do perfil (cada campo `None` herda o global).
+    pub theme: ThemeOverride,
     pub keepalive: String,
     pub timeout: String,
 }
@@ -149,6 +151,7 @@ impl ProfileForm {
             favorite: false,
             environment: Environment::None,
             jump: None,
+            theme: ThemeOverride::default(),
             keepalive: d.keepalive_secs.map(|k| k.to_string()).unwrap_or_default(),
             timeout: d.connect_timeout_secs.to_string(),
         }
@@ -183,6 +186,7 @@ impl ProfileForm {
         f.favorite = p.favorite;
         f.environment = p.environment;
         f.jump = p.jump;
+        f.theme = p.theme.clone();
         f.keepalive = p.keepalive_secs.map(|k| k.to_string()).unwrap_or_default();
         f.timeout = p.connect_timeout_secs.to_string();
         f
@@ -267,6 +271,7 @@ impl ProfileForm {
         profile.favorite = self.favorite;
         profile.environment = self.environment;
         profile.jump = self.jump;
+        profile.theme = self.theme.clone();
         profile.keepalive_secs = keepalive;
         profile.connect_timeout_secs = timeout;
 

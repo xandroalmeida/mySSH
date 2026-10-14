@@ -10,9 +10,10 @@ use crate::form::{AuthKind, SecretMode};
 use crate::i18n;
 use crate::logic::folder_path;
 use crate::settings::{FONT_MAX, FONT_MIN, LOCK_MAX_MINUTES, ThemePref};
+use crate::split::Dir;
 use crate::view::warn_color;
 
-enum Next {
+pub(crate) enum Next {
     Keep,
     Close,
     Save,
@@ -27,9 +28,18 @@ enum Next {
     OpenSettings,
     AskForget(HostEndpoint),
     ConfirmForget(HostEndpoint),
+    ConfirmClosePane(u64, crate::split::PaneId),
+    EndAllSessions,
+    /// Ler o ssh config (`None` = `~/.ssh/config`).
+    ImportLoad(Option<std::path::PathBuf>),
+    ImportPick,
+    ImportConfirm,
+    SplitConfirm(Dir, Option<ProfileId>),
+    ExportConfig,
+    ImportConfig,
 }
 
-fn error_color(ui: &egui::Ui) -> Color32 {
+pub(crate) fn error_color(ui: &egui::Ui) -> Color32 {
     if ui.visuals().dark_mode {
         Color32::from_rgb(255, 120, 110)
     } else {
@@ -94,6 +104,43 @@ impl App {
                 );
                 (Dialog::ConfirmQuit, next)
             }
+            Dialog::ImportSsh(mut d) => {
+                let next = self.import_dialog(ctx, &mut d);
+                (Dialog::ImportSsh(d), next)
+            }
+            Dialog::Split(mut sd) => {
+                let next = self.split_dialog(ctx, &mut sd);
+                (Dialog::Split(sd), next)
+            }
+            Dialog::ConfirmClosePane { tab, pane } => {
+                let title = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == tab)
+                    .and_then(|t| t.body.as_split_ref())
+                    .map(|s| s.pane_title(pane))
+                    .unwrap_or_default();
+                let next = confirm(
+                    ctx,
+                    "confirm-close-pane",
+                    i18n::CLOSE_PANE_TITLE,
+                    &i18n::close_pane_body(&title),
+                    i18n::CLOSE_PANE_CONFIRM,
+                    Next::ConfirmClosePane(tab, pane),
+                );
+                (Dialog::ConfirmClosePane { tab, pane }, next)
+            }
+            Dialog::ConfirmEndAll => {
+                let next = confirm(
+                    ctx,
+                    "confirm-end-all",
+                    i18n::END_ALL_TITLE,
+                    &i18n::end_all_body(self.active_sessions()),
+                    i18n::END_ALL_CONFIRM,
+                    Next::EndAllSessions,
+                );
+                (Dialog::ConfirmEndAll, next)
+            }
             Dialog::ConfirmForget(ep) => {
                 let next = confirm(
                     ctx,
@@ -130,6 +177,23 @@ impl App {
                 self.close_tab(id);
             }
             Next::ConfirmQuit => self.confirm_quit(ctx),
+            Next::ConfirmClosePane(tab, pane) => {
+                self.close_dialog();
+                self.close_pane(tab, pane);
+            }
+            Next::EndAllSessions => {
+                self.close_dialog();
+                self.end_all_sessions();
+            }
+            Next::ImportLoad(path) => self.start_import_load(ctx, path),
+            Next::ImportPick => self.pick_import_file(ctx),
+            Next::ImportConfirm => self.confirm_import(ctx),
+            Next::SplitConfirm(dir, profile) => {
+                self.close_dialog();
+                self.split_active(dir, profile);
+            }
+            Next::ExportConfig => self.export_config(ctx),
+            Next::ImportConfig => self.import_config(ctx),
             Next::OpenSettings => self.open_settings(),
             Next::AskForget(ep) => self.dialog = Dialog::ConfirmForget(ep),
             Next::ConfirmForget(ep) => {
@@ -405,6 +469,12 @@ impl App {
                 });
                 ui.end_row();
             });
+        ui.add_space(6.0);
+        let font = self.settings.terminal_font_size;
+        egui::CollapsingHeader::new(RichText::new(i18n::TH_TITLE).strong())
+            .id_salt("profile-theme")
+            .default_open(!crate::theming::is_inherited(&f.theme))
+            .show(ui, |ui| crate::theming::editor(ui, &mut f.theme, font));
     }
 
     // ----------------------------------------------------------- configurações
@@ -416,6 +486,8 @@ impl App {
         let locked = self.vault.is_locked();
         let session_only = self.vault_mode == VaultMode::SessionOnly;
         let mut forget: Option<HostEndpoint> = None;
+        let mut cfg_action: Option<Next> = None;
+        let cfg_busy = self.config_busy;
         let scroll_trusted = std::mem::take(&mut self.scroll_to_trusted);
         let max_h = (ctx.content_rect().height() - 140.0).max(240.0);
         let resp = egui::Modal::new(egui::Id::new("settings-dialog")).show(ctx, |ui| {
@@ -432,10 +504,21 @@ impl App {
                         .spacing([10.0, 10.0])
                         .show(ui, |ui| {
                             ui.label(i18n::S_THEME);
-                            ui.horizontal(|ui| {
-                                ui.radio_value(&mut s.theme, ThemePref::System, i18n::THEME_SYSTEM);
-                                ui.radio_value(&mut s.theme, ThemePref::Light, i18n::THEME_LIGHT);
-                                ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK);
+                            ui.vertical(|ui| {
+                                ui.horizontal(|ui| {
+                                    ui.radio_value(
+                                        &mut s.theme,
+                                        ThemePref::System,
+                                        i18n::THEME_SYSTEM,
+                                    );
+                                    ui.radio_value(
+                                        &mut s.theme,
+                                        ThemePref::Light,
+                                        i18n::THEME_LIGHT,
+                                    );
+                                    ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK);
+                                });
+                                ui.weak(i18n::TH_SYSTEM_HELP);
                             });
                             ui.end_row();
 
@@ -459,6 +542,10 @@ impl App {
 
                             ui.label(i18n::S_PASTE);
                             ui.checkbox(&mut s.confirm_multiline_paste, i18n::S_PASTE_HELP);
+                            ui.end_row();
+
+                            ui.label(i18n::S_LOCK_SUSPEND);
+                            ui.checkbox(&mut s.vault_lock_on_suspend, i18n::S_LOCK_SUSPEND_HELP);
                             ui.end_row();
 
                             ui.label(i18n::S_PROD);
@@ -492,6 +579,23 @@ impl App {
                         }
                     });
                     ui.weak(i18n::LOCK_NOW_HELP);
+                    ui.separator();
+                    ui.label(RichText::new(i18n::S_CONFIG).strong());
+                    ui.horizontal(|ui| {
+                        if ui
+                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_EXPORT))
+                            .clicked()
+                        {
+                            cfg_action = Some(Next::ExportConfig);
+                        }
+                        if ui
+                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_IMPORT))
+                            .clicked()
+                        {
+                            cfg_action = Some(Next::ImportConfig);
+                        }
+                    });
+                    ui.colored_label(warn_color(ui), i18n::CFG_WARN);
                     ui.separator();
                     let head = ui.label(RichText::new(i18n::S_TRUSTED).strong());
                     if scroll_trusted {
@@ -543,6 +647,9 @@ impl App {
         }
         if let Some(ep) = forget {
             return Next::AskForget(ep);
+        }
+        if let Some(n) = cfg_action {
+            return n;
         }
         if lock_now {
             self.vault.lock();

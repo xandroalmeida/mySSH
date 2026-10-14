@@ -16,6 +16,7 @@ myssh-store = { path = "../store" }
 myssh-secrets = { path = "../secrets" }
 myssh-ssh = { path = "../ssh" }
 myssh-term = { path = "../term" }
+myssh-sshconfig = { path = "../sshconfig" }
 eframe = "0.36"
 egui = "0.36"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }

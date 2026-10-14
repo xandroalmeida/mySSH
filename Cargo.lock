@@ -2769,6 +2769,7 @@ dependencies = [
  "myssh-core",
  "myssh-secrets",
  "myssh-ssh",
+ "myssh-sshconfig",
  "myssh-store",
  "myssh-term",
  "png 0.18.1",
