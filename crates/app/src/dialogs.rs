@@ -1,6 +1,7 @@
 //! Diálogos modais: perfil, configurações, conexão rápida e confirmações.
 
 use egui::{Color32, Key, RichText};
+use myssh_core::trust::HostEndpoint;
 use myssh_core::{Environment, ProfileId};
 
 use crate::app::{App, Dialog, ProfileDialog, QuickDialog, VaultIssue, VaultMode};
@@ -22,6 +23,10 @@ enum Next {
     ConfirmCloseTab(u64),
     ConfirmQuit,
     Quick(String),
+    /// Volta às Configurações (após cancelar o "esquecer host").
+    OpenSettings,
+    AskForget(HostEndpoint),
+    ConfirmForget(HostEndpoint),
 }
 
 fn error_color(ui: &egui::Ui) -> Color32 {
@@ -42,11 +47,8 @@ impl App {
                 (Dialog::Profile(d), next)
             }
             Dialog::Settings => {
-                let close = self.settings_dialog(ctx);
-                (
-                    Dialog::Settings,
-                    if close { Next::Close } else { Next::Keep },
-                )
+                let next = self.settings_dialog(ctx);
+                (Dialog::Settings, next)
             }
             Dialog::Quick(mut q) => {
                 let next = quick_dialog(ctx, &mut q);
@@ -92,6 +94,21 @@ impl App {
                 );
                 (Dialog::ConfirmQuit, next)
             }
+            Dialog::ConfirmForget(ep) => {
+                let next = confirm(
+                    ctx,
+                    "confirm-forget",
+                    i18n::FORGET_TITLE,
+                    &i18n::forget_body(&ep.host, ep.port),
+                    i18n::FORGET_CONFIRM,
+                    Next::ConfirmForget(ep.clone()),
+                );
+                let next = match next {
+                    Next::Close => Next::OpenSettings,
+                    other => other,
+                };
+                (Dialog::ConfirmForget(ep), next)
+            }
         };
         self.dialog = dialog;
         match next {
@@ -113,6 +130,12 @@ impl App {
                 self.close_tab(id);
             }
             Next::ConfirmQuit => self.confirm_quit(ctx),
+            Next::OpenSettings => self.open_settings(),
+            Next::AskForget(ep) => self.dialog = Dialog::ConfirmForget(ep),
+            Next::ConfirmForget(ep) => {
+                self.forget_host(&ep);
+                self.dialog = Dialog::Settings;
+            }
             Next::Quick(text) => match self.confirm_quick(&text) {
                 Ok(()) => self.close_dialog(),
                 Err(e) => {
@@ -386,79 +409,128 @@ impl App {
 
     // ----------------------------------------------------------- configurações
 
-    fn settings_dialog(&mut self, ctx: &egui::Context) -> bool {
+    fn settings_dialog(&mut self, ctx: &egui::Context) -> Next {
         let mut close = false;
         let mut lock_now = false;
         let mut unlock = false;
         let locked = self.vault.is_locked();
         let session_only = self.vault_mode == VaultMode::SessionOnly;
+        let mut forget: Option<HostEndpoint> = None;
+        let scroll_trusted = std::mem::take(&mut self.scroll_to_trusted);
+        let max_h = (ctx.content_rect().height() - 140.0).max(240.0);
         let resp = egui::Modal::new(egui::Id::new("settings-dialog")).show(ctx, |ui| {
             ui.set_width(520.0);
             ui.heading(i18n::SETTINGS_TITLE);
             ui.add_space(6.0);
-            let s = &mut self.settings;
-            egui::Grid::new("settings-grid")
-                .num_columns(2)
-                .spacing([10.0, 10.0])
+            egui::ScrollArea::vertical()
+                .max_height(max_h)
+                .auto_shrink([false, true])
                 .show(ui, |ui| {
-                    ui.label(i18n::S_THEME);
-                    ui.horizontal(|ui| {
-                        ui.radio_value(&mut s.theme, ThemePref::System, i18n::THEME_SYSTEM);
-                        ui.radio_value(&mut s.theme, ThemePref::Light, i18n::THEME_LIGHT);
-                        ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK);
-                    });
-                    ui.end_row();
+                    let s = &mut self.settings;
+                    egui::Grid::new("settings-grid")
+                        .num_columns(2)
+                        .spacing([10.0, 10.0])
+                        .show(ui, |ui| {
+                            ui.label(i18n::S_THEME);
+                            ui.horizontal(|ui| {
+                                ui.radio_value(&mut s.theme, ThemePref::System, i18n::THEME_SYSTEM);
+                                ui.radio_value(&mut s.theme, ThemePref::Light, i18n::THEME_LIGHT);
+                                ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK);
+                            });
+                            ui.end_row();
 
-                    ui.label(i18n::S_FONT);
-                    ui.vertical(|ui| {
-                        ui.add(
-                            egui::Slider::new(&mut s.terminal_font_size, FONT_MIN..=FONT_MAX)
-                                .suffix(" pt")
-                                .step_by(0.5),
-                        );
-                        ui.label(
-                            RichText::new(i18n::FONT_SAMPLE)
-                                .monospace()
-                                .size(s.terminal_font_size),
-                        );
-                    });
-                    ui.end_row();
+                            ui.label(i18n::S_FONT);
+                            ui.vertical(|ui| {
+                                ui.add(
+                                    egui::Slider::new(
+                                        &mut s.terminal_font_size,
+                                        FONT_MIN..=FONT_MAX,
+                                    )
+                                    .suffix(" pt")
+                                    .step_by(0.5),
+                                );
+                                ui.label(
+                                    RichText::new(i18n::FONT_SAMPLE)
+                                        .monospace()
+                                        .size(s.terminal_font_size),
+                                );
+                            });
+                            ui.end_row();
 
-                    ui.label(i18n::S_PASTE);
-                    ui.checkbox(&mut s.confirm_multiline_paste, i18n::S_PASTE_HELP);
-                    ui.end_row();
+                            ui.label(i18n::S_PASTE);
+                            ui.checkbox(&mut s.confirm_multiline_paste, i18n::S_PASTE_HELP);
+                            ui.end_row();
 
-                    ui.label(i18n::S_PROD);
-                    ui.checkbox(&mut s.prod_warning, i18n::S_PROD_HELP);
-                    ui.end_row();
+                            ui.label(i18n::S_PROD);
+                            ui.checkbox(&mut s.prod_warning, i18n::S_PROD_HELP);
+                            ui.end_row();
 
-                    ui.label(i18n::S_VAULT_TIMEOUT);
-                    ui.horizontal(|ui| {
-                        ui.add(
-                            egui::DragValue::new(&mut s.vault_lock_minutes)
-                                .range(0..=LOCK_MAX_MINUTES)
-                                .suffix(" min"),
-                        );
-                        ui.weak(i18n::S_VAULT_TIMEOUT_HELP);
-                    });
-                    ui.end_row();
-                });
-            ui.separator();
-            ui.label(RichText::new(i18n::S_VAULT).strong());
-            if session_only {
-                ui.colored_label(warn_color(ui), i18n::S_VAULT_SESSION_ONLY);
-            }
-            ui.horizontal(|ui| {
-                if locked {
-                    ui.label(i18n::VAULT_LOCKED_BADGE);
-                    if ui.button(i18n::UNLOCK_VAULT).clicked() {
-                        unlock = true;
+                            ui.label(i18n::S_VAULT_TIMEOUT);
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::DragValue::new(&mut s.vault_lock_minutes)
+                                        .range(0..=LOCK_MAX_MINUTES)
+                                        .suffix(" min"),
+                                );
+                                ui.weak(i18n::S_VAULT_TIMEOUT_HELP);
+                            });
+                            ui.end_row();
+                        });
+                    ui.separator();
+                    ui.label(RichText::new(i18n::S_VAULT).strong());
+                    if session_only {
+                        ui.colored_label(warn_color(ui), i18n::S_VAULT_SESSION_ONLY);
                     }
-                } else if ui.button(i18n::LOCK_NOW).clicked() {
-                    lock_now = true;
-                }
-            });
-            ui.weak(i18n::LOCK_NOW_HELP);
+                    ui.horizontal(|ui| {
+                        if locked {
+                            ui.label(i18n::VAULT_LOCKED_BADGE);
+                            if ui.button(i18n::UNLOCK_VAULT).clicked() {
+                                unlock = true;
+                            }
+                        } else if ui.button(i18n::LOCK_NOW).clicked() {
+                            lock_now = true;
+                        }
+                    });
+                    ui.weak(i18n::LOCK_NOW_HELP);
+                    ui.separator();
+                    let head = ui.label(RichText::new(i18n::S_TRUSTED).strong());
+                    if scroll_trusted {
+                        head.scroll_to_me(Some(egui::Align::TOP));
+                    }
+                    ui.weak(i18n::TRUSTED_HELP);
+                    if let Some(e) = &self.trusted_error {
+                        ui.colored_label(error_color(ui), e);
+                    }
+                    if self.trusted.is_empty() {
+                        ui.label(i18n::TRUSTED_EMPTY);
+                    }
+                    for (ep, key) in &self.trusted {
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                egui::Label::new(
+                                    RichText::new(format!(
+                                        "{}  {}",
+                                        crate::terminal_tab::fmt_endpoint(ep),
+                                        key.algorithm
+                                    ))
+                                    .monospace()
+                                    .strong(),
+                                )
+                                .selectable(true),
+                            );
+                            if ui.button(i18n::TRUSTED_FORGET).clicked() {
+                                forget = Some(ep.clone());
+                            }
+                        });
+                        ui.add(
+                            egui::Label::new(
+                                RichText::new(&key.fingerprint_sha256).monospace().small(),
+                            )
+                            .selectable(true),
+                        );
+                        ui.add_space(4.0);
+                    }
+                });
             ui.separator();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button(i18n::CLOSE).clicked() {
@@ -469,6 +541,9 @@ impl App {
         if resp.should_close() {
             close = true;
         }
+        if let Some(ep) = forget {
+            return Next::AskForget(ep);
+        }
         if lock_now {
             self.vault.lock();
             self.set_notice(i18n::VAULT_LOCKED_NOTICE);
@@ -476,7 +551,7 @@ impl App {
         if unlock {
             self.unlock_vault(ctx);
         }
-        close
+        if close { Next::Close } else { Next::Keep }
     }
 }
 

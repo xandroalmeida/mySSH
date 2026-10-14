@@ -14,6 +14,8 @@ path = "src/main.rs"
 myssh-core = { path = "../core" }
 myssh-store = { path = "../store" }
 myssh-secrets = { path = "../secrets" }
+myssh-ssh = { path = "../ssh" }
+myssh-term = { path = "../term" }
 eframe = "0.36"
 egui = "0.36"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }

@@ -1,11 +1,14 @@
-//! Abas e ponto de extensão para o terminal.
-//!
-//! O crate de terminal/SSH (a ser integrado) implementa [`TabBody`] e é instanciado em
-//! [`make_body`] para [`TabKind::Terminal`]. Enquanto isso, [`PlaceholderTerminal`] ocupa o lugar.
+//! Abas. [`TerminalTab`] (módulo `terminal_tab`) implementa [`TabBody`] para [`TabKind::Terminal`].
 
-use myssh_core::{AuthMethod, Environment, Profile};
+use std::sync::Arc;
+
+use egui::Color32;
+use myssh_core::{Environment, Profile};
+use myssh_secrets::Vault;
+use myssh_store::Store;
 
 use crate::i18n;
+use crate::terminal_tab::TerminalTab;
 
 /// O que a aba abre. Conexão rápida = perfil transitório (`saved == false`).
 #[derive(Debug, Clone)]
@@ -23,18 +26,88 @@ impl TabKind {
     }
 }
 
+/// Serviços e configurações que as abas recebem a cada frame (nada é copiado para dentro delas).
+pub struct TabEnv<'a> {
+    pub rt: &'a tokio::runtime::Handle,
+    pub store: &'a Arc<Store>,
+    pub vault: &'a Arc<Vault>,
+    pub ctx: &'a egui::Context,
+    pub font_size: f32,
+    pub confirm_paste: bool,
+    /// Um diálogo modal (do app ou de outra aba) está aberto: o terminal não recebe teclado.
+    pub input_blocked: bool,
+    /// Conecta sozinha ao abrir (desligado em demos e testes sem rede).
+    pub auto_connect: bool,
+}
+
+/// Pedidos da aba para o app.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum TabEvent {
+    /// O perfil mudou no store (ex.: senha salva no cofre): recarregar a lista.
+    ProfileChanged,
+    /// Abrir a lista de hosts confiáveis (Configurações).
+    OpenTrustedHosts,
+}
+
+/// Indicador de estado na barra de abas: ícone + texto (nunca só cor).
+#[derive(Debug, Clone, Copy)]
+pub struct StatusBadge {
+    pub icon: &'static str,
+    pub text: &'static str,
+    pub color: Color32,
+}
+
 /// Conteúdo de uma aba.
 pub trait TabBody {
     fn title(&self) -> String;
-    fn ui(&mut self, ui: &mut egui::Ui);
+    fn ui(&mut self, ui: &mut egui::Ui, env: &TabEnv);
+    /// Chamado em todo frame para todas as abas (inclusive em segundo plano): drena a saída das
+    /// sessões (evita backpressure) e avança a conexão.
+    fn pump(&mut self, _env: &TabEnv) {}
+    /// A aba tem um diálogo modal próprio a mostrar (senha, host key, colagem...).
+    fn needs_modal(&self) -> bool {
+        false
+    }
+    fn modal_ui(&mut self, _ctx: &egui::Context, _env: &TabEnv) {}
+    /// Drena a saída pendente sem precisar de UI (usado ao encerrar o app).
+    fn drain(&mut self) {}
+    fn status(&self) -> Option<StatusBadge> {
+        None
+    }
+    fn take_events(&mut self) -> Vec<TabEvent> {
+        Vec::new()
+    }
+    /// A aba gerencia o próprio tamanho (terminal): o app não a envolve em `ScrollArea`.
+    fn fills_space(&self) -> bool {
+        false
+    }
     /// Há sessão ativa: fechar exige confirmação.
     fn is_busy(&self) -> bool;
-    /// Encerra a sessão/recursos. Chamado ao fechar a aba ou a aplicação.
+    /// Pede o encerramento da sessão (não bloqueia). Chamado ao fechar a aba ou a aplicação.
     fn close(&mut self);
+    /// `true` quando nada mais está vivo (usado para esperar o desligamento ao sair).
+    fn is_closed(&self) -> bool {
+        true
+    }
     /// O teclado está capturado pelo terminal (muda a regra de atalhos; ver `shortcuts`).
     fn has_terminal_focus(&self) -> bool {
         false
     }
+    /// Somente testes: texto da tela do terminal.
+    #[cfg(test)]
+    fn debug_screen(&self) -> String {
+        String::new()
+    }
+    /// Somente testes: bytes de saída remota já processados.
+    #[cfg(test)]
+    fn debug_bytes(&self) -> u64 {
+        0
+    }
+    /// Somente testes: envia bytes à sessão (como se digitados).
+    #[cfg(test)]
+    fn debug_send(&self, _bytes: &[u8]) {}
+    /// Somente demo (`MYSSH_DEMO_SSH`): responde "aceitar e salvar" ao diálogo de host key.
+    fn demo_accept_host_key(&mut self) {}
     /// Somente protótipo/demo: força `is_busy` para exercitar a confirmação ao fechar.
     fn simulate_busy(&mut self, _busy: bool) {}
 }
@@ -45,74 +118,13 @@ pub struct Tab {
     pub body: Box<dyn TabBody>,
 }
 
-/// Cria o corpo da aba. Ponto único a trocar quando o terminal real existir.
+/// Cria o corpo da aba.
 pub fn make_body(kind: &TabKind, jump_name: Option<String>) -> Box<dyn TabBody> {
     match kind {
-        TabKind::Terminal { profile, saved } => Box::new(PlaceholderTerminal {
-            profile: (**profile).clone(),
-            saved: *saved,
-            jump_name,
-            simulate_busy: false,
-        }),
+        TabKind::Terminal { profile, saved } => {
+            Box::new(TerminalTab::new((**profile).clone(), *saved, jump_name))
+        }
         TabKind::Welcome => Box::new(WelcomeBody),
-    }
-}
-
-pub struct PlaceholderTerminal {
-    profile: Profile,
-    saved: bool,
-    jump_name: Option<String>,
-    simulate_busy: bool,
-}
-
-fn auth_text(a: &AuthMethod) -> &'static str {
-    match a {
-        AuthMethod::Password {
-            credential: Some(_),
-        } => i18n::AUTH_SUMMARY_PASSWORD_SAVED,
-        AuthMethod::Password { credential: None } => i18n::AUTH_SUMMARY_PASSWORD_ASK,
-        AuthMethod::KeyFile { .. } => i18n::AUTH_SUMMARY_KEY,
-        AuthMethod::Agent => i18n::AUTH_SUMMARY_AGENT,
-        AuthMethod::KeyboardInteractive => i18n::AUTH_SUMMARY_KI,
-    }
-}
-
-impl TabBody for PlaceholderTerminal {
-    fn title(&self) -> String {
-        self.profile.name.clone()
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui) {
-        let p = &self.profile;
-        ui.add_space(8.0);
-        ui.heading(&p.name);
-        ui.label(format!("{}@{}:{}", p.username, p.host, p.port));
-        ui.label(format!("{}: {}", i18n::AUTH_LABEL, auth_text(&p.auth)));
-        if let Some(j) = &self.jump_name {
-            ui.label(format!("{}: {j}", i18n::JUMP_LABEL));
-        }
-        if !self.saved {
-            ui.weak(i18n::QUICK_NOT_SAVED);
-        }
-        ui.add_space(12.0);
-        egui::Frame::group(ui.style()).show(ui, |ui| {
-            ui.set_min_size(egui::vec2(ui.available_width(), 160.0));
-            ui.centered_and_justified(|ui| ui.weak(i18n::TERMINAL_PLACEHOLDER));
-        });
-        ui.add_space(8.0);
-        ui.checkbox(&mut self.simulate_busy, i18n::SIMULATE_BUSY);
-    }
-
-    fn is_busy(&self) -> bool {
-        self.simulate_busy
-    }
-
-    fn close(&mut self) {
-        self.simulate_busy = false;
-    }
-
-    fn simulate_busy(&mut self, busy: bool) {
-        self.simulate_busy = busy;
     }
 }
 
@@ -123,7 +135,7 @@ impl TabBody for WelcomeBody {
         i18n::WELCOME_TITLE.into()
     }
 
-    fn ui(&mut self, ui: &mut egui::Ui) {
+    fn ui(&mut self, ui: &mut egui::Ui, _env: &TabEnv) {
         ui.add_space(24.0);
         ui.vertical_centered(|ui| {
             ui.heading(i18n::WELCOME_HEADING);

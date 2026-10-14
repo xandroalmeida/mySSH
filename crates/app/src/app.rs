@@ -5,6 +5,7 @@ use std::sync::Arc;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::time::{Duration, Instant};
 
+use myssh_core::trust::{HostEndpoint, HostKey, HostTrustStore};
 use myssh_core::{Profile, ProfileId};
 use myssh_secrets::{Availability, MemoryStore, SecretError, SecretRef, Vault};
 use myssh_store::{Folder, ProfileFilter, Store};
@@ -17,7 +18,7 @@ use crate::logic::{
 };
 use crate::settings::Settings;
 use crate::shortcuts::{self, Action};
-use crate::tabs::{Tab, TabKind, make_body};
+use crate::tabs::{Tab, TabEnv, TabEvent, TabKind, make_body};
 
 /// Mensagens de tarefas em segundo plano (keyring, diálogo de arquivo) para a thread de UI.
 pub enum Msg {
@@ -82,6 +83,8 @@ pub enum Dialog {
     ConfirmDelete(ProfileId),
     ConfirmCloseTab(u64),
     ConfirmQuit,
+    /// Esquecer a chave confiável de um host (volta às Configurações depois).
+    ConfirmForget(HostEndpoint),
 }
 
 pub struct Pending {
@@ -92,7 +95,7 @@ pub struct Pending {
 
 pub struct App {
     pub(crate) rt: Arc<tokio::runtime::Runtime>,
-    pub(crate) store: Store,
+    pub(crate) store: Arc<Store>,
     pub(crate) vault: Arc<Vault>,
     pub(crate) vault_mode: VaultMode,
     pub(crate) keyring: KeyringStatus,
@@ -117,6 +120,12 @@ pub struct App {
     next_op: u64,
     pub(crate) notice: Option<(String, Instant)>,
     quit_ok: bool,
+    /// Abas de terminal conectam sozinhas ao abrir (desligado em demos/testes sem rede).
+    pub(crate) auto_connect: bool,
+    /// Hosts confiáveis (cache; atualizado ao abrir as Configurações).
+    pub(crate) trusted: Vec<(HostEndpoint, HostKey)>,
+    pub(crate) trusted_error: Option<String>,
+    pub(crate) scroll_to_trusted: bool,
     pub(crate) demo: Option<Demo>,
 }
 
@@ -130,6 +139,7 @@ impl App {
         demo: Option<Demo>,
     ) -> Self {
         let (tx, rx) = channel();
+        let store = Arc::new(store);
         let settings = Settings::load(&store);
         vault.set_idle_timeout(settings.vault_timeout());
         let mut app = Self {
@@ -162,6 +172,10 @@ impl App {
             next_op: 1,
             notice: None,
             quit_ok: false,
+            auto_connect: demo.as_ref().is_none_or(Demo::connects),
+            trusted: Vec::new(),
+            trusted_error: None,
+            scroll_to_trusted: false,
             demo,
         };
         app.reload();
@@ -596,10 +610,109 @@ impl App {
         ctx.send_viewport_cmd(egui::ViewportCommand::Close);
     }
 
+    /// Desconecta todas as sessões e espera (no máximo 3 s) o desligamento educado terminar.
     pub fn close_all_tabs(&mut self) {
         for t in &mut self.tabs {
             t.body.close();
         }
+        let deadline = Instant::now() + Duration::from_secs(3);
+        while Instant::now() < deadline && !self.tabs.iter().all(|t| t.body.is_closed()) {
+            for t in &mut self.tabs {
+                t.body.drain();
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+    }
+
+    // ----------------------------------------------------- abas: integração
+
+    /// Separa as abas dos serviços que elas usam (empréstimos disjuntos).
+    pub(crate) fn tabs_and_env<'a>(
+        &'a mut self,
+        ctx: &'a egui::Context,
+    ) -> (&'a mut Vec<Tab>, TabEnv<'a>) {
+        let input_blocked =
+            !matches!(self.dialog, Dialog::None) || self.tabs.iter().any(|t| t.body.needs_modal());
+        let env = TabEnv {
+            rt: self.rt.handle(),
+            store: &self.store,
+            vault: &self.vault,
+            ctx,
+            font_size: self.settings.terminal_font_size,
+            confirm_paste: self.settings.confirm_multiline_paste,
+            input_blocked,
+            auto_connect: self.auto_connect,
+        };
+        (&mut self.tabs, env)
+    }
+
+    /// Todo frame, todas as abas: drena sessões (inclusive em segundo plano) e avança conexões.
+    pub fn pump_tabs(&mut self, ctx: &egui::Context) {
+        let (tabs, env) = self.tabs_and_env(ctx);
+        for t in tabs.iter_mut() {
+            t.body.pump(&env);
+        }
+    }
+
+    /// Mostra o diálogo pendente de uma aba (a ativa tem prioridade). Um por vez.
+    pub fn tab_modals(&mut self, ctx: &egui::Context) {
+        if !matches!(self.dialog, Dialog::None) {
+            return;
+        }
+        let active = self.active;
+        let (tabs, env) = self.tabs_and_env(ctx);
+        let idx = tabs
+            .iter()
+            .position(|t| Some(t.id) == active && t.body.needs_modal())
+            .or_else(|| tabs.iter().position(|t| t.body.needs_modal()));
+        if let Some(i) = idx {
+            tabs[i].body.modal_ui(ctx, &env);
+        }
+    }
+
+    /// Pedidos das abas (recarregar perfis, abrir hosts confiáveis).
+    pub fn process_tab_events(&mut self) {
+        let events: Vec<TabEvent> = self
+            .tabs
+            .iter_mut()
+            .flat_map(|t| t.body.take_events())
+            .collect();
+        for e in events {
+            match e {
+                TabEvent::ProfileChanged => self.reload(),
+                TabEvent::OpenTrustedHosts => {
+                    self.open_settings();
+                    self.scroll_to_trusted = true;
+                }
+            }
+        }
+    }
+
+    // --------------------------------------------------------- hosts confiáveis
+
+    pub fn open_settings(&mut self) {
+        self.refresh_trusted();
+        self.dialog = Dialog::Settings;
+    }
+
+    pub fn refresh_trusted(&mut self) {
+        match self.store.list() {
+            Ok(mut l) => {
+                l.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.algorithm.cmp(&b.1.algorithm)));
+                self.trusted = l;
+                self.trusted_error = None;
+            }
+            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR.into()),
+        }
+    }
+
+    /// Remove a chave confiável (o próximo acesso cai no fluxo de host desconhecido).
+    pub fn forget_host(&mut self, ep: &HostEndpoint) {
+        match self.store.forget(ep) {
+            Ok(()) => self.trusted_error = None,
+            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR.into()),
+        }
+        self.refresh_trusted();
     }
 
     /// Há operação em andamento (usado pela demo para esperar).

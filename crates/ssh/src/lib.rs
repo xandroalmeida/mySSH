@@ -17,9 +17,10 @@ mod error;
 mod session;
 mod trust;
 
+pub use error::{AUTH_REJECTED, KEY_DECODE};
 pub use session::{
     AuthMaterial, ConnectRequest, HostKeyDecision, HostKeyResponder, Notify, PtySize,
-    SessionCommand, SessionEvent, SessionHandle, spawn,
+    SessionCommand, SessionEvent, SessionHandle, key_requires_passphrase, spawn,
 };
 pub use trust::{fingerprint_sha256, host_key_from_public};
 
