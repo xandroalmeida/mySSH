@@ -2640,6 +2640,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "myssh-ssh"
+version = "0.1.0"
+dependencies = [
+ "myssh-core",
+ "myssh-store",
+ "russh",
+ "secrecy",
+ "tokio",
+ "zeroize",
+]
+
+[[package]]
 name = "myssh-store"
 version = "0.1.0"
 dependencies = [
@@ -2650,6 +2662,21 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "uuid",
+]
+
+[[package]]
+name = "myssh-term"
+version = "0.1.0"
+dependencies = [
+ "alacritty_terminal",
+ "eframe",
+ "egui",
+ "myssh-core",
+ "myssh-ssh",
+ "myssh-store",
+ "russh",
+ "secrecy",
+ "tokio",
 ]
 
 [[package]]

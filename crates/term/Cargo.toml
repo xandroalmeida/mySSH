@@ -1,0 +1,19 @@
+[package]
+name = "myssh-term"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Terminal do mySSH: emulação (alacritty_terminal) + widget egui sobre uma sessão myssh-ssh"
+
+[dependencies]
+myssh-core = { path = "../core" }
+myssh-ssh = { path = "../ssh" }
+egui = "0.36"
+alacritty_terminal = "0.26"
+
+[dev-dependencies]
+myssh-store = { path = "../store" }
+eframe = "0.36"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }
+secrecy = "0.10"
+russh = "0.64"
