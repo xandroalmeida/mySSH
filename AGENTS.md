@@ -9,8 +9,10 @@ Gerenciador desktop de sessões SSH em Rust (macOS, Windows, Linux). UI e mensag
 
 ## Comandos
 - Servidor de teste: `./testenv/up.sh` → `127.0.0.1:2222`, usuário `tester`, senha `tester-pass`, chaves em `testenv/keys/` (`id_ed25519` sem passphrase; `id_ed25519_pass` com passphrase `test-passphrase`). Só para desenvolvimento.
+- Testenv (M2): `up.sh` também sobe `myssh-testsshd-target` (**sem porta publicada**; só alcançável pela rede docker `myssh-testnet`, como `myssh-testsshd-target:22`, a partir do bastion `127.0.0.1:2222`; host keys próprias). Usuários nos dois: `tester` (senha/chave); `mfa` (chave pública **e** keyboard-interactive: prompt "Password:" respondido com o código fixo `mfa-code-123456`); `kionly` (só keyboard-interactive, resposta `ki-pass`). O sshd roda com PAM (`sshd.pam`).
+- Testes de jump host/MFA/SFTP: mesmos comandos abaixo (o alvo do jump é `MYSSH_TEST_TARGET`, padrão `myssh-testsshd-target:22`; os testes leem as host keys dos containers via `docker exec`, fora do código sob teste). Agente do sistema (macOS): `MYSSH_TEST_SYSTEM_AGENT=1` habilita `autenticacao_pelo_agente_do_sistema` (adiciona e remove a chave de teste no agente).
 - `cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace`
-- Testes de integração que precisam do servidor: `MYSSH_TEST_SSH=127.0.0.1:2222 cargo test --workspace -- --ignored`
+- Testes de integração que precisam do servidor: `MYSSH_TEST_SSH=127.0.0.1:2222 MYSSH_TEST_KEYS=$PWD/testenv/keys cargo test --workspace -- --ignored --test-threads=1` (`real_saida_dos_testes_sem_segredos` precisa de `MYSSH_TEST_LOG`, ver docs/M1-RESULTADO.md)
 
 ## Convenções
 - Nunca desabilitar validação de host key, nem "aceitar qualquer chave", nem em testes (testes fixam a chave esperada).

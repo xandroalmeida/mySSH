@@ -1,0 +1,5 @@
+# PAM do sshd de teste (keyboard-interactive): uma rodada de pam_unix = prompt "Password:" (sem eco).
+auth    required   pam_unix.so
+account required   pam_unix.so
+password required  pam_permit.so
+session required   pam_permit.so

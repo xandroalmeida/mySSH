@@ -99,6 +99,7 @@ impl App {
             term: "xterm-256color".into(),
             connect_timeout: Duration::from_secs(15),
             keepalive: Some(Duration::from_secs(30)),
+            jumps: vec![],
         };
         let handle = spawn(
             rt.handle(),

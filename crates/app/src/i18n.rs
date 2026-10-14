@@ -217,8 +217,6 @@ pub const TAB_CANCELLED: &str = "Conexão cancelada.";
 pub const JUMP_LABEL: &str = "Jump host";
 
 // Erros / avisos da aba
-pub const ERR_JUMP: &str = "Jump host ainda não suportado nesta versão: a conexão não foi feita. Edite o perfil e remova o jump host para conectar direto, se for seguro.";
-pub const ERR_KI: &str = "Keyboard-interactive (MFA) ainda não é suportado nesta versão. Use senha, chave ou agente SSH neste perfil.";
 pub const ERR_AUTH_PASSWORD: &str =
     "Autenticação recusada: senha incorreta ou usuário sem acesso a este servidor.";
 pub const ERR_AUTH_KEY: &str = "Autenticação recusada: o servidor não aceitou esta chave.";
@@ -290,3 +288,28 @@ pub fn forget_body(host: &str, port: u16) -> String {
 }
 pub const FORGET_CONFIRM: &str = "Esquecer";
 pub const TRUSTED_ERR: &str = "Não foi possível ler ou alterar os hosts confiáveis.";
+
+// M2-A: jump host, keyboard-interactive/MFA, reconexão
+pub const ERR_JUMP_LOOP: &str =
+    "A cadeia de jump hosts tem um ciclo: um perfil aparece duas vezes.";
+pub const ERR_JUMP_MISSING: &str =
+    "O jump host deste perfil não existe mais. Edite o perfil e escolha outro.";
+pub const KI_TITLE: &str = "Autenticação adicional";
+pub const KI_DEFAULT_INSTRUCTIONS: &str =
+    "O servidor pede informações adicionais para concluir o login.";
+pub const KI_SEND: &str = "Enviar";
+pub const KI_ECHO_HINT: &str = "Resposta";
+pub const RECONNECTED_SEPARATOR: &str = "— reconectado —";
+pub const HK_VIA: &str = "Caminho";
+pub fn hk_via_jump(n: usize, total: usize, name: &str) -> String {
+    format!("Salto {n} de {total}: {name}")
+}
+pub fn hk_via_target(last_jump: &str) -> String {
+    format!("Destino final, via bastion {last_jump}")
+}
+pub fn ask_password_title_jump(user: &str, host: &str, name: &str) -> String {
+    format!("Senha de {user}@{host} (jump host {name})")
+}
+pub fn ki_title_jump(name: &str) -> String {
+    format!("Autenticação adicional no jump host {name}")
+}
