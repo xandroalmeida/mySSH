@@ -64,7 +64,7 @@ Omita as seções vazias. Grave em `docs/releases/vX.Y.Z.md` e acrescente o mesm
 ## 6. Commit e tag
 - `git add Cargo.toml Cargo.lock CHANGELOG.md docs/releases/vX.Y.Z.md`
 - Commit: `release: vX.Y.Z`, com a linha de coautoria exigida pelo ambiente, se houver.
-- Tag anotada: `git tag -a vX.Y.Z -F docs/releases/vX.Y.Z.md`
+- Tag anotada: `git tag -a vX.Y.Z --cleanup=verbatim -F docs/releases/vX.Y.Z.md`
 
 ## 7. Publicar
 - `git push origin main` e depois `git push origin vX.Y.Z`
