@@ -397,6 +397,23 @@ impl TabBody for SplitBody {
         self.panes.iter().map(|p| p.body.active_transfers()).sum()
     }
 
+    #[cfg(test)]
+    fn files_panel(&self) -> Option<&crate::files::FilesPanel> {
+        self.panes
+            .iter()
+            .find(|p| p.id == self.focused)
+            .and_then(|p| p.body.files_panel())
+    }
+
+    #[cfg(test)]
+    fn files_panel_mut(&mut self) -> Option<&mut crate::files::FilesPanel> {
+        let f = self.focused;
+        self.panes
+            .iter_mut()
+            .find(|p| p.id == f)
+            .and_then(|p| p.body.files_panel_mut())
+    }
+
     fn toggle_files(&mut self) {
         let f = self.focused;
         if let Some(p) = self.panes.iter_mut().find(|p| p.id == f) {

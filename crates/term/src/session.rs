@@ -394,6 +394,11 @@ impl TermSession {
         }
     }
 
+    /// Conexão SSH viva da sessão (para SFTP em canais próprios), se já conectou.
+    pub fn connection(&self) -> Option<std::sync::Arc<myssh_ssh::Connection>> {
+        self.handle.connection()
+    }
+
     /// Envia bytes ao servidor sem bloquear a UI (descarta se o canal estiver cheio ou fechado).
     pub fn send_input(&self, bytes: Vec<u8>) -> bool {
         if bytes.is_empty() {
@@ -524,7 +529,7 @@ mod tests {
     ) {
         let (cmd_tx, cmd_rx) = mpsc::channel(64);
         let (evt_tx, evt_rx) = mpsc::channel(64);
-        let s = TermSession::new(SessionHandle { cmd_tx, evt_rx }, 40, 6);
+        let s = TermSession::new(SessionHandle::new(cmd_tx, evt_rx), 40, 6);
         (s, evt_tx, cmd_rx)
     }
 
@@ -632,7 +637,7 @@ mod tests {
     fn scrollback_e_limitado() {
         let (cmd_tx, _cmd_rx) = mpsc::channel(8);
         let (evt_tx, evt_rx) = mpsc::channel(8);
-        let mut s = TermSession::with_scrollback(SessionHandle { cmd_tx, evt_rx }, 20, 4, 50);
+        let mut s = TermSession::with_scrollback(SessionHandle::new(cmd_tx, evt_rx), 20, 4, 50);
         for i in 0..500 {
             feed(&mut s, &evt_tx, format!("linha {i}\r\n").as_bytes());
         }
@@ -650,7 +655,7 @@ mod tests {
         let hist = s.history_len();
         let (cmd_tx, mut cmd_rx2) = mpsc::channel(64);
         let (evt_tx2, evt_rx) = mpsc::channel(64);
-        s.restart(SessionHandle { cmd_tx, evt_rx }, "— reconectado —");
+        s.restart(SessionHandle::new(cmd_tx, evt_rx), "— reconectado —");
         assert!(!s.is_alt_screen());
         assert!(s.history_len() >= hist, "scrollback preservado");
         assert!(s.screen_text().contains("— reconectado —"));

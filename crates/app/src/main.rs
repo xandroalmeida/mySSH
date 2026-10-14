@@ -26,6 +26,8 @@ mod view;
 #[cfg(test)]
 mod real_tests;
 #[cfg(test)]
+mod real_tests_m3c;
+#[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
 mod ui_tests_m2b;

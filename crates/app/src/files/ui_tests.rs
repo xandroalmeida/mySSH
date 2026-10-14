@@ -215,7 +215,8 @@ fn navega_entrando_subindo_e_voltando() {
 #[test]
 fn caminho_digitado_e_erro_de_listagem() {
     let mut fx = fixture();
-    fx.mem.fail_list("/proibido", "Permissão negada.");
+    fx.mem
+        .fail_list("/proibido", TransferError::PermissionDenied);
     fx.h.state_mut()
         .navigate(Side::Remote, "/proibido".into(), true);
     fx.wait("erro", |p| p.remote_pane.error.is_some());
@@ -388,17 +389,14 @@ fn conflito_pergunta_e_responde() {
     fx.click_row("a.txt, Arquivo");
     fx.h.get_by_label("⬆ Enviar").click();
     fx.h.run_steps(2);
-    let rx = fx.mem.push_conflict(
+    let mut rx = fx.mem.push_conflict(
         tid(1),
         "/home/ana/a.txt",
         RemoteOrLocalMeta {
+            kind: Kind::File,
             size: 4096,
             mtime: Some(secs(1_700_000_000)),
         },
-        Some(RemoteOrLocalMeta {
-            size: 5,
-            mtime: Some(secs(1_700_500_000)),
-        }),
     );
     fx.h.run_steps(3);
     fx.h.get_by_label_contains("Já existe um item");
@@ -416,11 +414,12 @@ fn conflito_pergunta_e_responde() {
 fn conflito_aplicar_a_todos_e_cancelar() {
     let mut fx = fixture();
     let meta = || RemoteOrLocalMeta {
+        kind: Kind::File,
         size: 1,
         mtime: None,
     };
-    let rx1 = fx.mem.push_conflict(tid(1), "/a", meta(), None);
-    let rx2 = fx.mem.push_conflict(tid(1), "/b", meta(), None);
+    let mut rx1 = fx.mem.push_conflict(tid(1), "/a", meta());
+    let mut rx2 = fx.mem.push_conflict(tid(1), "/b", meta());
     fx.h.run_steps(3);
     fx.h.get_by_label("Aplicar a todos os conflitos desta transferência")
         .click();
@@ -775,15 +774,12 @@ fn m3b_screenshots() {
     // conflito
     let _rx = fx.mem.push_conflict(
         tid(1),
-        "/home/ana/projeto/dados/relatorio-final.pdf",
+        "/home/ana/notas.txt",
         RemoteOrLocalMeta {
-            size: 118_000_000,
+            kind: Kind::File,
+            size: 118_000,
             mtime: Some(secs(1_700_000_000)),
         },
-        Some(RemoteOrLocalMeta {
-            size: 120_000_000,
-            mtime: Some(secs(1_700_500_000)),
-        }),
     );
     fx.h.run_steps(3);
     shot(&mut fx, &dir, "m3b-03-conflito");

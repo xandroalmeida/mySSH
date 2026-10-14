@@ -2815,6 +2815,7 @@ dependencies = [
  "myssh-sshconfig",
  "myssh-store",
  "myssh-term",
+ "myssh-transfer",
  "png 0.18.1",
  "rfd",
  "secrecy",

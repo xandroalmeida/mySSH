@@ -51,6 +51,8 @@ enum FsMsg {
         res: Result<Vec<Entry>, String>,
     },
     Home(Result<String, String>),
+    /// Resultado de abrir o SFTP da sessão.
+    Backend(Result<Box<dyn FilesBackend>, String>),
     Op {
         side: Side,
         res: Result<(), String>,
@@ -63,6 +65,7 @@ pub struct FilesPanel {
     ctx: egui::Context,
     backend: Option<Box<dyn FilesBackend>>,
     remote: Option<Arc<dyn RemoteFs>>,
+    opening: bool,
     pub local: PaneState,
     pub remote_pane: PaneState,
     pub queue: Queue,
@@ -76,6 +79,10 @@ pub struct FilesPanel {
     /// Lado em que cada transferência grava (para atualizar a listagem ao terminar).
     dest: HashMap<TransferId, Side>,
     remote_rect: Option<egui::Rect>,
+    /// Origem de cada transferência (para mostrar os metadados do arquivo que chegaria num conflito).
+    sources: HashMap<TransferId, Entry>,
+    /// Por que a coluna remota não está disponível (abrindo, erro, sem SFTP).
+    pub remote_status: Option<String>,
     /// Coluna que recebe o foco do teclado no próximo desenho.
     refocus: Option<Side>,
 }
@@ -97,6 +104,7 @@ impl FilesPanel {
             ctx,
             backend,
             remote,
+            opening: false,
             local: PaneState::new(Side::Local),
             remote_pane: PaneState::new(Side::Remote),
             queue: Queue::default(),
@@ -108,6 +116,8 @@ impl FilesPanel {
             notice: None,
             dest: HashMap::new(),
             remote_rect: None,
+            sources: HashMap::new(),
+            remote_status: Some(i18n::FILES_REMOTE_UNAVAILABLE.to_string()),
             refocus: None,
         };
         p.navigate(
@@ -116,15 +126,54 @@ impl FilesPanel {
             false,
         );
         if let Some(r) = p.remote.clone() {
+            p.remote_status = None;
             let (tx, ctx) = (p.tx.clone(), p.ctx.clone());
             p.remote_pane.loading = true;
             p.rt.spawn(async move {
-                let res = r.home().await.map_err(|e| e.0);
+                let res = r.home().await.map_err(|e| e.to_string());
                 let _ = tx.send(FsMsg::Home(res));
                 ctx.request_repaint();
             });
         }
         p
+    }
+
+    /// Já tem backend ou está abrindo um.
+    pub fn has_backend(&self) -> bool {
+        self.backend.is_some() || self.opening
+    }
+
+    /// Abre o SFTP da conexão da sessão (fora da thread de UI) e liga a coluna remota.
+    pub fn attach_connection(&mut self, conn: std::sync::Arc<myssh_ssh::Connection>) {
+        self.opening = true;
+        self.remote_status = Some(i18n::FILES_REMOTE_OPENING.to_string());
+        let (tx, ctx, rt) = (self.tx.clone(), self.ctx.clone(), self.rt.clone());
+        let notify: Notify = {
+            let c = self.ctx.clone();
+            Arc::new(move || c.request_repaint())
+        };
+        self.rt.spawn(async move {
+            let res = backend::RealBackend::connect(&rt, conn, notify)
+                .await
+                .map(|b| Box::new(b) as Box<dyn FilesBackend>)
+                .map_err(|e| e.to_string());
+            let _ = tx.send(FsMsg::Backend(res));
+            ctx.request_repaint();
+        });
+    }
+
+    fn install_backend(&mut self, b: Box<dyn FilesBackend>) {
+        let r = b.remote();
+        self.backend = Some(b);
+        self.remote = Some(r.clone());
+        self.remote_status = None;
+        self.remote_pane.loading = true;
+        let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
+        self.rt.spawn(async move {
+            let res = r.home().await.map_err(|e| e.to_string());
+            let _ = tx.send(FsMsg::Home(res));
+            ctx.request_repaint();
+        });
     }
 
     pub fn pane(&self, side: Side) -> &PaneState {
@@ -187,7 +236,7 @@ impl FilesPanel {
                         r.list(&path)
                             .await
                             .map(|v| v.into_iter().map(Entry::from).collect())
-                            .map_err(|e| e.0)
+                            .map_err(|e| e.to_string())
                     })
                 }
             };
@@ -219,7 +268,7 @@ impl FilesPanel {
                 let Some(r) = self.remote.clone() else { return };
                 let (tx, ctx) = (self.tx.clone(), self.ctx.clone());
                 self.rt.spawn(async move {
-                    let res = r.home().await.map_err(|e| e.0);
+                    let res = r.home().await.map_err(|e| e.to_string());
                     let _ = tx.send(FsMsg::Home(res));
                     ctx.request_repaint();
                 });
@@ -242,6 +291,14 @@ impl FilesPanel {
             let Ok(m) = self.rx.try_recv() else { break };
             match m {
                 FsMsg::Listed { side, gen_, res } => self.pane_mut(side).on_listed(gen_, res),
+                FsMsg::Backend(Ok(b)) => {
+                    self.opening = false;
+                    self.install_backend(b);
+                }
+                FsMsg::Backend(Err(e)) => {
+                    // `opening` fica ligado: não tenta de novo a cada frame (reabrir o painel tenta).
+                    self.remote_status = Some(i18n::files_sftp_failed(&e));
+                }
                 FsMsg::Home(Ok(h)) => self.navigate(Side::Remote, h, true),
                 FsMsg::Home(Err(e)) => {
                     self.remote_pane.loading = false;
@@ -269,7 +326,17 @@ impl FilesPanel {
                 TransferEvent::Cancelled { id } => self.dest.get(id).copied(),
                 _ => None,
             };
+            let incoming = match &ev {
+                TransferEvent::Conflict { id, path, .. } => self.incoming_for(*id, path),
+                _ => None,
+            };
+            let before = self.queue.conflicts.len();
             self.queue.apply(ev);
+            if self.queue.conflicts.len() > before
+                && let Some(c) = self.queue.conflicts.back_mut()
+            {
+                c.incoming = incoming;
+            }
             if let Some(side) = refresh {
                 self.refresh(side);
             }
@@ -281,6 +348,17 @@ impl FilesPanel {
     }
 
     // ---------------------------------------------------------- transferências
+
+    /// Metadados do arquivo que chegaria, quando a origem é um arquivo único da listagem.
+    fn incoming_for(&self, id: TransferId, path: &str) -> Option<RemoteOrLocalMeta> {
+        let e = self.sources.get(&id)?;
+        let same = path == e.name || path.ends_with(&format!("/{}", e.name));
+        (e.kind == Kind::File && same).then_some(RemoteOrLocalMeta {
+            kind: Kind::File,
+            size: e.size,
+            mtime: e.mtime,
+        })
+    }
 
     fn start_transfer(&mut self, from: Side) {
         self.notice = None;
@@ -309,14 +387,26 @@ impl FilesPanel {
             &self.remote_pane.path,
             self.overwrite,
         );
-        self.enqueue_all(reqs, from.other());
+        self.enqueue_all(
+            reqs,
+            from.other(),
+            selected
+                .into_iter()
+                .filter(|e| e.kind != Kind::Other)
+                .collect(),
+        );
     }
 
-    fn enqueue_all(&mut self, reqs: Vec<TransferRequest>, dest: Side) {
+    fn enqueue_all(&mut self, reqs: Vec<TransferRequest>, dest: Side, srcs: Vec<Entry>) {
+        let mut sources = srcs.into_iter().map(Some).chain(std::iter::repeat(None));
         let Some(b) = &self.backend else { return };
         for r in reqs {
+            let src = sources.next().flatten();
             let id = b.enqueue(r);
             self.dest.insert(id, dest);
+            if let Some(e) = src {
+                self.sources.insert(id, e);
+            }
         }
     }
 
@@ -332,7 +422,7 @@ impl FilesPanel {
             return;
         }
         let reqs = plan::requests_for_drop(&paths, &self.remote_pane.path, self.overwrite);
-        self.enqueue_all(reqs, Side::Remote);
+        self.enqueue_all(reqs, Side::Remote, Vec::new());
     }
 
     // ------------------------------------------------------------- ações
@@ -381,7 +471,9 @@ impl FilesPanel {
             Side::Remote => {
                 let Some(r) = self.remote.clone() else { return };
                 let path = remote_join(&dir, name);
-                self.spawn_op(side, async move { r.mkdir(&path).await.map_err(|e| e.0) });
+                self.spawn_op(side, async move {
+                    r.mkdir(&path).await.map_err(|e| e.to_string())
+                });
             }
         }
     }
@@ -397,10 +489,9 @@ impl FilesPanel {
                 let Some(r) = self.remote.clone() else { return };
                 let to = remote_join(&remote_parent(from), new_name);
                 let from = from.to_string();
-                self.spawn_op(
-                    side,
-                    async move { r.rename(&from, &to).await.map_err(|e| e.0) },
-                );
+                self.spawn_op(side, async move {
+                    r.rename(&from, &to).await.map_err(|e| e.to_string())
+                });
             }
         }
     }
@@ -424,7 +515,7 @@ impl FilesPanel {
                     let mut first_err = None;
                     for e in items {
                         if let Err(m) = r.remove(&e.path, e.is_dir()).await {
-                            first_err.get_or_insert(format!("{}: {}", e.name, m.0));
+                            first_err.get_or_insert(format!("{}: {}", e.name, m));
                         }
                     }
                     first_err.map_or(Ok(()), Err)
@@ -507,7 +598,7 @@ impl FilesPanel {
             let cx = ColCtx {
                 uid,
                 label: i18n::FILES_LOCAL,
-                available: true,
+                unavailable: None,
                 keys,
                 can_transfer: can_up,
                 focus_request: refocus == Some(Side::Local),
@@ -538,7 +629,7 @@ impl FilesPanel {
             let cx = ColCtx {
                 uid,
                 label: i18n::FILES_REMOTE,
-                available: remote_ok,
+                unavailable: self.remote_status.as_deref(),
                 keys,
                 can_transfer: can_down,
                 focus_request: refocus == Some(Side::Remote),
@@ -696,16 +787,23 @@ impl FilesPanel {
     }
 }
 
-/// Painel de uma sessão. Ainda sem backend real (a integração com `myssh-transfer` liga aqui):
-/// a coluna local funciona e a remota mostra o aviso de indisponibilidade.
-pub fn new_for_session(env: &crate::tabs::TabEnv) -> FilesPanel {
-    FilesPanel::new(
+/// Painel de uma sessão: a coluna local funciona de imediato; a remota aparece quando o SFTP abre.
+pub fn new_for_session(
+    env: &crate::tabs::TabEnv,
+    conn: Option<Arc<myssh_ssh::Connection>>,
+) -> FilesPanel {
+    let mut p = FilesPanel::new(
         env.rt.clone(),
         env.ctx.clone(),
         None,
         local::home_dir(),
         env.default_overwrite,
-    )
+    );
+    match conn {
+        Some(c) => p.attach_connection(c),
+        None => p.remote_status = Some(i18n::FILES_NO_CONNECTION.to_string()),
+    }
+    p
 }
 
 /// Valida um nome contra a pasta atual (mensagem para o diálogo).

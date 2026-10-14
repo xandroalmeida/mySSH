@@ -130,6 +130,26 @@ pub type Notify = Arc<dyn Fn() + Send + Sync>;
 pub struct SessionHandle {
     pub cmd_tx: mpsc::Sender<SessionCommand>,
     pub evt_rx: mpsc::Receiver<SessionEvent>,
+    conn: ConnSlot,
+}
+
+/// Conexão da sessão, publicada quando ela fica `Connected` e limpa ao terminar.
+type ConnSlot = Arc<Mutex<Option<Arc<Connection>>>>;
+
+impl SessionHandle {
+    pub fn new(cmd_tx: mpsc::Sender<SessionCommand>, evt_rx: mpsc::Receiver<SessionEvent>) -> Self {
+        Self {
+            cmd_tx,
+            evt_rx,
+            conn: ConnSlot::default(),
+        }
+    }
+
+    /// A conexão SSH viva da sessão (para abrir SFTP em canais próprios); `None` antes de
+    /// conectar e depois de encerrar.
+    pub fn connection(&self) -> Option<Arc<Connection>> {
+        self.conn.lock().ok().and_then(|g| g.clone())
+    }
 }
 
 impl Drop for SessionHandle {
@@ -149,8 +169,9 @@ pub fn spawn(
     let (cmd_tx, cmd_rx) = mpsc::channel(CMD_CHANNEL_CAP);
     let (evt_tx, evt_rx) = mpsc::channel(EVENT_CHANNEL_CAP);
     let emit = EventSink::new(evt_tx, notify);
-    rt.spawn(run(req, trust, cmd_rx, emit));
-    SessionHandle { cmd_tx, evt_rx }
+    let handle = SessionHandle::new(cmd_tx, evt_rx);
+    rt.spawn(run(req, trust, cmd_rx, emit, handle.conn.clone()));
+    handle
 }
 
 /// Antes de conectar: só acompanha resize e espera o cancelamento.
@@ -178,8 +199,12 @@ async fn run(
     trust: Arc<dyn HostTrustStore>,
     mut cmd_rx: mpsc::Receiver<SessionCommand>,
     emit: EventSink,
+    slot: ConnSlot,
 ) {
-    let end = run_inner(&req, trust, &mut cmd_rx, &emit).await;
+    let end = run_inner(&req, trust, &mut cmd_rx, &emit, &slot).await;
+    if let Ok(mut g) = slot.lock() {
+        *g = None;
+    }
     // `req` (com senha/passphrase) é descartado aqui.
     drop(req);
     match end {
@@ -199,6 +224,7 @@ async fn run_inner(
     trust: Arc<dyn HostTrustStore>,
     cmd_rx: &mut mpsc::Receiver<SessionCommand>,
     emit: &EventSink,
+    slot: &ConnSlot,
 ) -> End {
     if !emit.state(SessionState::Connecting).await {
         return End::Clean;
@@ -228,6 +254,9 @@ async fn run_inner(
     if !emit.state(SessionState::Connected).await {
         conn.close().await;
         return End::Clean;
+    }
+    if let Ok(mut g) = slot.lock() {
+        *g = Some(conn.clone());
     }
 
     let mut result = End::Clean;

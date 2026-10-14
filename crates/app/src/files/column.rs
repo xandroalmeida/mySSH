@@ -156,8 +156,8 @@ impl PaneState {
 pub struct ColCtx<'a> {
     pub uid: u64,
     pub label: &'a str,
-    /// A coluna está disponível (remoto sem backend = `false`).
-    pub available: bool,
+    /// Motivo de a coluna estar indisponível (SFTP abrindo, com erro, sem conexão).
+    pub unavailable: Option<&'a str>,
     /// Teclado liberado (nenhum diálogo aberto).
     pub keys: bool,
     /// Há seleção na coluna de origem e destino conhecido (liga o menu "Enviar/Baixar").
@@ -249,9 +249,9 @@ pub fn column_ui(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mu
     let side = pane.side;
     ui.push_id((cx.uid, side), |ui| {
         ui.label(RichText::new(cx.label).strong());
-        if !cx.available {
+        if let Some(why) = cx.unavailable {
             ui.add_space(8.0);
-            ui.label(i18n::FILES_REMOTE_UNAVAILABLE);
+            ui.label(why);
             return;
         }
         ui.horizontal_wrapped(|ui| {

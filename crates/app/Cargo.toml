@@ -16,6 +16,7 @@ myssh-store = { path = "../store" }
 myssh-secrets = { path = "../secrets" }
 myssh-ssh = { path = "../ssh" }
 myssh-term = { path = "../term" }
+myssh-transfer = { path = "../transfer" }
 myssh-sshconfig = { path = "../sshconfig" }
 eframe = "0.36"
 egui = "0.36"
