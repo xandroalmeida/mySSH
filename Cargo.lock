@@ -2852,6 +2852,7 @@ dependencies = [
  "myssh-ssh",
  "myssh-sshconfig",
  "myssh-store",
+ "myssh-syncrun",
  "myssh-term",
  "myssh-transfer",
  "png 0.18.1",
@@ -2859,6 +2860,7 @@ dependencies = [
  "secrecy",
  "tempfile",
  "tokio",
+ "tokio-util",
  "winresource",
  "zeroize",
 ]

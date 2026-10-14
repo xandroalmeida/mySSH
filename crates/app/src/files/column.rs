@@ -26,6 +26,8 @@ pub enum Act {
     NewDir(Side),
     Rename(Side),
     Delete(Side),
+    /// "Sincronizar…" (usa as pastas abertas nas duas colunas).
+    Sync,
 }
 
 /// Carga do arrastar-soltar entre colunas: de onde saiu (a seleção é lida da coluna de origem).
@@ -347,7 +349,7 @@ fn header_row(ui: &mut egui::Ui, pane: &mut PaneState) {
     }
     for (key, label, cell) in items {
         let arrow = if pane.sort.key == key {
-            if pane.sort.asc { " ▲" } else { " ▼" }
+            if pane.sort.asc { " ⬆" } else { " ⬇" }
         } else {
             ""
         };

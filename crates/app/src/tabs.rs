@@ -49,6 +49,8 @@ pub struct TabEnv<'a> {
     pub theme: Option<myssh_term::TermTheme>,
     /// Política padrão de sobrescrita das transferências (Configurações).
     pub default_overwrite: Overwrite,
+    /// Diretório de dados do app (journal da sincronização); `None` em testes.
+    pub data_dir: Option<std::path::PathBuf>,
 }
 
 impl TabEnv<'_> {
@@ -109,6 +111,10 @@ pub trait TabBody {
     }
     /// Transferências de arquivos em andamento (fechar/sair pede confirmação mencionando o número).
     fn active_transfers(&self) -> usize {
+        0
+    }
+    /// Sincronizações em execução (fechar/sair pede confirmação).
+    fn active_syncs(&self) -> usize {
         0
     }
     /// Somente testes: o painel de arquivos da aba (ou do painel focado).

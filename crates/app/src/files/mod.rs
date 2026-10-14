@@ -14,9 +14,14 @@ mod local;
 pub mod model;
 pub mod plan;
 pub mod queue;
+pub mod sync_engine;
+pub mod sync_text;
+pub mod sync_ui;
 
 #[cfg(test)]
 mod app_tests;
+#[cfg(test)]
+mod sync_tests;
 #[cfg(test)]
 mod ui_tests;
 
@@ -69,6 +74,10 @@ pub struct FilesPanel {
     pub local: PaneState,
     pub remote_pane: PaneState,
     pub queue: Queue,
+    pub sync: sync_ui::SyncUi,
+    sync_engine: Option<Arc<dyn sync_engine::SyncEngine>>,
+    /// Id do perfil e arquivo do journal da sincronização.
+    sync_ctx: Option<(String, PathBuf)>,
     /// Política de sobrescrita das próximas transferências.
     pub overwrite: Overwrite,
     tx: Sender<FsMsg>,
@@ -108,6 +117,9 @@ impl FilesPanel {
             local: PaneState::new(Side::Local),
             remote_pane: PaneState::new(Side::Remote),
             queue: Queue::default(),
+            sync: sync_ui::SyncUi::default(),
+            sync_engine: None,
+            sync_ctx: None,
             overwrite,
             tx,
             rx,
@@ -146,6 +158,17 @@ impl FilesPanel {
     /// Abre o SFTP da conexão da sessão (fora da thread de UI) e liga a coluna remota.
     pub fn attach_connection(&mut self, conn: std::sync::Arc<myssh_ssh::Connection>) {
         self.opening = true;
+        let (pid, jpath) = self.sync_ctx.clone().unwrap_or_else(|| {
+            (
+                "sessao".into(),
+                std::env::temp_dir().join("myssh-sync.json"),
+            )
+        });
+        self.sync_engine = Some(Arc::new(sync_engine::RealSync {
+            conn: conn.clone(),
+            profile_id: pid,
+            journal_path: jpath,
+        }));
         self.remote_status = Some(i18n::FILES_REMOTE_OPENING.to_string());
         let (tx, ctx, rt) = (self.tx.clone(), self.ctx.clone(), self.rt.clone());
         let notify: Notify = {
@@ -197,13 +220,14 @@ impl FilesPanel {
 
     /// Cancela tudo (fechar aba/painel/app, desconectar). As confirmações vêm antes.
     pub fn cancel_all(&mut self) {
+        self.cancel_sync();
         if let Some(b) = &self.backend {
             b.cancel_all();
         }
     }
 
     pub fn needs_modal(&self) -> bool {
-        !self.queue.conflicts.is_empty() || self.dialog.is_some()
+        !self.queue.conflicts.is_empty() || self.dialog.is_some() || self.sync.open
     }
 
     // --------------------------------------------------------------- navegação
@@ -287,6 +311,7 @@ impl FilesPanel {
     /// Drena listagens/operações e eventos da fila (com orçamento). `true` = ainda há trabalho
     /// pendente (a UI deve pedir outro frame).
     pub fn pump(&mut self) -> bool {
+        self.pump_sync();
         for _ in 0..MSG_BUDGET {
             let Ok(m) = self.rx.try_recv() else { break };
             match m {
@@ -436,6 +461,7 @@ impl FilesPanel {
             Act::Refresh(s) => self.refresh(s),
             Act::Open(s, p) => self.navigate(s, p, true),
             Act::Transfer(s) => self.start_transfer(s),
+            Act::Sync => self.open_sync(),
             Act::NewDir(s) => self.dialog = Some(FsDialog::new_dir(s)),
             Act::Rename(s) => {
                 let sel = self.pane(s).selected();
@@ -548,6 +574,12 @@ impl FilesPanel {
             if let Some(n) = &self.notice {
                 ui.colored_label(crate::view::warn_color(ui), n);
             }
+            if self.sync.running() && !self.sync.open {
+                ui.label(i18n::SYNC_RUNNING_HIDDEN);
+                if ui.button(i18n::SYNC_SHOW).clicked() {
+                    self.sync.open = true;
+                }
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button(i18n::FILES_CLOSE).clicked() {
                     close = true;
@@ -568,7 +600,7 @@ impl FilesPanel {
             avail.min,
             egui::pos2(avail.right(), avail.bottom() - queue_h),
         );
-        let mid_w = 84.0;
+        let mid_w = 104.0;
         let col_w = ((cols_rect.width() - mid_w) / 2.0 - 8.0).max(120.0);
         let left = egui::Rect::from_min_size(cols_rect.min, vec2(col_w, cols_rect.height()));
         let mid = egui::Rect::from_min_size(
@@ -622,6 +654,14 @@ impl FilesPanel {
                     .clicked()
                 {
                     acts.push(Act::Transfer(Side::Remote));
+                }
+                ui.add_space(16.0);
+                if ui
+                    .add_enabled(remote_ready, egui::Button::new(i18n::FILES_SYNC))
+                    .on_hover_text(i18n::FILES_SYNC_HINT)
+                    .clicked()
+                {
+                    acts.push(Act::Sync);
                 }
             });
         });
@@ -758,6 +798,10 @@ impl FilesPanel {
             }
             return;
         }
+        if self.sync.open && self.dialog.is_none() {
+            self.sync_dialog(ctx);
+            return;
+        }
         let Some(mut d) = self.dialog.take() else {
             return;
         };
@@ -791,6 +835,7 @@ impl FilesPanel {
 pub fn new_for_session(
     env: &crate::tabs::TabEnv,
     conn: Option<Arc<myssh_ssh::Connection>>,
+    profile_id: &str,
 ) -> FilesPanel {
     let mut p = FilesPanel::new(
         env.rt.clone(),
@@ -799,6 +844,13 @@ pub fn new_for_session(
         local::home_dir(),
         env.default_overwrite,
     );
+    // journal por perfil no diretório de dados (sem hostname nem segredos)
+    p.sync_ctx = env.data_dir.as_ref().map(|d| {
+        (
+            profile_id.to_string(),
+            d.join("sync").join(format!("{profile_id}.json")),
+        )
+    });
     match conn {
         Some(c) => p.attach_connection(c),
         None => p.remote_status = Some(i18n::FILES_NO_CONNECTION.to_string()),
@@ -838,4 +890,12 @@ pub(crate) fn test_panel(
         Overwrite::Ask,
     );
     (p, mem)
+}
+
+#[cfg(test)]
+impl FilesPanel {
+    /// Testes: troca o executor de sincronização.
+    pub(crate) fn set_sync_engine(&mut self, e: Arc<dyn sync_engine::SyncEngine>) {
+        self.sync_engine = Some(e);
+    }
 }

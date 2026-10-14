@@ -116,6 +116,7 @@ pub const XFER_SCANNING: &str = "Contando";
 pub const XFER_RUNNING: &str = "Transferindo";
 pub const XFER_DONE: &str = "Concluída";
 pub const XFER_FAILED: &str = "Com falhas";
+pub const XFER_FAILED_BAR: &str = "Falhou: há arquivos com erro";
 pub const XFER_CANCELLED: &str = "Cancelada";
 pub const XFER_CANCELLING: &str = "Cancelando…";
 pub const XFER_CANCEL: &str = "Cancelar";

@@ -264,6 +264,19 @@ fn state_color(ui: &egui::Ui, s: State) -> Color32 {
     }
 }
 
+/// Cor da barra: erro e cancelamento nunca usam o azul de "em andamento/concluída".
+pub fn bar_fill(ui: &egui::Ui, s: State) -> Option<Color32> {
+    match s {
+        State::Failed => Some(if ui.visuals().dark_mode {
+            Color32::from_rgb(170, 60, 55)
+        } else {
+            Color32::from_rgb(200, 70, 60)
+        }),
+        State::Cancelled => Some(Color32::from_gray(120)),
+        _ => None,
+    }
+}
+
 /// Resumo numérico de uma linha.
 pub fn summary_line(it: &Item) -> String {
     let mut parts = vec![format!(
@@ -345,12 +358,18 @@ fn item_ui(ui: &mut egui::Ui, it: &mut Item, action: &mut Option<QueueAction>) {
         });
     });
     let frac = percent(it.bytes_done, it.bytes_total) / 100.0;
-    let text = if it.state == State::Scanning {
-        i18n::xfer_counting(it.files_total, it.bytes_total)
-    } else {
-        format!("{:.0}%", frac * 100.0)
+    let text = match it.state {
+        State::Scanning => i18n::xfer_counting(it.files_total, it.bytes_total),
+        // Com falhas/cancelada a barra não pode parecer "concluída".
+        State::Failed => i18n::XFER_FAILED_BAR.to_string(),
+        State::Cancelled => i18n::XFER_CANCELLED.to_string(),
+        _ => format!("{:.0}%", frac * 100.0),
     };
-    ui.add(egui::ProgressBar::new(frac).text(text).desired_height(14.0));
+    let mut bar = egui::ProgressBar::new(frac).text(text).desired_height(14.0);
+    if let Some(c) = bar_fill(ui, it.state) {
+        bar = bar.fill(c);
+    }
+    ui.add(bar);
     ui.weak(summary_line(it));
     if it.state == State::Running && !it.current.is_empty() {
         ui.add(egui::Label::new(RichText::new(&it.current).weak().small()).truncate());
@@ -528,6 +547,16 @@ mod tests {
             skipped: 0,
         });
         assert!(q.sticky_rename.is_empty());
+    }
+
+    #[test]
+    fn barra_de_falha_e_cancelamento_nao_parece_concluida() {
+        egui::__run_test_ui(|ui| {
+            assert!(bar_fill(ui, State::Failed).is_some());
+            assert!(bar_fill(ui, State::Cancelled).is_some());
+            assert!(bar_fill(ui, State::Done).is_none());
+            assert!(bar_fill(ui, State::Running).is_none());
+        });
     }
 
     #[test]

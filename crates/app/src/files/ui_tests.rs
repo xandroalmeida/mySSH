@@ -16,10 +16,10 @@ use super::model::Side;
 use super::queue::State;
 use super::{EVENT_BUDGET, FilesPanel};
 
-struct Fx {
-    h: Harness<'static, FilesPanel>,
-    mem: MemHandle,
-    tmp: tempfile::TempDir,
+pub(super) struct Fx {
+    pub(super) h: Harness<'static, FilesPanel>,
+    pub(super) mem: MemHandle,
+    pub(super) tmp: tempfile::TempDir,
     _rt: Arc<tokio::runtime::Runtime>,
 }
 
@@ -27,7 +27,7 @@ fn secs(n: u64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_secs(n)
 }
 
-fn build(policy: Overwrite, wgpu: bool) -> Fx {
+pub(super) fn build(policy: Overwrite, wgpu: bool) -> Fx {
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()
             .worker_threads(1)
@@ -76,7 +76,7 @@ fn build(policy: Overwrite, wgpu: bool) -> Fx {
         d.to_path_buf(),
         policy,
     );
-    let mut b = Harness::builder().with_size(egui::vec2(1100.0, if wgpu { 760.0 } else { 560.0 }));
+    let mut b = Harness::builder().with_size(egui::vec2(1100.0, 900.0));
     if wgpu {
         b = b.with_pixels_per_point(1.5).wgpu();
     }
@@ -106,12 +106,12 @@ fn build(policy: Overwrite, wgpu: bool) -> Fx {
     fx
 }
 
-fn fixture() -> Fx {
+pub(super) fn fixture() -> Fx {
     build(Overwrite::Ask, false)
 }
 
 impl Fx {
-    fn wait(&mut self, what: &str, cond: impl Fn(&FilesPanel) -> bool) {
+    pub(super) fn wait(&mut self, what: &str, cond: impl Fn(&FilesPanel) -> bool) {
         let start = Instant::now();
         while !cond(self.h.state()) {
             assert!(start.elapsed() < Duration::from_secs(10), "timeout: {what}");
@@ -121,7 +121,7 @@ impl Fx {
         self.h.run_steps(2);
     }
 
-    fn p(&self) -> &FilesPanel {
+    pub(super) fn p(&self) -> &FilesPanel {
         self.h.state()
     }
 
@@ -452,7 +452,11 @@ fn cancelar_item_e_cancelar_todas() {
     assert_eq!(fx.mem.state.lock().unwrap().cancelled, vec![tid(1)]);
     assert_eq!(fx.p().queue.get(tid(1)).unwrap().state, State::Cancelled);
     assert_eq!(fx.p().active(), 1);
-    fx.h.get_by_label_contains("Cancelada");
+    assert!(
+        fx.h.query_all_by_label_contains("Cancelada")
+            .next()
+            .is_some()
+    );
     fx.h.get_by_label("Cancelar todas").click();
     fx.h.run_steps(3);
     assert_eq!(fx.mem.state.lock().unwrap().cancel_all_calls, 1);

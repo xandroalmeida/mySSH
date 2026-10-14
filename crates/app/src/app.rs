@@ -170,6 +170,8 @@ pub struct App {
     quit_ok: bool,
     /// Abas de terminal conectam sozinhas ao abrir (desligado em demos/testes sem rede).
     pub(crate) auto_connect: bool,
+    /// Diretório de dados (journal da sincronização); `None` em testes.
+    pub data_dir: Option<std::path::PathBuf>,
     /// Hosts confiáveis (cache; atualizado ao abrir as Configurações).
     pub(crate) trusted: Vec<(HostEndpoint, HostKey)>,
     pub(crate) trusted_error: Option<String>,
@@ -224,6 +226,7 @@ impl App {
             notice: None,
             quit_ok: false,
             auto_connect: demo.as_ref().is_none_or(Demo::connects),
+            data_dir: None,
             trusted: Vec::new(),
             trusted_error: None,
             scroll_to_trusted: false,
@@ -912,6 +915,11 @@ impl App {
         self.tabs.iter().map(|t| t.body.active_transfers()).sum()
     }
 
+    /// Sincronizações em execução em todas as abas.
+    pub fn active_syncs(&self) -> usize {
+        self.tabs.iter().map(|t| t.body.active_syncs()).sum()
+    }
+
     pub fn any_busy(&self) -> bool {
         self.tabs.iter().any(|t| t.body.is_busy())
     }
@@ -1060,6 +1068,7 @@ impl App {
             prod_warning: self.settings.prod_warning,
             theme: None,
             default_overwrite: self.settings.files_overwrite,
+            data_dir: self.data_dir.clone(),
         };
         (&mut self.tabs, env)
     }

@@ -4,8 +4,10 @@ use crate::shortcuts::Action;
 
 mod files;
 mod m2b;
+mod sync;
 pub use files::*;
 pub use m2b::*;
+pub use sync::*;
 
 pub const TITLE: &str = "mySSH";
 pub const STORE_FALLBACK: &str = "Não foi possível abrir o banco de dados local: perfis e configurações não serão salvos nesta execução.";

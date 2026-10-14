@@ -28,28 +28,30 @@ use crate::real_tests::{
     type_line, wait,
 };
 
-const REMOTE_HOME: &str = "/home/tester";
-const WORK: &str = "/home/tester/m3c-ui";
+pub(crate) const REMOTE_HOME: &str = "/home/tester";
+pub(crate) const WORK: &str = "/home/tester/m3c-ui";
 
-fn fp(a: &App) -> &FilesPanel {
+pub(crate) fn fp(a: &App) -> &FilesPanel {
     a.tabs[1].body.files_panel().expect("painel de arquivos")
 }
 
-fn fpm<'a>(h: &'a mut Harness<'static, App>) -> &'a mut FilesPanel {
+pub(crate) fn fpm<'a>(h: &'a mut Harness<'static, App>) -> &'a mut FilesPanel {
     h.state_mut().tabs[1]
         .body
         .files_panel_mut()
         .expect("painel de arquivos")
 }
 
-struct Ctx {
-    h: Harness<'static, App>,
-    shots: Option<PathBuf>,
-    frame_ms: Vec<f64>,
+pub(crate) struct Ctx {
+    pub(crate) h: Harness<'static, App>,
+    pub(crate) shots: Option<PathBuf>,
+    pub(crate) frame_ms: Vec<f64>,
+    /// Diretório de dados do app nesta execução (journal da sincronização).
+    pub(crate) _data: tempfile::TempDir,
 }
 
 impl Ctx {
-    fn shot(&mut self, name: &str) {
+    pub(crate) fn shot(&mut self, name: &str) {
         let Some(dir) = self.shots.clone() else {
             return;
         };
@@ -60,7 +62,7 @@ impl Ctx {
         eprintln!("screenshot: {}", path.display());
     }
 
-    fn click(&mut self, label: &str) {
+    pub(crate) fn click(&mut self, label: &str) {
         self.h.get_by_label(label).click();
         self.h.run_steps(3);
     }
@@ -79,26 +81,26 @@ impl Ctx {
     }
 
     /// Botão do diálogo modal (o rótulo também existe na barra lateral; o modal vem por último).
-    fn click_dialog(&mut self, label: &str) {
+    pub(crate) fn click_dialog(&mut self, label: &str) {
         let n = self.h.query_all_by_label(label).last().expect("botão");
         n.click();
         self.h.run_steps(3);
     }
 
-    fn click_row(&mut self, side: Side, text: &str) {
+    pub(crate) fn click_row(&mut self, side: Side, text: &str) {
         self.row_click(side, text, Modifiers::NONE);
     }
 
-    fn cmd_click_row(&mut self, side: Side, text: &str) {
+    pub(crate) fn cmd_click_row(&mut self, side: Side, text: &str) {
         self.row_click(side, text, Modifiers::COMMAND);
     }
 
-    fn wait_panel(&mut self, what: &str, secs: u64, cond: impl Fn(&FilesPanel) -> bool) {
+    pub(crate) fn wait_panel(&mut self, what: &str, secs: u64, cond: impl Fn(&FilesPanel) -> bool) {
         wait(&mut self.h, what, secs, |a| cond(fp(a)));
     }
 
     /// Espera a fila esvaziar e mede o tempo de cada frame enquanto há transferência ativa.
-    fn wait_idle(&mut self, what: &str, secs: u64) {
+    pub(crate) fn wait_idle(&mut self, what: &str, secs: u64) {
         let t0 = Instant::now();
         loop {
             let busy = {
@@ -118,12 +120,12 @@ impl Ctx {
     }
 
     /// Esvazia as concluídas (a lista da fila rola; mantém o item novo visível).
-    fn clear_queue(&mut self) {
+    pub(crate) fn clear_queue(&mut self) {
         self.h.get_by_label("Limpar concluídas").click();
         self.h.run_steps(2);
     }
 
-    fn nav(&mut self, side: Side, path: &str) {
+    pub(crate) fn nav(&mut self, side: Side, path: &str) {
         fpm(&mut self.h).navigate(side, path.to_string(), true);
         let want = path.to_string();
         self.wait_panel("navegação", 10, move |p| {
@@ -132,7 +134,7 @@ impl Ctx {
         });
     }
 
-    fn remote_names(&self) -> Vec<String> {
+    pub(crate) fn remote_names(&self) -> Vec<String> {
         fp(self.h.state())
             .remote_pane
             .entries
@@ -146,7 +148,7 @@ impl Ctx {
     }
 }
 
-fn setup() -> Ctx {
+pub(crate) fn setup() -> Ctx {
     ready();
     let shots = std::env::var_os("MYSSH_DEMO_SHOTS").map(PathBuf::from);
     if let Some(d) = &shots {
@@ -162,6 +164,8 @@ fn setup() -> Ctx {
         },
     );
     add_profile(&mut app, &p);
+    let data = tempfile::tempdir().unwrap();
+    app.data_dir = Some(data.path().to_path_buf());
     app.open_profile(p.id);
     let mut b = Harness::builder().with_size(egui::vec2(1200.0, 800.0));
     if shots.is_some() {
@@ -172,6 +176,7 @@ fn setup() -> Ctx {
         h,
         shots,
         frame_ms: Vec::new(),
+        _data: data,
     };
     wait(&mut c.h, "conectado", 20, |a| {
         status(a, 1) == i18n::ST_CONNECTED

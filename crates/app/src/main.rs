@@ -28,6 +28,8 @@ mod real_tests;
 #[cfg(test)]
 mod real_tests_m3c;
 #[cfg(test)]
+mod real_tests_m4b;
+#[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
 mod ui_tests_m2b;
@@ -100,18 +102,14 @@ fn main() -> eframe::Result {
         ..Default::default()
     };
     let is_demo = demo.is_some();
+    let data_dir = dir.clone();
     let result = eframe::run_native(
         "myssh",
         options,
         Box::new(move |_cc| {
-            Ok(Box::new(App::new(
-                rt,
-                store,
-                vault,
-                mode,
-                store_warning,
-                demo,
-            )))
+            let mut app = App::new(rt, store, vault, mode, store_warning, demo);
+            app.data_dir = Some(data_dir);
+            Ok(Box::new(app))
         }),
     );
     if is_demo && demo::FAILED.load(std::sync::atomic::Ordering::SeqCst) {

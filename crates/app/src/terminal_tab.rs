@@ -575,9 +575,9 @@ impl TerminalTab {
             return;
         }
         let conn = self.sess.as_ref().and_then(|s| s.connection());
-        let panel = self
-            .files
-            .get_or_insert_with(|| files::new_for_session(env, conn.clone()));
+        let panel = self.files.get_or_insert_with(|| {
+            files::new_for_session(env, conn.clone(), &self.profile.id.to_string())
+        });
         if !panel.has_backend()
             && let Some(c) = conn
         {
@@ -1212,11 +1212,20 @@ impl TabBody for TerminalTab {
     }
 
     fn is_busy(&self) -> bool {
-        self.simulate_busy || self.session_live() || self.active_transfers() > 0
+        self.simulate_busy
+            || self.session_live()
+            || self.active_transfers() > 0
+            || self.active_syncs() > 0
     }
 
     fn active_transfers(&self) -> usize {
         self.files.as_ref().map_or(0, FilesPanel::active)
+    }
+
+    fn active_syncs(&self) -> usize {
+        self.files
+            .as_ref()
+            .map_or(0, |f| usize::from(f.sync_running()))
     }
 
     #[cfg(test)]

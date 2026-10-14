@@ -90,6 +90,13 @@ impl SplitBody {
             .map_or(0, |p| p.body.active_transfers())
     }
 
+    pub fn pane_syncs(&self, id: PaneId) -> usize {
+        self.panes
+            .iter()
+            .find(|p| p.id == id)
+            .map_or(0, |p| p.body.active_syncs())
+    }
+
     pub fn pane_title(&self, id: PaneId) -> String {
         self.panes
             .iter()
@@ -395,6 +402,10 @@ impl TabBody for SplitBody {
 
     fn active_transfers(&self) -> usize {
         self.panes.iter().map(|p| p.body.active_transfers()).sum()
+    }
+
+    fn active_syncs(&self) -> usize {
+        self.panes.iter().map(|p| p.body.active_syncs()).sum()
     }
 
     #[cfg(test)]
