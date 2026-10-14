@@ -135,6 +135,11 @@ pub fn show(ui: &mut Ui, sess: &mut TermSession, style: &TermStyle) -> TermRespo
     if sess.pump(DEFAULT_PUMP_BUDGET) {
         ui.ctx().request_repaint(); // ainda há saída pendente: continua no próximo frame
     }
+    if let Some(left) = sess.sync_deadline() {
+        // Synchronized update aberto: repinta quando o prazo vencer (o servidor pode nunca fechar).
+        ui.ctx()
+            .request_repaint_after(left + std::time::Duration::from_millis(5));
+    }
 
     let font = &style.font;
     let theme = &style.theme;

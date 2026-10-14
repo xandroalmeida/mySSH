@@ -629,3 +629,110 @@ fn arquivo_vazio() {
     assert!(p.candidates.is_empty());
     assert!(p.global_warnings.is_empty());
 }
+
+// ---- Orçamento global de Include e avisos sem conteúdo bruto ------------
+
+/// Conta as leituras e os bytes servidos (o orçamento vale por importação, com repetições).
+struct Counting {
+    inner: MemFs,
+    reads: std::cell::Cell<usize>,
+    bytes: std::cell::Cell<usize>,
+}
+
+impl IncludeSource for Counting {
+    fn expand(&self, pattern: &str) -> Vec<String> {
+        self.inner.expand(pattern)
+    }
+    fn read(&self, path: &str) -> std::io::Result<String> {
+        let c = self.inner.read(path)?;
+        self.reads.set(self.reads.get() + 1);
+        self.bytes.set(self.bytes.get() + c.len());
+        Ok(c)
+    }
+}
+
+fn counting(inner: MemFs) -> Counting {
+    Counting {
+        inner,
+        reads: Default::default(),
+        bytes: Default::default(),
+    }
+}
+
+#[test]
+fn include_billion_laughs_respeita_orcamento_de_arquivos() {
+    // l1 inclui l2 dez vezes, l2 inclui l3 dez vezes... (10^7 leituras sem orçamento).
+    let mut fs = MemFs::new();
+    for i in 1..=8 {
+        let body = if i < 8 {
+            format!("Include l{}\n", i + 1).repeat(10)
+        } else {
+            "Host folha\n".to_string()
+        };
+        fs = fs.with(&format!("/home/ana/.ssh/l{i}"), &body);
+    }
+    let c = counting(fs);
+    let p = parse_config("Include l1\n", &unix(), &c);
+    assert!(c.reads.get() <= 256, "leituras: {}", c.reads.get());
+    assert!(
+        p.global_warnings
+            .iter()
+            .any(|w| w.msg.contains("orçamento")),
+        "{:?}",
+        p.global_warnings
+    );
+}
+
+#[test]
+fn include_billion_laughs_respeita_orcamento_de_bytes() {
+    // Um arquivo de ~900 KiB incluído 50 vezes.
+    let big = format!("# {}\n", "x".repeat(900 * 1024));
+    let root = "Include big\n".repeat(50);
+    let c = counting(MemFs::new().with("/home/ana/.ssh/big", &big));
+    let p = parse_config(&root, &unix(), &c);
+    // Teto de 4 MiB aceitos; a última leitura (descartada) pode passar até 1 MiB.
+    assert!(c.bytes.get() <= 5 * 1024 * 1024, "bytes: {}", c.bytes.get());
+    assert!(c.reads.get() <= 5, "leituras: {}", c.reads.get());
+    assert!(c.reads.get() >= 1);
+    let all = p
+        .global_warnings
+        .iter()
+        .chain(p.candidates.iter().flat_map(|c| c.warnings.iter()));
+    assert!(all.into_iter().any(|w| w.msg.contains("orçamento")));
+}
+
+#[test]
+fn include_de_arquivo_sem_formato_de_config_nao_aparece_nos_avisos() {
+    let passwd = "root:x:0:0:root:/root:/bin/bash\n\
+                  daemon:*:1:1:daemon:/usr/sbin:/usr/sbin/nologin\n\
+                  \x1b[31mfake\u{202E}diretiva:com-segredo-s3cr3t\n";
+    let fs = fs_with(&[("/etc/passwd", passwd)]);
+    for cfg in ["Include /etc/passwd\n", "Host a\n  Include /etc/passwd\n"] {
+        let p = parse_config(cfg, &unix(), &fs);
+        let all: Vec<&Warning> = p
+            .global_warnings
+            .iter()
+            .chain(p.candidates.iter().flat_map(|c| c.warnings.iter()))
+            .collect();
+        assert!(!all.is_empty());
+        for w in all {
+            assert!(!w.msg.contains("/root"), "{}", w.msg);
+            assert!(!w.msg.contains("nologin"), "{}", w.msg);
+            assert!(!w.msg.contains("s3cr3t"), "{}", w.msg);
+            assert!(
+                !w.msg.contains('\x1b') && !w.msg.contains('\u{202E}'),
+                "{}",
+                w.msg
+            );
+            assert!(w.msg.chars().count() <= 160, "{}", w.msg);
+        }
+    }
+}
+
+#[test]
+fn nome_de_diretiva_ignorada_e_truncado() {
+    let p = run(&format!("Host a\n  {} v\n", "d".repeat(500)));
+    let c = get(&p, "a");
+    assert!(c.warnings.iter().all(|w| w.msg.chars().count() <= 160));
+    assert!(!c.warnings.is_empty());
+}

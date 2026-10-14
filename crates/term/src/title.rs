@@ -6,20 +6,7 @@ pub const MAX_TITLE_CHARS: usize = 128;
 /// Remove caracteres de controle (C0/C1), formatação bidirecional e invisíveis que permitiriam
 /// disfarçar o título; limita o tamanho.
 pub fn sanitize_title(raw: &str) -> String {
-    let out: String = raw
-        .chars()
-        .filter(|c| {
-            !c.is_control()
-                && !matches!(*c,
-                    '\u{200B}'..='\u{200F}' // zero-width, marcas LTR/RTL
-                    | '\u{202A}'..='\u{202E}' // embeddings/overrides bidi
-                    | '\u{2060}'..='\u{2064}'
-                    | '\u{2066}'..='\u{2069}' // isolates bidi
-                    | '\u{FEFF}')
-        })
-        .take(MAX_TITLE_CHARS)
-        .collect();
-    out.trim().to_string()
+    myssh_ssh::sanitize_text(raw, MAX_TITLE_CHARS, false)
 }
 
 #[cfg(test)]

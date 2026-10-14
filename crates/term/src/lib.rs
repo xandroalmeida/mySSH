@@ -7,6 +7,7 @@
 //! Segurança: OSC 52 (clipboard) e hyperlinks da saída remota são ignorados; o título remoto é
 //! exposto apenas como texto sanitizado e limitado.
 
+pub mod filter;
 pub mod keys;
 pub mod session;
 pub mod theme;
