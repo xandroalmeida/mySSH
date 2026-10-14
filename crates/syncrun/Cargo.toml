@@ -1,0 +1,27 @@
+[package]
+name = "myssh-syncrun"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Executor de sincronização unidirecional do mySSH: plano real (local/SFTP), hash de conteúdo, execução com journal e retomada (sem UI)"
+
+[dependencies]
+myssh-ssh = { path = "../ssh" }
+myssh-sync = { path = "../sync" }
+myssh-transfer = { path = "../transfer" }
+russh-sftp = "3"
+sha2 = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tokio = { version = "1", features = ["rt", "sync", "time", "macros", "fs", "io-util"] }
+tokio-util = { version = "0.7", default-features = false }
+
+[dev-dependencies]
+myssh-core = { path = "../core" }
+myssh-store = { path = "../store" }
+filetime = "0.2"
+russh = "0.64"
+secrecy = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util", "net"] }

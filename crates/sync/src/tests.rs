@@ -93,7 +93,7 @@ async fn tolerancia_usa_maior_resolucao() {
 }
 
 #[tokio::test]
-async fn destino_mais_novo_com_tamanho_diferente_e_conflito() {
+async fn destino_mais_novo_e_sempre_conflito_nunca_skip() {
     let mut s = MemTree::new();
     let mut d = MemTree::new();
     s.add_file("f", 5, Some(100));
@@ -102,8 +102,8 @@ async fn destino_mais_novo_com_tamanho_diferente_e_conflito() {
     d.add_file("g", 5, Some(500));
     let p = plan(&s, &d, &opts()).await.unwrap();
     assert_eq!(conflict(&p, "f"), ConflictReason::DestModifiedAfter);
-    assert_eq!(skip(&p, "g"), SkipReason::DestNewerSameSize);
-    assert_eq!(p.summary().conflict, 1);
+    assert_eq!(conflict(&p, "g"), ConflictReason::DestNewer);
+    assert_eq!(p.summary().conflict, 2);
 }
 
 #[tokio::test]

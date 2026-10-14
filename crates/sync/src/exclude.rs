@@ -3,6 +3,7 @@
 use crate::relpath::RelPath;
 use globset::{GlobBuilder, GlobMatcher};
 
+#[derive(Clone)]
 struct Rule {
     matcher: GlobMatcher,
     dir_only: bool,
@@ -15,6 +16,7 @@ struct Rule {
 /// é ancorado na raiz (`build/out`). `*` não cruza `/`; `**` cruza. Não há
 /// negação (`!`). Diretório excluído não é percorrido (nem na origem nem no
 /// destino; itens excluídos no destino nunca são apagados no modo espelho).
+#[derive(Clone)]
 pub struct Exclusions {
     rules: Vec<Rule>,
 }

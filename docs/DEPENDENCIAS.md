@@ -62,6 +62,13 @@ Dependências diretas de crates do workspace (`myssh-*`) entre si não são list
 | unicode-normalization | 0.1 | MIT OR Apache-2.0 | Normalização de nomes (NFC/NFD entre SOs) |
 | serde / serde_json / thiserror / tokio | — | MIT OR Apache-2.0 / MIT | Serialização, erros, assíncrono |
 
+## myssh-syncrun
+
+| Crate | Versão | Licença | Propósito |
+|---|---|---|---|
+| sha2 | 0.10 | MIT OR Apache-2.0 | SHA-256 para comparação por conteúdo |
+| russh-sftp / tokio-util / serde / serde_json / thiserror | — | MIT OR Apache-2.0 | Leitura SFTP, cancelamento, journal, erros |
+
 ## myssh-term
 
 | Crate | Versão | Licença | Propósito |

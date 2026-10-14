@@ -8,6 +8,10 @@
 //! * **Tolerância de mtime** = `max(tolerance configurada (2 s por padrão,
 //!   granularidade do FAT), resolução da origem, resolução do destino)`.
 //!   Fusos/relógios dessincronizados entre máquinas não são corrigidos.
+//! * Destino mais novo (além da tolerância) é sempre `Conflict`
+//!   (`DestModifiedAfter` ou, com mesmo tamanho, `DestNewer`); o planejador
+//!   nunca escolhe um vencedor em caso ambíguo. Dentro da tolerância e com
+//!   mesmo tamanho, os arquivos são considerados iguais.
 //! * Sem mtime em um dos lados não há como saber quem é mais novo: vira
 //!   `Conflict` (use comparação por conteúdo).
 //! * Symlinks e arquivos especiais **nunca** são seguidos nem copiados; são
@@ -46,7 +50,7 @@ pub enum CompareMode {
     Content,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct PlanOptions {
     pub direction: Direction,
     pub compare: CompareMode,
@@ -128,6 +132,9 @@ pub enum ConflictReason {
     TypeMismatch,
     /// Destino mais novo que a origem com tamanho diferente.
     DestModifiedAfter,
+    /// Destino mais novo que a origem, mesmo tamanho: caso ambíguo (quem
+    /// vence?); o usuário decide, nunca o planejador.
+    DestNewer,
     MtimeUnknown,
     /// Dois nomes da origem colidem no destino.
     SourceCollision {
@@ -153,8 +160,6 @@ pub enum SkipReason {
         name: String,
     },
     MaxDepth,
-    /// Destino mais novo, mesmo tamanho: não sobrescrever.
-    DestNewerSameSize,
     /// Diretório do destino contém itens excluídos; não pode ser apagado.
     ContainsExcluded,
 }
@@ -450,14 +455,12 @@ fn compare_files(s: &Entry, d: &Entry, mode: CompareMode) -> Action {
                 && diff > tol
             {
                 // Destino mais novo que a origem.
-                return if s.size != d.size {
-                    Action::Conflict {
-                        reason: ConflictReason::DestModifiedAfter,
-                    }
-                } else {
-                    Action::Skip {
-                        reason: SkipReason::DestNewerSameSize,
-                    }
+                return Action::Conflict {
+                    reason: if s.size != d.size {
+                        ConflictReason::DestModifiedAfter
+                    } else {
+                        ConflictReason::DestNewer
+                    },
                 };
             }
             if let Ok(diff) = sm.duration_since(dm)

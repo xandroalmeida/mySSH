@@ -7,7 +7,7 @@ use crate::plan::{Action, Plan};
 use crate::relpath::RelPath;
 use crate::tree::EntryKind;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Op {
@@ -43,6 +43,13 @@ impl Journal {
     /// Cria o journal com os itens executáveis do plano (Create/Update/Delete)
     /// como `Pending`, na ordem do plano. Conflitos e `Skip` ficam de fora.
     pub fn from_plan(plan: &Plan) -> Journal {
+        Self::from_plan_with_choices(plan, &HashSet::new())
+    }
+
+    /// Como [`Journal::from_plan`], incluindo como `Update` os conflitos de
+    /// arquivo cujo caminho está em `use_source` (decisão explícita do usuário
+    /// de sobrescrever o destino com a origem).
+    pub fn from_plan_with_choices(plan: &Plan, use_source: &HashSet<RelPath>) -> Journal {
         let items = plan
             .items
             .iter()
@@ -51,6 +58,7 @@ impl Journal {
                     Action::Create => Op::Create,
                     Action::Update { .. } => Op::Update,
                     Action::Delete => Op::Delete,
+                    Action::Conflict { .. } if use_source.contains(&it.path) => Op::Update,
                     _ => return None,
                 };
                 Some(JournalItem {
