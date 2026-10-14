@@ -2701,6 +2701,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "myssh-sshconfig"
+version = "0.1.0"
+dependencies = [
+ "myssh-core",
+]
+
+[[package]]
 name = "myssh-store"
 version = "0.1.0"
 dependencies = [
