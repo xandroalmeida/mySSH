@@ -572,6 +572,8 @@ fn real_host_key_alterada_bloqueia_e_esquecer_volta_ao_fluxo_desconhecido() {
             .count()
             >= 1
     );
+    // a rolagem até a seção é animada: deixa assentar antes de clicar
+    h.run_steps(30);
     click(&mut h, i18n::TRUSTED_FORGET);
     assert!(matches!(h.state().dialog, Dialog::ConfirmForget(_)));
     assert_eq!(
