@@ -29,14 +29,16 @@ fn runtime() -> Arc<tokio::runtime::Runtime> {
 }
 
 fn app_with(store: Arc<dyn SecretStore>, mode: VaultMode) -> App {
-    App::new(
+    let mut app = App::new(
         runtime(),
         Store::open_in_memory().unwrap(),
         Arc::new(Vault::new(store)),
         mode,
         None,
         None,
-    )
+    );
+    app.auto_connect = false;
+    app
 }
 
 fn memory_app() -> App {

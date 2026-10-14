@@ -11,7 +11,7 @@ use crate::env;
 use crate::i18n;
 use crate::logic::{FolderSel, folder_path, group_by_folder, matches};
 use crate::shortcuts::{self, Action};
-use crate::tabs::TabKind;
+use crate::tabs::{TabBody, TabKind};
 
 const SEARCH_ID: &str = "sidebar-search";
 
@@ -38,6 +38,7 @@ impl eframe::App for App {
         self.settings_housekeeping(&ctx);
         self.handle_close_request(&ctx);
         self.handle_shortcuts(&ctx);
+        self.pump_tabs(&ctx);
         if let Some(mut d) = self.demo.take() {
             d.tick(self, &ctx);
             self.demo = Some(d);
@@ -48,6 +49,8 @@ impl eframe::App for App {
         self.sidebar(ui);
         self.central(ui);
         self.dialogs(&ctx);
+        self.tab_modals(&ctx);
+        self.process_tab_events();
     }
 
     fn on_exit(&mut self) {
@@ -76,7 +79,7 @@ impl App {
                     });
                 }
                 if ui.button(i18n::SETTINGS).clicked() {
-                    self.dialog = Dialog::Settings;
+                    self.open_settings();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if self.vault.is_locked() {
@@ -342,8 +345,11 @@ impl App {
                     ui.horizontal(|ui| {
                         for t in &self.tabs {
                             let active = self.active == Some(t.id);
-                            let r =
-                                ui.selectable_label(active, tab_job(ui, &t.kind, &t.body.title()));
+                            let r = ui.selectable_label(active, tab_job(ui, &t.kind, &*t.body));
+                            let r = match t.body.status() {
+                                Some(b) => r.on_hover_text(format!("{} {}", b.icon, b.text)),
+                                None => r,
+                            };
                             if r.clicked() {
                                 select = Some(t.id);
                             }
@@ -364,7 +370,9 @@ impl App {
             ui.separator();
             let prod_warning = self.settings.prod_warning;
             let active = self.active;
-            match self.tabs.iter_mut().find(|t| Some(t.id) == active) {
+            let ctx = ui.ctx().clone();
+            let (tabs, env_services) = self.tabs_and_env(&ctx);
+            match tabs.iter_mut().find(|t| Some(t.id) == active) {
                 Some(t) => {
                     let (profile_info, environment) = match &t.kind {
                         TabKind::Terminal { profile, .. } => (
@@ -402,9 +410,13 @@ impl App {
                                     });
                                 ui.add_space(4.0);
                             }
-                            egui::ScrollArea::vertical()
-                                .auto_shrink([false, false])
-                                .show(ui, |ui| t.body.ui(ui));
+                            if t.body.fills_space() {
+                                t.body.ui(ui, &env_services);
+                            } else {
+                                egui::ScrollArea::vertical()
+                                    .auto_shrink([false, false])
+                                    .show(ui, |ui| t.body.ui(ui, &env_services));
+                            }
                         });
                 }
                 None => {
@@ -486,9 +498,21 @@ fn row_job(ui: &egui::Ui, p: &Profile) -> LayoutJob {
     job
 }
 
-fn tab_job(ui: &egui::Ui, kind: &TabKind, title: &str) -> LayoutJob {
+fn tab_job(ui: &egui::Ui, kind: &TabKind, body: &dyn TabBody) -> LayoutJob {
+    let title = body.title();
     let mut job = LayoutJob::default();
     let font: FontId = TextStyle::Button.resolve(ui.style());
+    if let Some(b) = body.status() {
+        job.append(
+            &format!("{} ", b.icon),
+            0.0,
+            TextFormat {
+                font_id: font.clone(),
+                color: b.color,
+                ..Default::default()
+            },
+        );
+    }
     if let Some(s) = env::style(kind.environment()) {
         job.append(
             &format!("{} ", s.icon),
@@ -501,7 +525,7 @@ fn tab_job(ui: &egui::Ui, kind: &TabKind, title: &str) -> LayoutJob {
         );
     }
     job.append(
-        title,
+        &title,
         0.0,
         TextFormat {
             font_id: font,

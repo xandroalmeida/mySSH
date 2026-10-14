@@ -17,6 +17,7 @@ use crate::form::{AuthKind, ProfileForm, SecretMode};
 use crate::settings::ThemePref;
 
 pub static FAILED: AtomicBool = AtomicBool::new(false);
+static FAIL_COUNT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
 
 pub(crate) type SeedFn = fn(&App) -> ProfileForm;
 pub(crate) type ActFn = fn(&mut App, &egui::Context);
@@ -26,6 +27,8 @@ enum Phase {
     Act,
     Settle(u32),
     WaitShot(Instant),
+    /// Janela ociosa: sem repaint (mede CPU ociosa com sessão conectada).
+    Idle(Instant),
 }
 
 pub struct Demo {
@@ -33,6 +36,11 @@ pub struct Demo {
     step: usize,
     phase: Phase,
     seeds: VecDeque<SeedFn>,
+    steps: &'static [(Option<&'static str>, ActFn)],
+    /// Quadros de espera antes de cada captura (conexões reais precisam de mais tempo).
+    settle: u32,
+    /// Modo SSH real: depois da última captura, fica ocioso (sem repaint) por alguns segundos.
+    idle_after: Option<Duration>,
 }
 
 fn log(msg: impl AsRef<str>) {
@@ -177,6 +185,36 @@ pub(crate) const STEPS: &[(Option<&str>, ActFn)] = &[
     }),
 ];
 
+/// Modo `MYSSH_DEMO_SSH=host:porta` + `MYSSH_DEMO_KEY=caminho` (chave sem passphrase): cria um
+/// perfil para o servidor de teste, mostra o diálogo de host desconhecido e conecta de verdade.
+fn ssh_seed(_: &App) -> ProfileForm {
+    let target = std::env::var("MYSSH_DEMO_SSH").unwrap_or_default();
+    let (host, port) = target.rsplit_once(':').unwrap_or(("127.0.0.1", "2222"));
+    let mut f = base("servidor-de-teste", host, "tester");
+    f.port = port.into();
+    f.auth = AuthKind::Key;
+    f.key_path = std::env::var("MYSSH_DEMO_KEY").unwrap_or_default();
+    f.environment = Environment::Development;
+    f
+}
+
+fn open_ssh(app: &mut App, _: &egui::Context) {
+    if let Some(id) = id_of(app, "servidor-de-teste") {
+        app.open_profile(id);
+    }
+}
+
+fn accept_ssh(app: &mut App, _: &egui::Context) {
+    for t in &mut app.tabs {
+        t.body.demo_accept_host_key();
+    }
+}
+
+pub(crate) const SSH_STEPS: &[(Option<&str>, ActFn)] = &[
+    (Some("30-ssh-host-desconhecido"), open_ssh),
+    (Some("31-ssh-conectado"), accept_ssh),
+];
+
 impl Demo {
     pub fn from_env() -> Option<Self> {
         let dir = PathBuf::from(std::env::var_os("MYSSH_DEMO_SHOTS").filter(|d| !d.is_empty())?);
@@ -184,21 +222,50 @@ impl Demo {
             eprintln!("[demo] não foi possível criar {}: {e}", dir.display());
             std::process::exit(2);
         }
+        let ssh = std::env::var_os("MYSSH_DEMO_SSH").is_some();
         Some(Self {
             dir,
             step: 0,
             phase: Phase::Seed,
-            seeds: seeds(),
+            seeds: if ssh {
+                VecDeque::from([ssh_seed as SeedFn])
+            } else {
+                seeds()
+            },
+            steps: if ssh { SSH_STEPS } else { STEPS },
+            settle: if ssh { 60 } else { 14 },
+            idle_after: ssh.then_some(Duration::from_secs(12)),
         })
+    }
+
+    /// O modo SSH conecta de verdade (as demais capturas não abrem conexões).
+    pub fn connects(&self) -> bool {
+        self.idle_after.is_some()
     }
 
     fn fail(&self, ctx: &egui::Context, why: &str) {
         log(format!("FALHA: {why}"));
         FAILED.store(true, Ordering::SeqCst);
         ctx.send_viewport_cmd(ViewportCommand::Close);
+        // Com a tela do Mac bloqueada a janela não pinta e o `Close` nunca é processado:
+        // encerra de vez em vez de ficar em laço (e gastando CPU).
+        if FAIL_COUNT.fetch_add(1, Ordering::SeqCst) >= 2 {
+            eprintln!("[demo] a janela não pintou (tela bloqueada?): abortando");
+            std::process::exit(1);
+        }
     }
 
     pub fn tick(&mut self, app: &mut App, ctx: &egui::Context) {
+        if let Phase::Idle(since) = self.phase {
+            let total = self.idle_after.unwrap_or_default();
+            if since.elapsed() >= total {
+                log("ocioso: fim");
+                ctx.send_viewport_cmd(ViewportCommand::Close);
+            } else {
+                ctx.request_repaint_after(total - since.elapsed());
+            }
+            return;
+        }
         ctx.request_repaint();
         match self.phase {
             Phase::Seed => {
@@ -223,14 +290,20 @@ impl Demo {
                     }
                 }
             }
-            Phase::Act => match STEPS.get(self.step) {
-                None => {
-                    log("concluído");
-                    ctx.send_viewport_cmd(ViewportCommand::Close);
-                }
+            Phase::Act => match self.steps.get(self.step) {
+                None => match self.idle_after {
+                    Some(_) => {
+                        log("capturas concluídas; janela ociosa (sem repaint)");
+                        self.phase = Phase::Idle(Instant::now());
+                    }
+                    None => {
+                        log("concluído");
+                        ctx.send_viewport_cmd(ViewportCommand::Close);
+                    }
+                },
                 Some((_, act)) => {
                     act(app, ctx);
-                    self.phase = Phase::Settle(14);
+                    self.phase = Phase::Settle(self.settle);
                 }
             },
             Phase::Settle(n) if n > 1 => self.phase = Phase::Settle(n - 1),
@@ -238,6 +311,7 @@ impl Demo {
                 ctx.send_viewport_cmd(ViewportCommand::Screenshot(egui::UserData::default()));
                 self.phase = Phase::WaitShot(Instant::now());
             }
+            Phase::Idle(_) => {}
             Phase::WaitShot(since) => {
                 let img = ctx.input(|i| {
                     i.events.iter().find_map(|e| match e {
@@ -246,7 +320,7 @@ impl Demo {
                     })
                 });
                 if let Some(img) = img {
-                    let name = STEPS[self.step].0.unwrap_or("shot");
+                    let name = self.steps[self.step].0.unwrap_or("shot");
                     let path = self.dir.join(format!("{name}.png"));
                     match save_png(&path, &img) {
                         Ok(()) => log(format!("screenshot: {}", path.display())),

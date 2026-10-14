@@ -47,11 +47,8 @@ pub const NO_TABS: &str = "Nenhuma aba aberta. Selecione um perfil e use “Abri
 pub const WELCOME_TITLE: &str = "Início";
 pub const WELCOME_HEADING: &str = "Bem-vindo ao mySSH";
 pub const WELCOME_BODY: &str = "Crie um perfil, ou use a conexão rápida, para abrir uma sessão.";
-pub const TERMINAL_PLACEHOLDER: &str = "O terminal será ligado aqui.";
-pub const SIMULATE_BUSY: &str = "Simular sessão ativa (protótipo)";
 pub const QUICK_NOT_SAVED: &str = "Conexão rápida: este perfil não foi salvo.";
 pub const AUTH_LABEL: &str = "Autenticação";
-pub const JUMP_LABEL: &str = "Jump host";
 pub const AUTH_SUMMARY_PASSWORD_SAVED: &str = "senha (salva no cofre)";
 pub const AUTH_SUMMARY_PASSWORD_ASK: &str = "senha (perguntar ao conectar)";
 pub const AUTH_SUMMARY_KEY: &str = "chave privada";
@@ -187,3 +184,102 @@ pub const S_VAULT: &str = "Cofre de segredos";
 pub const S_VAULT_SESSION_ONLY: &str = "Cofre em memória: senhas salvas valem só até fechar o app.";
 pub const LOCK_NOW: &str = "Bloquear cofre agora";
 pub const LOCK_NOW_HELP: &str = "Bloquear o cofre não encerra sessões abertas: ele só impede ler senhas e passphrases salvas em novas conexões até ser desbloqueado.";
+
+// Aba de terminal: estados
+pub const ST_IDLE: &str = "Não conectado";
+pub const ST_PREPARING: &str = "Preparando";
+pub const ST_NEEDS_INPUT: &str = "Aguardando credenciais";
+pub const ST_CONNECTING: &str = "Conectando";
+pub const ST_AWAITING_TRUST: &str = "Aguardando confiança";
+pub const ST_AUTHENTICATING: &str = "Autenticando";
+pub const ST_CONNECTED: &str = "Conectado";
+pub const ST_DISCONNECTED: &str = "Desconectado";
+pub const ST_ERROR: &str = "Erro";
+pub const ST_BLOCKED: &str = "Bloqueado";
+
+// Aba de terminal: ações
+pub const TAB_CONNECT: &str = "Conectar";
+pub const TAB_DISCONNECT: &str = "Desconectar";
+pub const TAB_RECONNECT: &str = "Reconectar";
+pub const TAB_RETRY: &str = "Tentar novamente";
+pub const TAB_PREPARING: &str = "Preparando a conexão…";
+pub const TAB_WAITING_INPUT: &str = "Aguardando você informar as credenciais…";
+pub const TAB_NOT_CONNECTED: &str = "Esta aba não está conectada.";
+pub const TAB_SESSION_ENDED: &str = "A sessão foi encerrada.";
+pub const TAB_CANCELLED: &str = "Conexão cancelada.";
+pub const JUMP_LABEL: &str = "Jump host";
+
+// Erros / avisos da aba
+pub const ERR_JUMP: &str = "Jump host ainda não suportado nesta versão: a conexão não foi feita. Edite o perfil e remova o jump host para conectar direto, se for seguro.";
+pub const ERR_KI: &str = "Keyboard-interactive (MFA) ainda não é suportado nesta versão. Use senha, chave ou agente SSH neste perfil.";
+pub const ERR_AUTH_PASSWORD: &str =
+    "Autenticação recusada: senha incorreta ou usuário sem acesso a este servidor.";
+pub const ERR_AUTH_KEY: &str = "Autenticação recusada: o servidor não aceitou esta chave.";
+pub const ERR_INTERNAL: &str = "Falha interna ao preparar a conexão.";
+pub const NOTE_CRED_MISSING: &str = "A credencial salva deste perfil não foi encontrada.";
+pub const NOTE_SECRET_MISSING: &str = "A senha salva não está mais no cofre.";
+pub const NOTE_VAULT_UNAVAILABLE: &str = "O cofre do sistema está indisponível.";
+pub const SAVED_TO_VAULT: &str = "Segredo salvo no cofre.";
+pub fn save_failed(why: &str) -> String {
+    format!("Não foi possível salvar no cofre: {why}")
+}
+
+// Pedido de senha / passphrase
+pub fn ask_password_title(user: &str, host: &str) -> String {
+    format!("Senha de {user}@{host}")
+}
+pub fn ask_passphrase_title(file: &str) -> String {
+    format!("Passphrase da chave “{file}”")
+}
+pub const ASK_PASSWORD_HINT: &str = "Senha";
+pub const ASK_PASSPHRASE_HINT: &str = "Passphrase";
+pub const ASK_SAVE: &str = "Salvar no cofre do sistema";
+pub const ASK_SAVE_HELP: &str = "Não marque em computadores compartilhados.";
+
+// Cofre bloqueado
+pub const VAULT_LOCKED_TITLE: &str = "Cofre bloqueado";
+pub const VAULT_LOCKED_BODY: &str = "A senha ou passphrase deste perfil está salva no cofre, que está bloqueado. Desbloqueie o cofre ou digite o segredo agora (sem salvar).";
+pub const VAULT_UNLOCKING: &str = "Desbloqueando…";
+pub const TYPE_NOW: &str = "Digitar agora";
+
+// Host key desconhecida
+pub const HK_TITLE: &str = "Servidor desconhecido";
+pub const HK_BODY: &str = "É a primeira vez que você se conecta a este servidor. Confirme a impressão digital abaixo por um canal confiável (com o administrador, no console do provedor ou em documentação oficial) antes de aceitar. Se não for possível confirmar, rejeite.";
+pub const HK_HOST: &str = "Servidor";
+pub const HK_ALGO: &str = "Algoritmo";
+pub const HK_FINGERPRINT: &str = "Impressão digital (SHA-256)";
+pub const HK_REJECT: &str = "Rejeitar";
+pub const HK_ACCEPT_ONCE: &str = "Aceitar uma vez";
+pub const HK_ACCEPT_SAVE: &str = "Aceitar e salvar";
+
+// Host key alterada
+pub const HKC_TITLE: &str = "ALERTA: a chave do servidor mudou";
+pub const HKC_BODY: &str = "A chave apresentada agora é diferente da que você confiou antes. Isso pode indicar um ataque de interceptação (MITM), em que alguém se passa pelo servidor para roubar senhas e dados. Por segurança a conexão foi bloqueada e nada foi enviado. Se o servidor foi reinstalado ou trocou de chave de forma legítima, confirme com o administrador por um canal confiável antes de esquecer a chave antiga.";
+pub const HKC_PRESENTED: &str = "Chave apresentada agora";
+pub const HKC_KNOWN: &str = "Chave(s) confiável(is) conhecida(s)";
+pub const HKC_REVOKED: &str = "Esta chave foi revogada anteriormente por você.";
+pub const HKC_OPEN_TRUSTED: &str = "Abrir hosts confiáveis";
+pub const HKC_HINT: &str = "Depois de esquecer a chave antiga em Configurações, uma nova conexão pedirá confirmação como servidor desconhecido.";
+
+// Colagem
+pub const PASTE_TITLE: &str = "Colar várias linhas?";
+pub const PASTE_BODY: &str =
+    "O texto abaixo tem várias linhas e cada uma pode ser executada como comando.";
+pub const PASTE_CONFIRM: &str = "Colar";
+pub fn paste_lines(n: usize) -> String {
+    format!("{n} linhas")
+}
+
+// Hosts confiáveis (Configurações)
+pub const S_TRUSTED: &str = "Hosts confiáveis";
+pub const TRUSTED_EMPTY: &str = "Nenhum host confiável salvo.";
+pub const TRUSTED_FORGET: &str = "Esquecer";
+pub const TRUSTED_HELP: &str = "Chaves aceitas com “Aceitar e salvar”. Esquecer remove a chave: a próxima conexão pedirá confirmação de novo.";
+pub const FORGET_TITLE: &str = "Esquecer este host?";
+pub fn forget_body(host: &str, port: u16) -> String {
+    format!(
+        "A chave confiável de {host}:{port} será removida. Na próxima conexão você precisará confirmar a impressão digital novamente."
+    )
+}
+pub const FORGET_CONFIRM: &str = "Esquecer";
+pub const TRUSTED_ERR: &str = "Não foi possível ler ou alterar os hosts confiáveis.";

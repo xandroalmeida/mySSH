@@ -11,8 +11,11 @@ mod paths;
 mod settings;
 mod shortcuts;
 mod tabs;
+mod terminal_tab;
 mod view;
 
+#[cfg(test)]
+mod real_tests;
 #[cfg(test)]
 mod ui_tests;
 

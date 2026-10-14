@@ -5,7 +5,7 @@ use std::io;
 
 pub(crate) const TIMEOUT: &str = "Tempo esgotado ao conectar.";
 pub(crate) const CONNECTION_LOST: &str = "A conexão com o servidor foi perdida.";
-pub(crate) const AUTH_REJECTED: &str = "Autenticação recusada pelo servidor.";
+pub const AUTH_REJECTED: &str = "Autenticação recusada pelo servidor.";
 pub(crate) const HOST_REJECTED: &str = "Conexão cancelada: host não confiável.";
 pub(crate) const HOST_CHANGED: &str =
     "A chave do servidor mudou ou não é a confiável: conexão bloqueada (possível ataque).";
@@ -19,7 +19,7 @@ pub(crate) const NO_AGENT: &str =
     "Agente SSH indisponível (SSH_AUTH_SOCK não definido ou inacessível).";
 pub(crate) const AGENT_NO_KEYS: &str = "O agente SSH não tem chaves aceitas por este servidor.";
 pub(crate) const KEY_READ: &str = "Não foi possível ler o arquivo da chave privada.";
-pub(crate) const KEY_DECODE: &str = "Chave privada inválida ou passphrase incorreta.";
+pub const KEY_DECODE: &str = "Chave privada inválida ou passphrase incorreta.";
 
 pub(crate) fn io_message(e: &io::Error) -> String {
     use io::ErrorKind::*;

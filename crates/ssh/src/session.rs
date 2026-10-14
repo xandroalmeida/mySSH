@@ -356,6 +356,18 @@ async fn load_key(
         .map_err(|_| error::KEY_DECODE.to_string())
 }
 
+/// Diz se a chave privada em `path` exige passphrase (leitura síncrona: chamar fora da thread
+/// de UI). Erros são mensagens pt-BR sanitizadas.
+pub fn key_requires_passphrase(path: &std::path::Path) -> Result<bool, String> {
+    let text =
+        Zeroizing::new(std::fs::read_to_string(path).map_err(|_| error::KEY_READ.to_string())?);
+    match decode_secret_key(&text, None) {
+        Ok(_) => Ok(false),
+        Err(russh::keys::Error::KeyIsEncrypted) => Ok(true),
+        Err(_) => Err(error::KEY_DECODE.to_string()),
+    }
+}
+
 /// RSA nunca usa SHA-1: se o servidor não anunciar rsa-sha2, tentamos SHA-256.
 async fn rsa_hash(session: &Handle, key_alg: &Algorithm) -> Option<HashAlg> {
     if !matches!(key_alg, Algorithm::Rsa { .. }) {
