@@ -2,7 +2,7 @@
 
 CARGO      ?= cargo
 APP        := myssh-app
-VERSION    := $(shell sed -n 's/^version = "\(.*\)"/\1/p' crates/app/Cargo.toml | head -1)
+VERSION    := $(shell sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
 ARCH       := $(shell uname -m | sed 's/arm64/aarch64/')
 APP_BUNDLE := target/release/mySSH.app
 DMG        := target/release/mySSH_$(VERSION)_$(ARCH).dmg
@@ -12,12 +12,15 @@ INSTALL_DIR ?= /Applications
 TEST_ENV := MYSSH_TEST_SSH=127.0.0.1:2222 MYSSH_TEST_KEYS=$(CURDIR)/testenv/keys
 
 .DEFAULT_GOAL := help
-.PHONY: help setup build release run run-release fmt fmt-check lint test \
+.PHONY: version help setup build release run run-release fmt fmt-check lint test \
         testenv-up testenv-down test-real check audit icons package-mac \
         install-mac uninstall-mac clean
 
 help: ## Lista os alvos
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z_-]+:.*## / {printf "  \033[36m%-14s\033[0m %s\n", $$1, $$2}' $(MAKEFILE_LIST)
+
+version: ## Mostra a versão atual do workspace
+	@echo $(VERSION)
 
 # --- Ambiente -----------------------------------------------------------------
 

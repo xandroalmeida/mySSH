@@ -1,6 +1,6 @@
 [package]
 name = "myssh-ssh"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Sessão SSH (russh) do mySSH: conexão, host trust, autenticação e PTY, sem dependência de UI"

@@ -1,6 +1,6 @@
 [package]
 name = "myssh-syncrun"
-version = "0.1.0"
+version.workspace = true
 edition = "2024"
 license = "MIT OR Apache-2.0"
 description = "Executor de sincronização unidirecional do mySSH: plano real (local/SFTP), hash de conteúdo, execução com journal e retomada (sem UI)"
