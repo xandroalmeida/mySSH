@@ -37,6 +37,9 @@ pub struct CopyArgs<'a> {
     pub dst: Side<'a>,
     pub src_path: &'a str,
     pub dst_path: &'a str,
+    /// Modo Renomear: o nome original. Publica sem substituir; se `dst_path` for ocupado durante
+    /// a cópia (ex.: outro arquivo do mesmo lote), usa o próximo nome livre a partir do original.
+    pub rename_base: Option<&'a str>,
     pub preserve_mtime: bool,
     pub preserve_perms: bool,
     pub cancel: &'a CancellationToken,
@@ -377,7 +380,23 @@ async fn copy_inner(
     if cancelled() {
         return Err(TransferError::Cancelled);
     }
-    dst.publish(&tp, a.dst_path, &rand_token()).await?;
+    match a.rename_base {
+        None => dst.publish(&tp, a.dst_path, &rand_token()).await?,
+        Some(base) => {
+            let mut dest = a.dst_path.to_string();
+            let mut tries = 0;
+            while !dst.publish_new(&tp, &dest).await? {
+                tries += 1;
+                if tries > 100 {
+                    return Err(TransferError::Io("não há nome livre para renomear".into()));
+                }
+                if cancelled() {
+                    return Err(TransferError::Cancelled);
+                }
+                dest = dst.free_name(base).await?;
+            }
+        }
+    }
     st.temp = None;
     if let Some(sc) = st.sidecar.take() {
         let _ = dst.remove_file(&sc).await;

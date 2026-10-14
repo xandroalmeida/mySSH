@@ -620,10 +620,13 @@ async fn conflitos_overwrite_skip_rename_ask() {
     assert_eq!(content("a.txt").await, "antigo");
     r.assert_no_leftovers("d").await;
 
-    // Download com conflito local: Skip e Rename
+    // Download com conflito local e Rename. O remoto já tem "a (1).txt", "a (2).txt"... dos
+    // passos anteriores: o nome livre escolhido para "a.txt" pode ser ocupado por outro arquivo
+    // do mesmo lote durante a cópia, e nenhum dos dois pode sumir (publicação sem substituir).
     let dst = tmp();
     std::fs::create_dir(dst.path().join("d")).unwrap();
     std::fs::write(dst.path().join("d/a.txt"), "local-antigo").unwrap();
+    let remote_names = r.names("d").await;
     let mut q = req(Direction::Download, dst.path(), &r.p("d"));
     q.overwrite = Overwrite::Rename;
     let run = run_simple(&mut mgr, q).await;
@@ -632,9 +635,20 @@ async fn conflitos_overwrite_skip_rename_ask() {
         std::fs::read_to_string(dst.path().join("d/a.txt")).unwrap(),
         "local-antigo"
     );
+    let local: Vec<String> = std::fs::read_dir(dst.path().join("d"))
+        .unwrap()
+        .map(|e| std::fs::read_to_string(e.unwrap().path()).unwrap())
+        .collect();
     assert_eq!(
-        std::fs::read_to_string(dst.path().join("d/a (1).txt")).unwrap(),
-        "antigo"
+        local.len(),
+        remote_names.len() + 1,
+        "{local:?} {remote_names:?}"
+    );
+    // "a.txt", "b.txt" e "c.txt" remotos continuam "antigo": os três chegaram.
+    assert_eq!(
+        local.iter().filter(|c| *c == "antigo").count(),
+        3,
+        "{local:?}"
     );
     r.cleanup().await;
 }

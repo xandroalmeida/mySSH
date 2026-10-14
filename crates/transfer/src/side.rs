@@ -193,7 +193,7 @@ pub enum Side<'a> {
 
 pub enum Reader {
     Local(tokio::fs::File),
-    Remote(SftpFile),
+    Remote(Box<SftpFile>),
 }
 
 impl Reader {
@@ -216,7 +216,7 @@ impl Reader {
 
 pub enum Writer {
     Local(tokio::fs::File),
-    Remote(SftpFile),
+    Remote(Box<SftpFile>),
 }
 
 impl Writer {
@@ -349,6 +349,49 @@ impl<'a> Side<'a> {
         }
     }
 
+    /// Publica `temp` como `dest` **sem substituir**: `Ok(false)` se `dest` já existe (o
+    /// temporário fica intacto). Local: `hard_link` + remoção do temporário (atômico: falha com
+    /// `AlreadyExists`); em sistemas sem hard link (FAT/exFAT, alguns compartilhamentos) recai em
+    /// `lstat` + `rename`, com uma janela curta. Remoto: o `SSH_FXP_RENAME` padrão já falha se o
+    /// destino existe.
+    pub async fn publish_new(&self, temp: &str, dest: &str) -> Result<bool, TransferError> {
+        match self {
+            Side::Local => match tokio::fs::hard_link(temp, dest).await {
+                Ok(()) => {
+                    let _ = tokio::fs::remove_file(temp).await;
+                    Ok(true)
+                }
+                Err(e) if e.kind() == io::ErrorKind::AlreadyExists => Ok(false),
+                Err(_) => {
+                    if self.lstat(dest).await?.is_some() {
+                        return Ok(false);
+                    }
+                    self.rename(temp, dest).await.map(|()| true)
+                }
+            },
+            Side::Remote(_) => match self.rename(temp, dest).await {
+                Ok(()) => Ok(true),
+                Err(e) => match self.lstat(dest).await {
+                    Ok(Some(_)) => Ok(false),
+                    _ => Err(e),
+                },
+            },
+        }
+    }
+
+    /// Primeiro "nome (n).ext" livre no diretório de `path`.
+    pub async fn free_name(&self, path: &str) -> Result<String, TransferError> {
+        let parent = self.parent(path);
+        let name = self.file_name(path);
+        for n in 1..10_000u32 {
+            let cand = self.join(&parent, &names::rename_candidate(&name, n));
+            if self.lstat(&cand).await?.is_none() {
+                return Ok(cand);
+            }
+        }
+        Err(TransferError::Io("não há nome livre para renomear".into()))
+    }
+
     /// Publica `temp` como `dest` (substituindo um arquivo existente).
     ///
     /// Local: `rename` do SO (atômico, substitui). Remoto: o `SSH_FXP_RENAME` padrão falha se o
@@ -393,7 +436,11 @@ impl<'a> Side<'a> {
                 .await
                 .map(Reader::Local)
                 .map_err(io_err),
-            Side::Remote(s) => s.open(path).await.map(Reader::Remote).map_err(sftp_err),
+            Side::Remote(s) => s
+                .open(path)
+                .await
+                .map(|f| Reader::Remote(Box::new(f)))
+                .map_err(sftp_err),
         }
     }
 
@@ -426,7 +473,7 @@ impl<'a> Side<'a> {
                 };
                 s.open_with_flags(path, flags)
                     .await
-                    .map(Writer::Remote)
+                    .map(|f| Writer::Remote(Box::new(f)))
                     .map_err(sftp_err)
             }
         }
@@ -579,6 +626,37 @@ mod tests {
 
     fn mode(p: &Path) -> u32 {
         std::fs::metadata(p).unwrap().permissions().mode() & 0o777
+    }
+
+    #[tokio::test]
+    async fn publish_new_nunca_substitui() {
+        let d = tempfile::tempdir().unwrap();
+        let p = |n: &str| d.path().join(n).to_str().unwrap().to_string();
+        std::fs::write(p("t1"), "novo").unwrap();
+        std::fs::write(p("dest"), "existente").unwrap();
+
+        // Destino ocupado: não publica, nada muda.
+        assert!(!Side::Local.publish_new(&p("t1"), &p("dest")).await.unwrap());
+        assert_eq!(std::fs::read_to_string(p("dest")).unwrap(), "existente");
+        assert_eq!(std::fs::read_to_string(p("t1")).unwrap(), "novo");
+
+        // Destino livre: publica e o temporário some.
+        assert!(
+            Side::Local
+                .publish_new(&p("t1"), &p("livre"))
+                .await
+                .unwrap()
+        );
+        assert_eq!(std::fs::read_to_string(p("livre")).unwrap(), "novo");
+        assert!(!d.path().join("t1").exists());
+
+        // Próximo nome livre a partir do original.
+        std::fs::write(p("a (1).txt"), "x").unwrap();
+        std::fs::write(p("a.txt"), "x").unwrap();
+        assert_eq!(
+            Side::Local.free_name(&p("a.txt")).await.unwrap(),
+            p("a (2).txt")
+        );
     }
 
     #[tokio::test]

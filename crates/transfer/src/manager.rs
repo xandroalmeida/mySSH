@@ -654,6 +654,7 @@ async fn process(
         return Err(TransferError::Cancelled);
     }
     let mut dst_path = dst.to_string();
+    let mut rename_base = None;
     if let Some(ex) = dst_side.lstat(&dst_path).await? {
         if ex.kind == crate::Kind::Dir {
             return Err(TransferError::DestinationKind("um diretório"));
@@ -661,7 +662,10 @@ async fn process(
         match resolve(ctx, display, &ex).await? {
             Resolve::Skip => return Ok(Outcome::Skipped),
             Resolve::Overwrite => {}
-            Resolve::Rename => dst_path = free_name(&dst_side, &dst_path).await?,
+            Resolve::Rename => {
+                dst_path = dst_side.free_name(dst).await?;
+                rename_base = Some(dst);
+            }
         }
     }
     let w = engine::copy_file(CopyArgs {
@@ -669,6 +673,7 @@ async fn process(
         dst: dst_side,
         src_path: src,
         dst_path: &dst_path,
+        rename_base,
         preserve_mtime: ctx.preserve_mtime,
         preserve_perms: ctx.preserve_perms,
         cancel: &job.cancel,
@@ -745,17 +750,4 @@ async fn resolve(
             }
         }
     }
-}
-
-/// Primeiro "nome (n).ext" livre no diretório do destino.
-async fn free_name(side: &Side<'_>, path: &str) -> Result<String, TransferError> {
-    let parent = side.parent(path);
-    let name = side.file_name(path);
-    for n in 1..10_000u32 {
-        let cand = side.join(&parent, &names::rename_candidate(&name, n));
-        if side.lstat(&cand).await?.is_none() {
-            return Ok(cand);
-        }
-    }
-    Err(TransferError::Io("não há nome livre para renomear".into()))
 }
