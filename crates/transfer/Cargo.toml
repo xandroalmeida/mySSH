@@ -1,0 +1,26 @@
+[package]
+name = "myssh-transfer"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Transferência SFTP do mySSH: navegador remoto, fila de upload/download, retomada e FileTree remoto (sem UI)"
+
+[dependencies]
+myssh-ssh = { path = "../ssh" }
+myssh-sync = { path = "../sync" }
+russh-sftp = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util"] }
+tokio-util = { version = "0.7", default-features = false }
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+filetime = "0.2"
+unicode-normalization = "0.1"
+
+[dev-dependencies]
+myssh-core = { path = "../core" }
+myssh-store = { path = "../store" }
+russh = "0.64"
+secrecy = "0.10"
+tempfile = "3"
+tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "fs", "io-util", "net"] }

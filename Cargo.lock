@@ -1657,6 +1657,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "64cd1e32ddd350061ae6edb1b082d7c54915b5c672c389143b9a63403a109f24"
 
 [[package]]
+name = "filetime"
+version = "0.2.29"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5c287a33c7f0a620c38e641e7f60827713987b3c0f26e8ddc9462cc69cf75759"
+dependencies = [
+ "cfg-if",
+ "libc",
+]
+
+[[package]]
 name = "find-msvc-tools"
 version = "0.1.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2901,6 +2911,27 @@ dependencies = [
  "russh",
  "secrecy",
  "tokio",
+]
+
+[[package]]
+name = "myssh-transfer"
+version = "0.1.0"
+dependencies = [
+ "filetime",
+ "myssh-core",
+ "myssh-ssh",
+ "myssh-store",
+ "myssh-sync",
+ "russh",
+ "russh-sftp",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tokio",
+ "tokio-util",
+ "unicode-normalization",
 ]
 
 [[package]]
