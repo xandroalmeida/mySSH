@@ -20,6 +20,7 @@ myssh-sshconfig = { path = "../sshconfig" }
 eframe = "0.36"
 egui = "0.36"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }
+chrono = "0.4"
 directories = "6"
 rfd = "0.17"
 secrecy = "0.10"

@@ -6,6 +6,7 @@ mod demo;
 mod dialogs;
 mod dialogs_extra;
 mod env;
+mod files;
 mod form;
 mod i18n;
 mod icon;

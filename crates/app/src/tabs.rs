@@ -7,6 +7,7 @@ use myssh_core::{Environment, Profile};
 use myssh_secrets::Vault;
 use myssh_store::Store;
 
+use crate::files::contract::Overwrite;
 use crate::i18n;
 use crate::terminal_tab::TerminalTab;
 
@@ -46,6 +47,8 @@ pub struct TabEnv<'a> {
     /// Paleta do terminal escolhida pelo perfil; `None` = a global (claro/escuro).
     /// Preenchido por `with_profile_theme` para cada aba/painel.
     pub theme: Option<myssh_term::TermTheme>,
+    /// Política padrão de sobrescrita das transferências (Configurações).
+    pub default_overwrite: Overwrite,
 }
 
 impl TabEnv<'_> {
@@ -104,6 +107,12 @@ pub trait TabBody {
     fn fills_space(&self) -> bool {
         false
     }
+    /// Transferências de arquivos em andamento (fechar/sair pede confirmação mencionando o número).
+    fn active_transfers(&self) -> usize {
+        0
+    }
+    /// Mostra/oculta o painel de arquivos (atalho e botão).
+    fn toggle_files(&mut self) {}
     /// Há sessão ativa: fechar exige confirmação.
     fn is_busy(&self) -> bool;
     /// Pede o encerramento da sessão (não bloqueia). Chamado ao fechar a aba ou a aplicação.

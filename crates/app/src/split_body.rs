@@ -83,6 +83,13 @@ impl SplitBody {
             .is_some_and(|p| p.body.is_busy())
     }
 
+    pub fn pane_transfers(&self, id: PaneId) -> usize {
+        self.panes
+            .iter()
+            .find(|p| p.id == id)
+            .map_or(0, |p| p.body.active_transfers())
+    }
+
     pub fn pane_title(&self, id: PaneId) -> String {
         self.panes
             .iter()
@@ -384,6 +391,17 @@ impl TabBody for SplitBody {
 
     fn is_busy(&self) -> bool {
         self.panes.iter().any(|p| p.body.is_busy())
+    }
+
+    fn active_transfers(&self) -> usize {
+        self.panes.iter().map(|p| p.body.active_transfers()).sum()
+    }
+
+    fn toggle_files(&mut self) {
+        let f = self.focused;
+        if let Some(p) = self.panes.iter_mut().find(|p| p.id == f) {
+            p.body.toggle_files();
+        }
     }
 
     fn close(&mut self) {

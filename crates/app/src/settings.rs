@@ -2,6 +2,9 @@
 
 use myssh_store::Store;
 
+use crate::files::contract::Overwrite;
+use crate::files::plan::{overwrite_key, parse_overwrite};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemePref {
     System,
@@ -46,6 +49,8 @@ pub struct Settings {
     pub prod_warning: bool,
     /// Bloquear o cofre ao detectar suspensão do computador (ver `suspend`).
     pub vault_lock_on_suspend: bool,
+    /// Política padrão de sobrescrita nas transferências de arquivos.
+    pub files_overwrite: Overwrite,
 }
 
 pub const FONT_MIN: f32 = 8.0;
@@ -61,6 +66,7 @@ impl Default for Settings {
             vault_lock_minutes: 15,
             prod_warning: true,
             vault_lock_on_suspend: true,
+            files_overwrite: Overwrite::Ask,
         }
     }
 }
@@ -71,6 +77,7 @@ const K_PASTE: &str = "terminal.confirm_multiline_paste";
 const K_LOCK: &str = "vault.lock_minutes";
 const K_PROD: &str = "ui.prod_warning";
 const K_SUSPEND: &str = "vault.lock_on_suspend";
+const K_FILES_OVERWRITE: &str = "files.overwrite";
 
 impl Settings {
     /// Lê valores via `get`; chaves ausentes ou inválidas caem no padrão.
@@ -96,6 +103,9 @@ impl Settings {
             vault_lock_on_suspend: get(K_SUSPEND)
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(d.vault_lock_on_suspend),
+            files_overwrite: get(K_FILES_OVERWRITE)
+                .and_then(|s| parse_overwrite(&s))
+                .unwrap_or(d.files_overwrite),
         }
     }
 
@@ -103,7 +113,7 @@ impl Settings {
         Self::from_getter(|k| store.get_setting(k).ok().flatten())
     }
 
-    pub fn pairs(&self) -> [(&'static str, String); 6] {
+    pub fn pairs(&self) -> [(&'static str, String); 7] {
         [
             (K_THEME, self.theme.key().to_string()),
             (K_FONT, format!("{}", self.terminal_font_size)),
@@ -111,6 +121,10 @@ impl Settings {
             (K_LOCK, self.vault_lock_minutes.to_string()),
             (K_PROD, self.prod_warning.to_string()),
             (K_SUSPEND, self.vault_lock_on_suspend.to_string()),
+            (
+                K_FILES_OVERWRITE,
+                overwrite_key(self.files_overwrite).to_string(),
+            ),
         ]
     }
 
@@ -156,6 +170,8 @@ mod tests {
         assert_eq!(s.vault_lock_minutes, LOCK_MAX_MINUTES);
         assert!(!s.prod_warning);
         assert!(!s.vault_lock_on_suspend);
+        // valor inválido da política cai no padrão
+        assert_eq!(s.files_overwrite, Overwrite::Ask);
     }
 
     #[test]
@@ -176,6 +192,7 @@ mod tests {
             vault_lock_minutes: 0,
             prod_warning: false,
             vault_lock_on_suspend: false,
+            files_overwrite: Overwrite::Skip,
         };
         s.save(&store).unwrap();
         assert_eq!(Settings::load(&store), s);

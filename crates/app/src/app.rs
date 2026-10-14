@@ -907,6 +907,11 @@ impl App {
         }
     }
 
+    /// Transferências em andamento em todas as abas.
+    pub fn active_transfers(&self) -> usize {
+        self.tabs.iter().map(|t| t.body.active_transfers()).sum()
+    }
+
     pub fn any_busy(&self) -> bool {
         self.tabs.iter().any(|t| t.body.is_busy())
     }
@@ -948,6 +953,11 @@ impl App {
                 }
             }
             Action::NextPane => self.cycle_pane(),
+            Action::ToggleFiles => {
+                if let Some(t) = self.active_tab_mut() {
+                    t.body.toggle_files();
+                }
+            }
         }
     }
 
@@ -1049,6 +1059,7 @@ impl App {
             dark: ctx.theme() == egui::Theme::Dark,
             prod_warning: self.settings.prod_warning,
             theme: None,
+            default_overwrite: self.settings.files_overwrite,
         };
         (&mut self.tabs, env)
     }

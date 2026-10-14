@@ -17,6 +17,9 @@
 //! terminal): `Ctrl+D` é fim de arquivo no shell remoto e `Ctrl+E`/`Ctrl+J` são do readline.
 //! Eles são consultados antes dos demais para que `Ctrl+Shift+W` não acione também "fechar aba".
 //!
+//! Painel de arquivos: `Cmd/Ctrl+Shift+F` mostra/oculta (exige `Shift` como as divisões; `Cmd/Ctrl+F`
+//! continua sendo a busca de perfis).
+//!
 //! Observação: `egui::Modifiers::matches_logically` ignora `Shift` extra, então quando o foco
 //! está fora do terminal `Ctrl+Shift+T` também dispara — aceitável e coerente com a regra.
 
@@ -32,14 +35,16 @@ pub enum Action {
     SplitStack,
     ClosePane,
     NextPane,
+    ToggleFiles,
 }
 
 /// Ordem de consulta: os que exigem `Shift` vêm primeiro (ver nota no topo do módulo).
-pub const ACTIONS: [Action; 8] = [
+pub const ACTIONS: [Action; 9] = [
     Action::SplitSide,
     Action::SplitStack,
     Action::ClosePane,
     Action::NextPane,
+    Action::ToggleFiles,
     Action::NewTab,
     Action::CloseTab,
     Action::NewProfile,
@@ -50,7 +55,11 @@ pub const ACTIONS: [Action; 8] = [
 pub fn needs_shift(a: Action) -> bool {
     matches!(
         a,
-        Action::SplitSide | Action::SplitStack | Action::ClosePane | Action::NextPane
+        Action::SplitSide
+            | Action::SplitStack
+            | Action::ClosePane
+            | Action::NextPane
+            | Action::ToggleFiles
     )
 }
 
@@ -64,6 +73,7 @@ pub fn key(a: Action) -> Key {
         Action::SplitStack => Key::E,
         Action::ClosePane => Key::W,
         Action::NextPane => Key::J,
+        Action::ToggleFiles => Key::F,
     }
 }
 

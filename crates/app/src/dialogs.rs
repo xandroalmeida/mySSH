@@ -83,11 +83,16 @@ impl App {
                     .find(|t| t.id == id)
                     .map(|t| t.body.title())
                     .unwrap_or_default();
+                let n = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == id)
+                    .map_or(0, |t| t.body.active_transfers());
                 let next = confirm(
                     ctx,
                     "confirm-close",
                     i18n::CLOSE_TAB_TITLE,
-                    &i18n::close_tab_body(&title),
+                    &with_transfers(i18n::close_tab_body(&title), n),
                     i18n::CLOSE_TAB_CONFIRM,
                     Next::ConfirmCloseTab(id),
                 );
@@ -98,7 +103,7 @@ impl App {
                     ctx,
                     "confirm-quit",
                     i18n::QUIT_TITLE,
-                    i18n::QUIT_BODY,
+                    &with_transfers(i18n::QUIT_BODY.to_string(), self.active_transfers()),
                     i18n::QUIT_CONFIRM,
                     Next::ConfirmQuit,
                 );
@@ -120,11 +125,17 @@ impl App {
                     .and_then(|t| t.body.as_split_ref())
                     .map(|s| s.pane_title(pane))
                     .unwrap_or_default();
+                let n = self
+                    .tabs
+                    .iter()
+                    .find(|t| t.id == tab)
+                    .and_then(|t| t.body.as_split_ref())
+                    .map_or(0, |s| s.pane_transfers(pane));
                 let next = confirm(
                     ctx,
                     "confirm-close-pane",
                     i18n::CLOSE_PANE_TITLE,
-                    &i18n::close_pane_body(&title),
+                    &with_transfers(i18n::close_pane_body(&title), n),
                     i18n::CLOSE_PANE_CONFIRM,
                     Next::ConfirmClosePane(tab, pane),
                 );
@@ -135,7 +146,10 @@ impl App {
                     ctx,
                     "confirm-end-all",
                     i18n::END_ALL_TITLE,
-                    &i18n::end_all_body(self.active_sessions()),
+                    &with_transfers(
+                        i18n::end_all_body(self.active_sessions()),
+                        self.active_transfers(),
+                    ),
                     i18n::END_ALL_CONFIRM,
                     Next::EndAllSessions,
                 );
@@ -552,6 +566,21 @@ impl App {
                             ui.checkbox(&mut s.prod_warning, i18n::S_PROD_HELP);
                             ui.end_row();
 
+                            ui.label(i18n::S_FILES_POLICY);
+                            ui.vertical(|ui| {
+                                ui.horizontal(|ui| {
+                                    for p in crate::files::plan::POLICIES {
+                                        ui.radio_value(
+                                            &mut s.files_overwrite,
+                                            p,
+                                            crate::files::plan::overwrite_label(p),
+                                        );
+                                    }
+                                });
+                                ui.weak(i18n::S_FILES_POLICY_HELP);
+                            });
+                            ui.end_row();
+
                             ui.label(i18n::S_VAULT_TIMEOUT);
                             ui.horizontal(|ui| {
                                 ui.add(
@@ -702,6 +731,15 @@ fn quick_dialog(ctx: &egui::Context, q: &mut QuickDialog) -> Next {
 }
 
 // ---------------------------------------------------------------- confirmações
+
+/// Acrescenta o aviso das transferências em andamento (se houver) ao corpo de uma confirmação.
+fn with_transfers(body: String, n: usize) -> String {
+    if n == 0 {
+        body
+    } else {
+        format!("{body}\n\n{}", i18n::transfers_warning(n))
+    }
+}
 
 fn confirm(
     ctx: &egui::Context,

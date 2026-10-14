@@ -2,7 +2,9 @@
 
 use crate::shortcuts::Action;
 
+mod files;
 mod m2b;
+pub use files::*;
 pub use m2b::*;
 
 pub const TITLE: &str = "mySSH";
@@ -78,6 +80,7 @@ pub fn shortcut_name(a: Action) -> &'static str {
         Action::SplitStack => "dividir painel empilhado (mesmo perfil)",
         Action::ClosePane => "fechar painel",
         Action::NextPane => "próximo painel",
+        Action::ToggleFiles => "painel de arquivos (SFTP)",
     }
 }
 

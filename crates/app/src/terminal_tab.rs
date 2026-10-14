@@ -26,6 +26,7 @@ use myssh_term::{DEFAULT_PUMP_BUDGET, HostKeyAlert, TermSession, TermStyle, Term
 use zeroize::Zeroize;
 
 use crate::app::secret_error_text;
+use crate::files::{self, FilesPanel};
 use crate::i18n;
 use crate::tabs::{StatusBadge, TabBody, TabEnv, TabEvent};
 use crate::view::warn_color;
@@ -132,9 +133,11 @@ enum ModalKind {
     Vault,
     HostKey,
     AuthPrompt,
+    Files,
 }
 
 enum Act {
+    ToggleFiles,
     Connect,
     Disconnect,
     OpenTrusted,
@@ -163,6 +166,9 @@ pub struct TerminalTab {
     notice: Option<String>,
     events: Vec<TabEvent>,
     modal_kind: Option<ModalKind>,
+    /// Painel de arquivos (criado ao abrir; some ao reconectar/desconectar/fechar).
+    files: Option<FilesPanel>,
+    files_open: bool,
 }
 
 impl TerminalTab {
@@ -186,7 +192,24 @@ impl TerminalTab {
             notice: None,
             events: Vec::new(),
             modal_kind: None,
+            files: None,
+            files_open: false,
         }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn debug_set_files(&mut self, f: FilesPanel) {
+        self.files = Some(f);
+        self.files_open = true;
+    }
+
+    /// Cancela as transferências e descarta o painel (a conexão que o sustentava acabou).
+    fn drop_files(&mut self) {
+        if let Some(f) = self.files.as_mut() {
+            f.cancel_all();
+        }
+        self.files = None;
+        self.files_open = false;
     }
 
     // ------------------------------------------------------------ conexão
@@ -197,6 +220,7 @@ impl TerminalTab {
         if let Some(s) = &self.sess {
             s.disconnect();
         }
+        self.drop_files();
         self.notice = None;
         self.paste = None;
         self.ki = None;
@@ -382,6 +406,7 @@ impl TerminalTab {
     }
 
     fn disconnect(&mut self) {
+        self.drop_files();
         match &self.phase {
             Phase::Live => {
                 if let Some(s) = &self.sess {
@@ -467,6 +492,7 @@ impl TerminalTab {
             {
                 Some(ModalKind::AuthPrompt)
             }
+            _ if self.files.as_ref().is_some_and(FilesPanel::needs_modal) => Some(ModalKind::Files),
             _ => None,
         }
     }
@@ -510,6 +536,20 @@ impl TerminalTab {
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
+                    .add_enabled(
+                        live || self.files_open,
+                        egui::Button::new(i18n::FILES_BUTTON).selected(self.files_open),
+                    )
+                    .on_hover_text(format!(
+                        "{} ({})",
+                        i18n::FILES_BUTTON_HINT,
+                        crate::shortcuts::label(crate::shortcuts::Action::ToggleFiles)
+                    ))
+                    .clicked()
+                {
+                    *act = Some(Act::ToggleFiles);
+                }
+                if ui
                     .add_enabled(can_reconnect, egui::Button::new(label))
                     .clicked()
                 {
@@ -527,6 +567,28 @@ impl TerminalTab {
             });
         });
         ui.separator();
+    }
+
+    /// Painel de arquivos redimensionável abaixo da barra (o terminal fica com o resto).
+    fn files_section(&mut self, ui: &mut egui::Ui, env: &TabEnv) {
+        if !self.files_open {
+            return;
+        }
+        let panel = self
+            .files
+            .get_or_insert_with(|| files::new_for_session(env));
+        let max_h = (ui.available_height() * 0.8).max(200.0);
+        let mut close = false;
+        egui::Panel::bottom(Id::new(("files-panel", self.uid)))
+            .resizable(true)
+            .default_size(340.0)
+            .size_range(180.0..=max_h)
+            .show(ui, |ui| {
+                close = panel.ui(ui);
+            });
+        if close {
+            self.files_open = false;
+        }
     }
 
     fn message_panel(&self, ui: &mut egui::Ui, msg: &str, is_error: bool) {
@@ -1025,6 +1087,11 @@ impl TabBody for TerminalTab {
             }
         }
 
+        // Fila de arquivos: drena com orçamento por frame (também em segundo plano).
+        if let Some(f) = self.files.as_mut() {
+            f.pump();
+        }
+
         // Drena a sessão (também em segundo plano: evita backpressure).
         if let Some(s) = self.sess.as_mut() {
             if s.pump(DEFAULT_PUMP_BUDGET) {
@@ -1048,6 +1115,7 @@ impl TabBody for TerminalTab {
     fn ui(&mut self, ui: &mut egui::Ui, env: &TabEnv) {
         let mut act = None;
         self.toolbar(ui, &mut act);
+        self.files_section(ui, env);
         match &self.phase {
             Phase::Idle => {
                 let msg = if self.sess.is_some() {
@@ -1068,6 +1136,7 @@ impl TabBody for TerminalTab {
             Phase::Live => self.live_ui(ui, env, &mut act),
         }
         match act {
+            Some(Act::ToggleFiles) => self.toggle_files(),
             Some(Act::Connect) => self.connect(env),
             Some(Act::Disconnect) => self.disconnect(),
             Some(Act::OpenTrusted) => self.events.push(TabEvent::OpenTrustedHosts),
@@ -1091,6 +1160,11 @@ impl TabBody for TerminalTab {
             ModalKind::Vault => self.vault_modal(ctx, env),
             ModalKind::HostKey => self.host_key_modal(ctx, fresh),
             ModalKind::AuthPrompt => self.auth_prompt_modal(ctx, fresh),
+            ModalKind::Files => {
+                if let Some(f) = self.files.as_mut() {
+                    f.modal_ui(ctx);
+                }
+            }
         }
     }
 
@@ -1132,10 +1206,21 @@ impl TabBody for TerminalTab {
     }
 
     fn is_busy(&self) -> bool {
-        self.simulate_busy || self.session_live()
+        self.simulate_busy || self.session_live() || self.active_transfers() > 0
+    }
+
+    fn active_transfers(&self) -> usize {
+        self.files.as_ref().map_or(0, FilesPanel::active)
+    }
+
+    fn toggle_files(&mut self) {
+        if self.files_open || self.session_live() {
+            self.files_open = !self.files_open;
+        }
     }
 
     fn close(&mut self) {
+        self.drop_files();
         if let Some(s) = &self.sess {
             s.disconnect();
         }
@@ -1529,6 +1614,37 @@ fn key_line(ui: &mut egui::Ui, algo: &str, fp: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn fila_ativa_deixa_a_aba_ocupada_e_fechar_cancela_tudo() {
+        let rt = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let ctx = egui::Context::default();
+        let (panel, mem) = crate::files::test_panel(rt.handle().clone(), ctx);
+        let mut tab = TerminalTab::new(Profile::new("srv", "srv.example.com", "ana"), false, None);
+        assert!(!tab.is_busy());
+        tab.debug_set_files(panel);
+        assert!(
+            !tab.is_busy(),
+            "painel aberto sem transferências não é atividade"
+        );
+        mem.state
+            .lock()
+            .unwrap()
+            .active
+            .insert(myssh_transfer_id(1));
+        assert_eq!(tab.active_transfers(), 1);
+        assert!(tab.is_busy());
+        tab.close();
+        assert_eq!(mem.state.lock().unwrap().cancel_all_calls, 1);
+        assert_eq!(tab.active_transfers(), 0);
+    }
+
+    fn myssh_transfer_id(n: u64) -> crate::files::contract::TransferId {
+        crate::files::contract::TransferId(n)
+    }
 
     #[test]
     fn previa_trunca_e_conta_linhas() {
