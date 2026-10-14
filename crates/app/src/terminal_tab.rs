@@ -3,7 +3,11 @@
 //!
 //! Fluxo: `Idle` → `Resolving` (cofre/arquivo da chave, em `spawn_blocking`) → [`Prompt` |
 //! `VaultLocked`] → `Live` (há um `TermSession`) ou `Failed` (erro antes de existir sessão).
-//! Reconectar sempre cria uma sessão nova (limpa a tela) e **nunca reenvia comandos**.
+//! Reconectar cria uma conexão nova no **mesmo terminal** (scrollback mantido, separador
+//! "— reconectado —") e **nunca reenvia comandos**.
+//!
+//! Jump host: a cadeia (`Profile::jump`, recursiva) é carregada do store e as credenciais de cada
+//! perfil (saltos e destino) são resolvidas em ordem, perguntando quando não salvas.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -14,7 +18,7 @@ use myssh_core::trust::{HostEndpoint, HostTrustStore};
 use myssh_core::{AuthMethod, Credential, CredentialId, CredentialKind, Profile, SessionState};
 use myssh_secrets::{SecretError, SecretString, Vault, new_secret_ref};
 use myssh_ssh::{
-    AUTH_REJECTED, AuthMaterial, ConnectRequest, HostKeyDecision, KEY_DECODE, Notify, PtySize,
+    AUTH_REJECTED, AuthMaterial, ConnectRequest, Hop, HostKeyDecision, KEY_DECODE, Notify, PtySize,
     key_requires_passphrase, spawn,
 };
 use myssh_store::Store;
@@ -46,6 +50,8 @@ enum SecretKind {
 }
 
 struct SecretPrompt {
+    /// Posição na cadeia: `0..hops.len()` = jump hosts; `hops.len()` = destino.
+    index: usize,
     kind: SecretKind,
     text: String,
     save: bool,
@@ -59,7 +65,7 @@ impl Drop for SecretPrompt {
     }
 }
 
-/// Resultado da preparação de credenciais (calculado fora da thread de UI).
+/// Resultado da preparação das credenciais de UM perfil (calculado fora da thread de UI).
 enum Resolved {
     Ready(AuthMaterial),
     Prompt {
@@ -70,12 +76,47 @@ enum Resolved {
     Failed(String),
 }
 
+/// Por que a resolução da cadeia parou.
+enum Stop {
+    Done,
+    Prompt {
+        index: usize,
+        kind: SecretKind,
+        note: Option<String>,
+    },
+    VaultLocked {
+        index: usize,
+    },
+    Failed(String),
+}
+
+/// Resultado da resolução da cadeia (jump hosts + destino). `mats[i]` = material já resolvido.
+struct ResolveOut {
+    hops: Vec<Profile>,
+    mats: Vec<Option<AuthMaterial>>,
+    stop: Stop,
+}
+
+/// Respostas de um pedido de keyboard-interactive em edição (zeroizadas ao descartar).
+struct KiForm {
+    fields: Vec<String>,
+}
+
+impl Drop for KiForm {
+    fn drop(&mut self) {
+        for f in &mut self.fields {
+            f.zeroize();
+        }
+    }
+}
+
 type UnlockRx = Receiver<Result<(), SecretError>>;
 
 enum Phase {
     Idle,
-    Resolving(Receiver<Resolved>),
+    Resolving(Receiver<ResolveOut>),
     VaultLocked {
+        index: usize,
         error: Option<String>,
         unlocking: Option<UnlockRx>,
     },
@@ -90,6 +131,7 @@ enum ModalKind {
     Secret,
     Vault,
     HostKey,
+    AuthPrompt,
 }
 
 enum Act {
@@ -103,15 +145,21 @@ pub struct TerminalTab {
     profile: Profile,
     saved: bool,
     jump_name: Option<String>,
+    /// Jump hosts da cadeia atual (do mais próximo do cliente ao mais próximo do destino).
+    hops: Vec<Profile>,
+    /// Material de autenticação resolvido (`hops.len() + 1` posições; a última é o destino).
+    mats: Vec<Option<AuthMaterial>>,
     phase: Phase,
     sess: Option<TermSession>,
     started: bool,
-    /// A próxima conexão deve perguntar o segredo (o anterior foi recusado).
-    force_prompt: bool,
+    /// A próxima conexão deve perguntar o segredo desta posição da cadeia (foi recusado).
+    force: Option<usize>,
+    /// Respostas em edição do pedido de keyboard-interactive.
+    ki: Option<KiForm>,
     error_seen: bool,
     simulate_busy: bool,
     paste: Option<String>,
-    save_rx: Option<Receiver<Result<AuthMethod, String>>>,
+    save_rx: Option<Receiver<(usize, Result<AuthMethod, String>)>>,
     notice: Option<String>,
     events: Vec<TabEvent>,
     modal_kind: Option<ModalKind>,
@@ -124,10 +172,13 @@ impl TerminalTab {
             profile,
             saved,
             jump_name,
+            hops: Vec::new(),
+            mats: Vec::new(),
             phase: Phase::Idle,
             sess: None,
             started: false,
-            force_prompt: false,
+            force: None,
+            ki: None,
             error_seen: false,
             simulate_busy: false,
             paste: None,
@@ -140,43 +191,55 @@ impl TerminalTab {
 
     // ------------------------------------------------------------ conexão
 
-    /// Inicia uma conexão nova (descarta a sessão anterior, se houver).
+    /// Inicia uma conexão nova. O terminal anterior (se houver) é mantido: a conexão antiga é
+    /// encerrada e a nova escreve no mesmo `Term` (ver [`TermSession::restart`]).
     fn connect(&mut self, env: &TabEnv) {
-        self.sess = None; // soltar o handle desconecta
+        if let Some(s) = &self.sess {
+            s.disconnect();
+        }
         self.notice = None;
         self.paste = None;
+        self.ki = None;
         self.error_seen = false;
-        // Jump host: NUNCA conectar ignorando o salto (M2).
-        if self.profile.jump.is_some() {
-            self.phase = Phase::Failed(i18n::ERR_JUMP.into());
-            return;
-        }
-        if matches!(self.profile.auth, AuthMethod::KeyboardInteractive) {
-            self.phase = Phase::Failed(i18n::ERR_KI.into());
-            return;
-        }
-        let force = std::mem::take(&mut self.force_prompt);
-        self.start_resolve(env, force);
+        self.mats.clear();
+        self.hops.clear();
+        let force = self.force.take();
+        self.start_resolve(env, Vec::new(), Vec::new(), force);
     }
 
-    fn start_resolve(&mut self, env: &TabEnv, force: bool) {
+    /// Resolve (fora da thread de UI) a cadeia de jump hosts e as credenciais, parando na primeira
+    /// que precisa do usuário. `hops`/`mats` vazios = primeira passada (carrega a cadeia do store).
+    fn start_resolve(
+        &mut self,
+        env: &TabEnv,
+        hops: Vec<Profile>,
+        mats: Vec<Option<AuthMaterial>>,
+        force: Option<usize>,
+    ) {
         let (tx, rx) = channel();
         let (store, vault, ctx) = (env.store.clone(), env.vault.clone(), env.ctx.clone());
-        let auth = self.profile.auth.clone();
+        let target = self.profile.clone();
         env.rt.spawn_blocking(move || {
-            let _ = tx.send(resolve(&store, &vault, &auth, force));
+            let _ = tx.send(resolve_chain(&store, &vault, &target, hops, mats, force));
             ctx.request_repaint();
         });
         self.phase = Phase::Resolving(rx);
     }
 
-    fn on_resolved(&mut self, env: &TabEnv, r: Resolved) {
-        match r {
-            Resolved::Ready(auth) => self.launch(env, auth),
-            Resolved::Prompt { kind, note } => {
-                let can_save = self.saved
+    /// Perfil na posição `index` da cadeia (`hops.len()` = destino).
+    fn profile_at(&self, index: usize) -> &Profile {
+        self.hops.get(index).unwrap_or(&self.profile)
+    }
+
+    fn on_resolved(&mut self, env: &TabEnv, out: ResolveOut) {
+        self.hops = out.hops;
+        self.mats = out.mats;
+        match out.stop {
+            Stop::Done => self.launch(env),
+            Stop::Prompt { index, kind, note } => {
+                let can_save = (index < self.hops.len() || self.saved)
                     && matches!(
-                        (&self.profile.auth, kind),
+                        (&self.profile_at(index).auth, kind),
                         (
                             AuthMethod::Password { credential: None },
                             SecretKind::Password
@@ -189,6 +252,7 @@ impl TerminalTab {
                         )
                     );
                 self.phase = Phase::Prompt(SecretPrompt {
+                    index,
                     kind,
                     text: String::new(),
                     save: false,
@@ -196,25 +260,51 @@ impl TerminalTab {
                     note,
                 });
             }
-            Resolved::VaultLocked => {
+            Stop::VaultLocked { index } => {
                 self.phase = Phase::VaultLocked {
+                    index,
                     error: None,
                     unlocking: None,
                 }
             }
-            Resolved::Failed(m) => self.phase = Phase::Failed(m),
+            Stop::Failed(m) => self.phase = Phase::Failed(m),
         }
     }
 
-    fn launch(&mut self, env: &TabEnv, auth: AuthMaterial) {
+    fn launch(&mut self, env: &TabEnv) {
+        let mut mats = std::mem::take(&mut self.mats);
+        let Some(Some(auth)) = mats.pop() else {
+            self.phase = Phase::Failed(i18n::ERR_INTERNAL.into());
+            return;
+        };
+        let mut jumps = Vec::with_capacity(self.hops.len());
+        for (h, m) in self.hops.iter().zip(mats) {
+            let Some(auth) = m else {
+                self.phase = Phase::Failed(i18n::ERR_INTERNAL.into());
+                return;
+            };
+            jumps.push(Hop {
+                endpoint: HostEndpoint::new(&h.host, h.port),
+                username: h.username.clone(),
+                auth,
+                connect_timeout: std::time::Duration::from_secs(u64::from(
+                    h.connect_timeout_secs.max(1),
+                )),
+            });
+        }
         let p = &self.profile;
+        // Reconexão: o PTY nasce com o tamanho atual do terminal mantido.
+        let (cols, rows) = self
+            .sess
+            .as_ref()
+            .map_or((INITIAL_COLS, INITIAL_ROWS), |s| s.size());
         let req = ConnectRequest {
             endpoint: HostEndpoint::new(&p.host, p.port),
             username: p.username.clone(),
             auth,
             pty: PtySize {
-                cols: INITIAL_COLS,
-                rows: INITIAL_ROWS,
+                cols,
+                rows,
                 pix_w: 0,
                 pix_h: 0,
             },
@@ -226,12 +316,24 @@ impl TerminalTab {
                 .keepalive_secs
                 .filter(|s| *s > 0)
                 .map(|s| std::time::Duration::from_secs(u64::from(s))),
+            jumps,
         };
         let ctx = env.ctx.clone();
         let notify: Notify = Arc::new(move || ctx.request_repaint());
         let trust: Arc<dyn HostTrustStore> = env.store.clone();
         let handle = spawn(env.rt, req, trust, notify);
-        self.sess = Some(TermSession::new(handle, INITIAL_COLS, INITIAL_ROWS));
+        match self.sess.as_mut() {
+            Some(s) => {
+                // Só marca a reconexão se a sessão anterior mostrou alguma saída.
+                let sep = if s.bytes_received() > 0 {
+                    i18n::RECONNECTED_SEPARATOR
+                } else {
+                    ""
+                };
+                s.restart(handle, sep);
+            }
+            None => self.sess = Some(TermSession::new(handle, INITIAL_COLS, INITIAL_ROWS)),
+        }
         self.phase = Phase::Live;
     }
 
@@ -241,9 +343,9 @@ impl TerminalTab {
         };
         let secret = SecretString::from(std::mem::take(&mut p.text));
         if p.save && p.can_save {
-            self.spawn_save(env, p.kind, secret.clone());
+            self.spawn_save(env, p.index, p.kind, secret.clone());
         }
-        let auth = match (p.kind, &self.profile.auth) {
+        let material = match (p.kind, &self.profile_at(p.index).auth) {
             (SecretKind::Password, _) => AuthMaterial::Password(secret),
             (SecretKind::Passphrase, AuthMethod::KeyFile { path, .. }) => AuthMaterial::KeyFile {
                 path: path.clone(),
@@ -254,17 +356,27 @@ impl TerminalTab {
                 return;
             }
         };
-        self.launch(env, auth);
+        if let Some(slot) = self.mats.get_mut(p.index) {
+            *slot = Some(material);
+        }
+        let (hops, mats) = (
+            std::mem::take(&mut self.hops),
+            std::mem::take(&mut self.mats),
+        );
+        self.start_resolve(env, hops, mats, None);
     }
 
-    /// Salva o segredo digitado no cofre e associa ao perfil (em segundo plano).
-    fn spawn_save(&mut self, env: &TabEnv, kind: SecretKind, secret: SecretString) {
+    /// Salva o segredo digitado no cofre e associa ao perfil da posição `index` (em segundo plano).
+    fn spawn_save(&mut self, env: &TabEnv, index: usize, kind: SecretKind, secret: SecretString) {
         let (tx, rx) = channel();
         self.save_rx = Some(rx);
         let (store, vault, ctx) = (env.store.clone(), env.vault.clone(), env.ctx.clone());
-        let (pid, name) = (self.profile.id, self.profile.name.clone());
+        let (pid, name) = {
+            let p = self.profile_at(index);
+            (p.id, p.name.clone())
+        };
         env.rt.spawn_blocking(move || {
-            let _ = tx.send(save_secret(&store, &vault, pid, &name, kind, secret));
+            let _ = tx.send((index, save_secret(&store, &vault, pid, &name, kind, secret)));
             ctx.request_repaint();
         });
     }
@@ -288,7 +400,7 @@ impl TerminalTab {
         self.sess.as_ref().is_some_and(|s| s.closed().is_none())
     }
 
-    fn unlock(&mut self, env: &TabEnv) {
+    fn unlock(&mut self, env: &TabEnv, index: usize) {
         let (tx, rx) = channel();
         let (vault, ctx) = (env.vault.clone(), env.ctx.clone());
         env.rt.spawn_blocking(move || {
@@ -296,6 +408,7 @@ impl TerminalTab {
             ctx.request_repaint();
         });
         self.phase = Phase::VaultLocked {
+            index,
             error: None,
             unlocking: Some(rx),
         };
@@ -346,6 +459,14 @@ impl TerminalTab {
             {
                 Some(ModalKind::HostKey)
             }
+            Phase::Live
+                if self
+                    .sess
+                    .as_ref()
+                    .is_some_and(|s| s.auth_prompt().is_some()) =>
+            {
+                Some(ModalKind::AuthPrompt)
+            }
             _ => None,
         }
     }
@@ -367,7 +488,7 @@ impl TerminalTab {
         let can_reconnect = !live && !matches!(self.phase, Phase::Resolving(_));
         let label = if matches!(self.phase, Phase::Idle) && self.sess.is_none() {
             i18n::TAB_CONNECT
-        } else if self.force_prompt {
+        } else if self.force.is_some() {
             i18n::TAB_RETRY
         } else {
             i18n::TAB_RECONNECT
@@ -425,7 +546,8 @@ impl TerminalTab {
             return;
         };
         if let Some(alert) = sess.host_key_alert().cloned() {
-            alert_panel(ui, &alert, act);
+            let via = hop_label(&self.hops, alert.hop);
+            alert_panel(ui, &alert, via.as_deref(), act);
             return;
         }
         if let Some(Some(msg)) = sess.closed() {
@@ -462,8 +584,21 @@ impl TerminalTab {
     // ------------------------------------------------------------ modais
 
     fn secret_modal(&mut self, ctx: &egui::Context, env: &TabEnv, fresh: bool) {
-        let (user, host) = (self.profile.username.clone(), self.profile.host.clone());
-        let key_file = match &self.profile.auth {
+        let index = match &self.phase {
+            Phase::Prompt(p) => p.index,
+            _ => return,
+        };
+        let is_jump = index < self.hops.len();
+        let (user, host, name, auth) = {
+            let t = self.profile_at(index);
+            (
+                t.username.clone(),
+                t.host.clone(),
+                t.name.clone(),
+                t.auth.clone(),
+            )
+        };
+        let key_file = match &auth {
             AuthMethod::KeyFile { path, .. } => path
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
@@ -478,6 +613,9 @@ impl TerminalTab {
         let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
             ui.set_width(440.0);
             ui.heading(match p.kind {
+                SecretKind::Password if is_jump => {
+                    i18n::ask_password_title_jump(&user, &host, &name)
+                }
                 SecretKind::Password => i18n::ask_password_title(&user, &host),
                 SecretKind::Passphrase => i18n::ask_passphrase_title(&key_file),
             });
@@ -529,10 +667,15 @@ impl TerminalTab {
     }
 
     fn vault_modal(&mut self, ctx: &egui::Context, env: &TabEnv) {
-        let Phase::VaultLocked { error, unlocking } = &self.phase else {
+        let Phase::VaultLocked {
+            index,
+            error,
+            unlocking,
+        } = &self.phase
+        else {
             return;
         };
-        let (err, busy) = (error.clone(), unlocking.is_some());
+        let (index, err, busy) = (*index, error.clone(), unlocking.is_some());
         let mut unlock = false;
         let mut type_now = false;
         let mut cancel = false;
@@ -571,13 +714,14 @@ impl TerminalTab {
         if cancel {
             self.disconnect();
         } else if unlock {
-            self.unlock(env);
+            self.unlock(env, index);
         } else if type_now {
-            let kind = match self.profile.auth {
+            let kind = match self.profile_at(index).auth {
                 AuthMethod::KeyFile { .. } => SecretKind::Passphrase,
                 _ => SecretKind::Password,
             };
             self.phase = Phase::Prompt(SecretPrompt {
+                index,
                 kind,
                 text: String::new(),
                 save: false,
@@ -594,6 +738,7 @@ impl TerminalTab {
         let Some(p) = sess.host_key_prompt().cloned() else {
             return;
         };
+        let via = hop_label(&self.hops, p.hop);
         let mut decision = None;
         let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
             ui.set_width(540.0);
@@ -611,6 +756,11 @@ impl TerminalTab {
                             .selectable(true),
                     );
                     ui.end_row();
+                    if let Some(v) = &via {
+                        ui.label(i18n::HK_VIA);
+                        ui.label(v);
+                        ui.end_row();
+                    }
                     ui.label(i18n::HK_ALGO);
                     ui.add(
                         egui::Label::new(RichText::new(&p.key.algorithm).monospace())
@@ -653,6 +803,89 @@ impl TerminalTab {
         }
         if let Some(d) = decision {
             sess.answer_host_key(d);
+        }
+    }
+
+    fn auth_prompt_modal(&mut self, ctx: &egui::Context, fresh: bool) {
+        let Some(info) = self.sess.as_ref().and_then(|s| s.auth_prompt()).cloned() else {
+            return;
+        };
+        // Campos novos para cada pedido (o servidor pode mandar várias rodadas).
+        if self
+            .ki
+            .as_ref()
+            .is_none_or(|k| k.fields.len() != info.prompts.len())
+        {
+            self.ki = Some(KiForm {
+                fields: vec![String::new(); info.prompts.len()],
+            });
+        }
+        let title = match info.hop {
+            Some(i) => i18n::ki_title_jump(self.hops.get(i).map_or("", |h| h.name.as_str())),
+            None if !info.name.trim().is_empty() => info.name.clone(),
+            None => i18n::KI_TITLE.to_string(),
+        };
+        let instructions = if info.instructions.trim().is_empty() {
+            i18n::KI_DEFAULT_INSTRUCTIONS.to_string()
+        } else {
+            info.instructions.clone()
+        };
+        let uid = self.uid;
+        let mut submit = false;
+        let mut cancel = false;
+        let Some(form) = self.ki.as_mut() else {
+            return;
+        };
+        let resp = egui::Modal::new(Id::new(("tab-modal", uid))).show(ctx, |ui| {
+            ui.set_width(460.0);
+            ui.heading(&title);
+            ui.add_space(6.0);
+            ui.label(&instructions);
+            ui.add_space(6.0);
+            let mut enter = false;
+            for (i, (text, echo)) in info.prompts.iter().enumerate() {
+                ui.label(text.trim());
+                let te = ui.add(
+                    egui::TextEdit::singleline(&mut form.fields[i])
+                        .password(!*echo)
+                        .hint_text(i18n::KI_ECHO_HINT)
+                        .desired_width(f32::INFINITY),
+                );
+                if fresh && i == 0 {
+                    te.request_focus();
+                }
+                if te.lost_focus() && ui.input(|inp| inp.key_pressed(Key::Enter)) {
+                    enter = true;
+                }
+                ui.add_space(4.0);
+            }
+            ui.add_space(4.0);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button(i18n::KI_SEND).clicked() || enter {
+                    submit = true;
+                }
+                if ui.button(i18n::CANCEL).clicked() {
+                    cancel = true;
+                }
+            });
+        });
+        if resp.should_close() {
+            cancel = true;
+        }
+        let Some(sess) = self.sess.as_mut() else {
+            return;
+        };
+        if cancel {
+            sess.cancel_auth();
+            self.ki = None;
+        } else if submit && let Some(mut form) = self.ki.take() {
+            // Cada campo vira um SecretString (zeroizado ao soltar); o buffer original é zerado.
+            let answers = form
+                .fields
+                .iter_mut()
+                .map(|f| SecretString::from(std::mem::take(f)))
+                .collect();
+            sess.answer_auth(answers);
         }
     }
 
@@ -722,9 +955,11 @@ impl TabBody for TerminalTab {
             Phase::Resolving(rx) => match rx.try_recv() {
                 Ok(r) => Some(r),
                 Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => {
-                    Some(Resolved::Failed(i18n::ERR_INTERNAL.into()))
-                }
+                Err(TryRecvError::Disconnected) => Some(ResolveOut {
+                    hops: Vec::new(),
+                    mats: Vec::new(),
+                    stop: Stop::Failed(i18n::ERR_INTERNAL.into()),
+                }),
             },
             _ => None,
         };
@@ -733,21 +968,32 @@ impl TabBody for TerminalTab {
         }
 
         // Desbloqueio do cofre concluído?
-        let unlocked = match &self.phase {
+        let (locked_index, unlocked) = match &self.phase {
             Phase::VaultLocked {
+                index,
                 unlocking: Some(rx),
                 ..
-            } => match rx.try_recv() {
-                Ok(r) => Some(r),
-                Err(TryRecvError::Empty) => None,
-                Err(TryRecvError::Disconnected) => Some(Err(SecretError::Locked)),
-            },
-            _ => None,
+            } => (
+                *index,
+                match rx.try_recv() {
+                    Ok(r) => Some(r),
+                    Err(TryRecvError::Empty) => None,
+                    Err(TryRecvError::Disconnected) => Some(Err(SecretError::Locked)),
+                },
+            ),
+            _ => (0, None),
         };
         match unlocked {
-            Some(Ok(())) => self.start_resolve(env, false),
+            Some(Ok(())) => {
+                let (hops, mats) = (
+                    std::mem::take(&mut self.hops),
+                    std::mem::take(&mut self.mats),
+                );
+                self.start_resolve(env, hops, mats, None);
+            }
             Some(Err(e)) => {
                 self.phase = Phase::VaultLocked {
+                    index: locked_index,
                     error: Some(secret_error_text(&e)),
                     unlocking: None,
                 }
@@ -758,13 +1004,16 @@ impl TabBody for TerminalTab {
         // Salvamento do segredo no cofre concluído?
         if let Some(rx) = &self.save_rx {
             match rx.try_recv() {
-                Ok(Ok(auth)) => {
-                    self.profile.auth = auth;
+                Ok((index, Ok(auth))) => {
+                    match self.hops.get_mut(index) {
+                        Some(h) => h.auth = auth,
+                        None => self.profile.auth = auth,
+                    }
                     self.notice = Some(i18n::SAVED_TO_VAULT.into());
                     self.events.push(TabEvent::ProfileChanged);
                     self.save_rx = None;
                 }
-                Ok(Err(why)) => {
+                Ok((_, Err(why))) => {
                     self.notice = Some(i18n::save_failed(&why));
                     self.save_rx = None;
                 }
@@ -782,13 +1031,8 @@ impl TabBody for TerminalTab {
                 && let Some(Some(msg)) = s.closed()
             {
                 self.error_seen = true;
-                let ask_again = match &self.profile.auth {
-                    AuthMethod::Password { .. } => msg == AUTH_REJECTED,
-                    AuthMethod::KeyFile { .. } => msg == KEY_DECODE,
-                    _ => false,
-                };
-                if ask_again {
-                    self.force_prompt = true;
+                if let Some(i) = ask_again_index(&self.hops, &self.profile.auth, msg) {
+                    self.force = Some(i);
                 }
             }
         }
@@ -843,6 +1087,7 @@ impl TabBody for TerminalTab {
             ModalKind::Secret => self.secret_modal(ctx, env, fresh),
             ModalKind::Vault => self.vault_modal(ctx, env),
             ModalKind::HostKey => self.host_key_modal(ctx, fresh),
+            ModalKind::AuthPrompt => self.auth_prompt_modal(ctx, fresh),
         }
     }
 
@@ -894,6 +1139,7 @@ impl TabBody for TerminalTab {
         if let Some(mut t) = self.paste.take() {
             t.zeroize();
         }
+        self.ki = None;
         if matches!(
             self.phase,
             Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. }
@@ -1010,6 +1256,99 @@ fn fetch(store: &Store, vault: &Vault, cid: CredentialId) -> Fetch {
     }
 }
 
+/// Rótulo "por onde" para o diálogo/alerta de host key: `hop` = índice do salto; `None` = destino.
+fn hop_label(hops: &[Profile], hop: Option<usize>) -> Option<String> {
+    match hop {
+        Some(i) => Some(i18n::hk_via_jump(
+            i + 1,
+            hops.len(),
+            hops.get(i).map_or("?", |h| h.name.as_str()),
+        )),
+        None => hops.last().map(|h| i18n::hk_via_target(&h.name)),
+    }
+}
+
+/// Posição da cadeia cujo segredo foi recusado (a próxima tentativa deve perguntar de novo).
+/// Erros de salto chegam como "Jump host N: <mensagem>".
+fn ask_again_index(hops: &[Profile], target_auth: &AuthMethod, msg: &str) -> Option<usize> {
+    let rejected = |auth: &AuthMethod, m: &str| match auth {
+        AuthMethod::Password { .. } => m == AUTH_REJECTED,
+        AuthMethod::KeyFile { .. } => m == KEY_DECODE,
+        _ => false,
+    };
+    if let Some(rest) = msg.strip_prefix("Jump host ")
+        && let Some((n, m)) = rest.split_once(": ")
+        && let Ok(n) = n.parse::<usize>()
+        && let Some(h) = hops.get(n.wrapping_sub(1))
+    {
+        return rejected(&h.auth, m).then_some(n - 1);
+    }
+    rejected(target_auth, msg).then_some(hops.len())
+}
+
+/// Carrega a cadeia de jump hosts (primeira passada) e resolve as credenciais em ordem, parando
+/// na primeira que precisa do usuário. Roda em `spawn_blocking`.
+fn resolve_chain(
+    store: &Store,
+    vault: &Vault,
+    target: &Profile,
+    mut hops: Vec<Profile>,
+    mut mats: Vec<Option<AuthMaterial>>,
+    force: Option<usize>,
+) -> ResolveOut {
+    let fail = |hops, mats, m: &str| ResolveOut {
+        hops,
+        mats,
+        stop: Stop::Failed(m.to_string()),
+    };
+    if mats.is_empty() {
+        let mut seen = vec![target.id];
+        let mut chain = Vec::new();
+        let mut cur = target.jump;
+        while let Some(id) = cur {
+            if seen.contains(&id) {
+                return fail(hops, mats, i18n::ERR_JUMP_LOOP);
+            }
+            seen.push(id);
+            match store.get_profile(id) {
+                Ok(Some(p)) => {
+                    cur = p.jump;
+                    chain.push(p);
+                }
+                _ => return fail(hops, mats, i18n::ERR_JUMP_MISSING),
+            }
+        }
+        chain.reverse(); // do cliente para o destino
+        hops = chain;
+        mats = (0..=hops.len()).map(|_| None).collect();
+    }
+    for i in 0..mats.len() {
+        if mats[i].is_some() {
+            continue;
+        }
+        let auth = hops.get(i).map_or(&target.auth, |h| &h.auth);
+        let stop = match resolve(store, vault, auth, force == Some(i)) {
+            Resolved::Ready(m) => {
+                mats[i] = Some(m);
+                continue;
+            }
+            Resolved::Prompt { kind, note } => Stop::Prompt {
+                index: i,
+                kind,
+                note,
+            },
+            Resolved::VaultLocked => Stop::VaultLocked { index: i },
+            Resolved::Failed(m) => Stop::Failed(m),
+        };
+        return ResolveOut { hops, mats, stop };
+    }
+    ResolveOut {
+        hops,
+        mats,
+        stop: Stop::Done,
+    }
+}
+
 /// Prepara o material de autenticação. Roda em `spawn_blocking` (cofre do SO e disco).
 fn resolve(store: &Store, vault: &Vault, auth: &AuthMethod, force: bool) -> Resolved {
     match auth {
@@ -1054,7 +1393,7 @@ fn resolve(store: &Store, vault: &Vault, auth: &AuthMethod, force: bool) -> Reso
             }
         }
         AuthMethod::Agent => Resolved::Ready(AuthMaterial::Agent),
-        AuthMethod::KeyboardInteractive => Resolved::Failed(i18n::ERR_KI.into()),
+        AuthMethod::KeyboardInteractive => Resolved::Ready(AuthMaterial::KeyboardInteractive),
     }
 }
 
@@ -1118,7 +1457,7 @@ fn save_secret(
 }
 
 /// Painel vermelho e bloqueante de chave de servidor alterada. Sem opção de aceitar.
-fn alert_panel(ui: &mut egui::Ui, alert: &HostKeyAlert, act: &mut Option<Act>) {
+fn alert_panel(ui: &mut egui::Ui, alert: &HostKeyAlert, via: Option<&str>, act: &mut Option<Act>) {
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -1146,6 +1485,9 @@ fn alert_panel(ui: &mut egui::Ui, alert: &HostKeyAlert, act: &mut Option<Act>) {
                         ))
                         .monospace(),
                     );
+                    if let Some(v) = via {
+                        ui.label(format!("{}: {v}", i18n::HK_VIA));
+                    }
                     ui.add_space(6.0);
                     ui.strong(i18n::HKC_PRESENTED);
                     key_line(

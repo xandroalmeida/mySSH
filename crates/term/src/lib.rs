@@ -14,7 +14,8 @@ pub mod title;
 pub mod widget;
 
 pub use session::{
-    DEFAULT_PUMP_BUDGET, DEFAULT_SCROLLBACK, HostKeyAlert, HostKeyPrompt, TermSession,
+    AuthPromptInfo, DEFAULT_PUMP_BUDGET, DEFAULT_SCROLLBACK, HostKeyAlert, HostKeyPrompt,
+    TermSession,
 };
 pub use theme::{TermStyle, TermTheme};
 pub use widget::{TermResponse, show};

@@ -11,8 +11,8 @@ use std::time::{Duration, Instant};
 use myssh_core::SessionState;
 use myssh_core::trust::{HostEndpoint, HostKey, HostTrustStore, TrustVerdict};
 use myssh_ssh::{
-    AuthMaterial, ConnectRequest, HostKeyDecision, PtySize, SessionCommand, SessionEvent,
-    SessionHandle, host_key_from_public, spawn,
+    AuthMaterial, ConnectRequest, Connection, EventSink, Hop, HostKeyDecision, PtySize,
+    SessionCommand, SessionEvent, SessionHandle, host_key_from_public, spawn,
 };
 use myssh_store::Store;
 use russh::keys::PublicKey;
@@ -76,6 +76,9 @@ async fn ready() {
                 && &b == b"SSH-"
             {
                 drop(s);
+                // A própria sonda (fechada antes de autenticar) soma 1 s de penalidade: deixa expirar
+                // para não empurrar a conexão real para além do limite.
+                tokio::time::sleep(Duration::from_millis(1200)).await;
                 let _ = server_key();
                 return;
             }
@@ -107,6 +110,7 @@ fn request(ep: HostEndpoint, auth: AuthMaterial) -> ConnectRequest {
         term: "xterm-256color".into(),
         connect_timeout: Duration::from_secs(10),
         keepalive: Some(Duration::from_secs(15)),
+        jumps: vec![],
     }
 }
 
@@ -195,10 +199,12 @@ async fn host_desconhecido_aceitar_e_salvar() {
             SessionEvent::State(s) => states.push(s),
             SessionEvent::HostKeyUnknown {
                 endpoint: ep,
+                hop,
                 key,
                 responder,
             } => {
                 assert_eq!(ep, endpoint());
+                assert_eq!(hop, None, "conexão direta: o servidor é o destino");
                 assert_eq!(key.fingerprint_sha256, server.fingerprint_sha256);
                 break responder;
             }
@@ -324,7 +330,9 @@ async fn chave_alterada_bloqueia_antes_da_autenticacao() {
                 panic!("mudança de chave não pode oferecer aceitar")
             }
             SessionEvent::Closed { error } => closed = Some(error),
-            SessionEvent::Data(_) => panic!("sem dados antes de autenticar"),
+            SessionEvent::Data(_) | SessionEvent::AuthPrompt { .. } => {
+                panic!("sem dados nem prompts antes de autenticar")
+            }
         }
     }
     assert!(saw_changed);
@@ -394,23 +402,6 @@ async fn chave_com_e_sem_passphrase() {
     let mut h = start(request(endpoint(), ausente), trusting());
     let run = drain_until(&mut h, 15, |_| false).await;
     assert!(run.closed.unwrap().unwrap().contains("ler o arquivo"));
-}
-
-#[tokio::test(flavor = "multi_thread")]
-#[ignore]
-async fn keyboard_interactive_ainda_nao_suportado() {
-    ready().await;
-    let mut h = start(
-        request(endpoint(), AuthMaterial::KeyboardInteractive),
-        trusting(),
-    );
-    let run = drain_until(&mut h, 15, |_| false).await;
-    assert!(
-        run.closed
-            .unwrap()
-            .unwrap()
-            .contains("ainda não é suportado")
-    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -684,4 +675,469 @@ async fn autenticacao_por_agente() {
     let _ = agent.kill();
     let _ = agent.wait();
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+// ------------------------------------------------------------------ keyboard-interactive / MFA
+
+fn request_as(user: &str, auth: AuthMaterial) -> ConnectRequest {
+    let mut r = request(endpoint(), auth);
+    r.username = user.into();
+    r
+}
+
+/// Responde aos `AuthPrompt`s com `answers[i]` na rodada `i` (sem resposta = cancela); devolve os
+/// prompts vistos (texto, echo) e o resultado final da sessão.
+async fn run_with_prompts(
+    h: &mut SessionHandle,
+    answers: &[&str],
+) -> (Vec<Vec<(String, bool)>>, Run) {
+    let mut seen = vec![];
+    let mut run = Run {
+        states: vec![],
+        data: vec![],
+        closed: None,
+    };
+    let t0 = Instant::now();
+    while t0.elapsed() < Duration::from_secs(20) && run.closed.is_none() {
+        match tokio::time::timeout(Duration::from_millis(200), h.evt_rx.recv()).await {
+            Ok(Some(SessionEvent::State(s))) => {
+                let done = s == SessionState::Connected;
+                run.states.push(s);
+                if done {
+                    break;
+                }
+            }
+            Ok(Some(SessionEvent::Data(d))) => run.data.extend(d),
+            Ok(Some(SessionEvent::Closed { error })) => run.closed = Some(error),
+            Ok(Some(SessionEvent::AuthPrompt {
+                hop,
+                prompts,
+                responder,
+                ..
+            })) => {
+                assert_eq!(hop, None);
+                let n = seen.len();
+                seen.push(prompts.clone());
+                match answers.get(n) {
+                    Some(a) => responder.answer(
+                        prompts
+                            .iter()
+                            .map(|_| SecretString::from(a.to_string()))
+                            .collect(),
+                    ),
+                    None => drop(responder), // cancela
+                }
+            }
+            Ok(Some(_)) => {}
+            Ok(None) => break,
+            Err(_) => {}
+        }
+    }
+    (seen, run)
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn mfa_chave_mais_keyboard_interactive() {
+    ready().await;
+    let auth = AuthMaterial::KeyFile {
+        path: keys_dir().join("id_ed25519"),
+        passphrase: None,
+    };
+    let mut h = start(request_as("mfa", auth), trusting());
+    let (seen, run) = run_with_prompts(&mut h, &["mfa-code-123456"]).await;
+    assert!(
+        run.states.contains(&SessionState::Connected),
+        "{:?}",
+        run.closed
+    );
+    assert_eq!(seen.len(), 1, "uma rodada de prompt");
+    assert_eq!(seen[0].len(), 1);
+    assert!(seen[0][0].0.to_lowercase().contains("password"));
+    assert!(!seen[0][0].1, "senha sem eco");
+    h.cmd_tx
+        .send(SessionCommand::Input(b"id -un\r".to_vec()))
+        .await
+        .unwrap();
+    let run = drain_until(&mut h, 10, |r| text(&r.data).contains("mfa\r\n")).await;
+    assert!(text(&run.data).contains("mfa\r\n"), "{}", text(&run.data));
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn mfa_resposta_errada_e_cancelamento() {
+    ready().await;
+    let key = || AuthMaterial::KeyFile {
+        path: keys_dir().join("id_ed25519"),
+        passphrase: None,
+    };
+    let mut h = start(request_as("mfa", key()), trusting());
+    let (_, run) = run_with_prompts(&mut h, &["errado"]).await;
+    assert_eq!(
+        run.closed.unwrap().unwrap(),
+        "Autenticação recusada pelo servidor."
+    );
+
+    // Sem resposta (responder solto) = cancelado.
+    let mut h = start(request_as("mfa", key()), trusting());
+    let (seen, run) = run_with_prompts(&mut h, &[]).await;
+    assert_eq!(seen.len(), 1);
+    assert_eq!(run.closed.unwrap().unwrap(), "Autenticação cancelada.");
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn keyboard_interactive_puro() {
+    ready().await;
+    let mut h = start(
+        request_as("kionly", AuthMaterial::KeyboardInteractive),
+        trusting(),
+    );
+    let (seen, run) = run_with_prompts(&mut h, &["ki-pass"]).await;
+    assert!(
+        run.states.contains(&SessionState::Connected),
+        "{:?}",
+        run.closed
+    );
+    assert_eq!(seen.len(), 1);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn senha_recusada_com_keyboard_interactive_oferecido() {
+    ready().await;
+    // `kionly` não aceita o método `password`, só keyboard-interactive: o prompt simples
+    // "Password:" é respondido sozinho com a senha do perfil (sem diálogo).
+    let pw = AuthMaterial::Password(SecretString::from("ki-pass".to_string()));
+    let mut h = start(request_as("kionly", pw), trusting());
+    let (seen, run) = run_with_prompts(&mut h, &[]).await;
+    assert!(
+        run.states.contains(&SessionState::Connected),
+        "{:?}",
+        run.closed
+    );
+    assert!(
+        seen.is_empty(),
+        "sem diálogo para o prompt de senha simples"
+    );
+
+    // Senha errada num servidor que ainda aceita `password` (tester): um prompt "Password:" só
+    // repetiria a senha errada; recusa direto, sem perguntar.
+    let wrong = AuthMaterial::Password(SecretString::from("errada".to_string()));
+    let mut h = start(request_as("tester", wrong), trusting());
+    let (seen, run) = run_with_prompts(&mut h, &[]).await;
+    assert!(seen.is_empty());
+    assert_eq!(
+        run.closed.unwrap().unwrap(),
+        "Autenticação recusada pelo servidor."
+    );
+}
+
+// ------------------------------------------------------------------ Connection (canais, SFTP)
+
+fn sink() -> EventSink {
+    let (tx, mut rx) = tokio::sync::mpsc::channel(32);
+    tokio::spawn(async move { while rx.recv().await.is_some() {} });
+    EventSink::new(tx, Arc::new(|| {}))
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn conexao_reutilizavel_varios_canais_e_sftp() {
+    ready().await;
+    let trust: Arc<dyn HostTrustStore> = trusting();
+    let conn = Connection::connect(&request(endpoint(), pw()), &trust, &sink())
+        .await
+        .expect("connect");
+    assert_eq!(conn.open_channels(), 0);
+    assert!(!conn.is_closed(), "sem canais ainda: não fecha sozinha");
+    let sh1 = conn
+        .open_shell(size(80, 24), "xterm-256color")
+        .await
+        .unwrap();
+    let sh2 = conn
+        .open_shell(size(80, 24), "xterm-256color")
+        .await
+        .unwrap();
+    let sftp = conn.open_sftp().await.expect("sftp");
+    assert_eq!(conn.open_channels(), 3);
+    let names: Vec<String> = sftp
+        .read_dir("/home/tester")
+        .await
+        .expect("read_dir")
+        .map(|e| e.file_name())
+        .collect();
+    assert!(names.iter().any(|n| n == ".ssh"), "{names:?}");
+    drop(sftp);
+    drop(sh1);
+    assert_eq!(conn.open_channels(), 1);
+    assert!(!conn.is_closed());
+    drop(sh2); // último canal: a conexão fecha
+    for _ in 0..50 {
+        if conn.is_closed() {
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    assert!(conn.is_closed(), "fecha quando o último canal fecha");
+    assert!(conn.open_shell(size(80, 24), "xterm").await.is_err());
+
+    // Fechamento explícito.
+    let conn = Connection::connect(&request(endpoint(), pw()), &trust, &sink())
+        .await
+        .unwrap();
+    let _sh = conn.open_shell(size(80, 24), "xterm").await.unwrap();
+    conn.close().await;
+    assert!(conn.is_closed());
+}
+
+// ------------------------------------------------------------------ jump host
+
+const TARGET_CONTAINER: &str = "myssh-testsshd-target";
+
+fn target_endpoint() -> HostEndpoint {
+    let v = std::env::var("MYSSH_TEST_TARGET").unwrap_or_else(|_| format!("{TARGET_CONTAINER}:22"));
+    let (h, p) = v.rsplit_once(':').expect("host:porta");
+    HostEndpoint::new(h, p.parse().expect("porta"))
+}
+
+/// Host key do destino, lida do container FORA do código sob teste.
+fn target_key() -> HostKey {
+    let out = Command::new("docker")
+        .args([
+            "exec",
+            TARGET_CONTAINER,
+            "cat",
+            "/etc/ssh/ssh_host_ed25519_key.pub",
+        ])
+        .output()
+        .expect("docker exec");
+    let text = String::from_utf8_lossy(&out.stdout).into_owned();
+    host_key_from_public(&PublicKey::from_openssh(text.trim()).expect("chave do destino"))
+        .expect("hostkey")
+}
+
+fn target_log_lines() -> usize {
+    let out = Command::new("docker")
+        .args(["logs", TARGET_CONTAINER])
+        .output()
+        .expect("docker logs");
+    String::from_utf8_lossy(&out.stdout).lines().count()
+        + String::from_utf8_lossy(&out.stderr).lines().count()
+}
+
+fn bastion_hop() -> Hop {
+    Hop {
+        endpoint: endpoint(),
+        username: "tester".into(),
+        auth: pw(),
+        connect_timeout: Duration::from_secs(10),
+    }
+}
+
+fn jump_request() -> ConnectRequest {
+    let mut r = request(target_endpoint(), pw());
+    r.jumps = vec![bastion_hop()];
+    r
+}
+
+fn jump_store(bastion: Option<HostKey>, target: Option<HostKey>) -> Arc<Store> {
+    let s = Arc::new(Store::open_in_memory().expect("store"));
+    if let Some(k) = bastion {
+        s.trust(&endpoint(), &k).unwrap();
+    }
+    if let Some(k) = target {
+        s.trust(&target_endpoint(), &k).unwrap();
+    }
+    s
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn jump_host_ok() {
+    ready().await;
+    let store = jump_store(Some(server_key()), Some(target_key()));
+    let mut h = start(jump_request(), store);
+    let run = drain_until(&mut h, 20, |r| r.states.contains(&SessionState::Connected)).await;
+    assert!(
+        run.states.contains(&SessionState::Connected),
+        "{:?} {:?}",
+        run.states,
+        run.closed
+    );
+    h.cmd_tx
+        .send(SessionCommand::Input(b"hostname\r".to_vec()))
+        .await
+        .unwrap();
+    let want = Command::new("docker")
+        .args(["exec", TARGET_CONTAINER, "hostname"])
+        .output()
+        .unwrap();
+    let want = String::from_utf8_lossy(&want.stdout).trim().to_string();
+    let run = drain_until(&mut h, 10, |r| {
+        text(&r.data).contains(&format!("{want}\r\n"))
+    })
+    .await;
+    assert!(
+        text(&run.data).contains(&format!("{want}\r\n")),
+        "saída deveria vir do destino ({want}): {}",
+        text(&run.data)
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn jump_host_key_desconhecida_indica_o_salto_certo() {
+    ready().await;
+    // Bastion desconhecido: o primeiro prompt é do salto 0; depois, o do destino (hop None).
+    let store = jump_store(None, None);
+    let mut h = start(jump_request(), store.clone());
+    let mut prompts = vec![];
+    while prompts.len() < 2 {
+        match next(&mut h, 20).await {
+            SessionEvent::HostKeyUnknown {
+                endpoint: ep,
+                hop,
+                key,
+                responder,
+            } => {
+                prompts.push((ep, hop, key.fingerprint_sha256));
+                responder.answer(HostKeyDecision::AcceptAndSave);
+            }
+            SessionEvent::State(_) => {}
+            other => panic!("evento inesperado: {other:?}"),
+        }
+    }
+    assert_eq!(
+        prompts[0],
+        (endpoint(), Some(0), server_key().fingerprint_sha256)
+    );
+    assert_eq!(
+        prompts[1],
+        (target_endpoint(), None, target_key().fingerprint_sha256)
+    );
+    let run = drain_until(&mut h, 20, |r| r.states.contains(&SessionState::Connected)).await;
+    assert!(
+        run.states.contains(&SessionState::Connected),
+        "{:?}",
+        run.closed
+    );
+    // Cada salto foi salvo sob o próprio endpoint.
+    assert_eq!(
+        store.verify(&endpoint(), &server_key()).unwrap(),
+        TrustVerdict::Trusted
+    );
+    assert_eq!(
+        store.verify(&target_endpoint(), &target_key()).unwrap(),
+        TrustVerdict::Trusted
+    );
+    drop(h);
+
+    // Só o destino é desconhecido: um único prompt, com hop None, e rejeitar encerra.
+    ready().await;
+    let store = jump_store(Some(server_key()), None);
+    let mut h = start(jump_request(), store.clone());
+    loop {
+        match next(&mut h, 20).await {
+            SessionEvent::HostKeyUnknown {
+                endpoint: ep,
+                hop,
+                responder,
+                ..
+            } => {
+                assert_eq!((ep, hop), (target_endpoint(), None));
+                responder.answer(HostKeyDecision::Reject);
+                break;
+            }
+            SessionEvent::State(_) => {}
+            other => panic!("evento inesperado: {other:?}"),
+        }
+    }
+    let run = drain_until(&mut h, 15, |_| false).await;
+    assert!(run.closed.unwrap().unwrap().contains("não confiável"));
+    assert_eq!(
+        store.verify(&target_endpoint(), &target_key()).unwrap(),
+        TrustVerdict::Unknown
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn jump_host_key_do_bastion_alterada_bloqueia_antes_do_destino() {
+    ready().await;
+    // O store tem OUTRA chave ed25519 para o bastion; o destino é confiável (mas nunca deve ser tocado).
+    let store = jump_store(Some(pub_host_key("id_ed25519.pub")), Some(target_key()));
+    let before = target_log_lines();
+    let mut h = start(jump_request(), store);
+    let mut changed = None;
+    let mut closed = None;
+    let mut states = vec![];
+    while closed.is_none() {
+        match next(&mut h, 20).await {
+            SessionEvent::State(s) => states.push(s),
+            SessionEvent::HostKeyChanged {
+                endpoint: ep, hop, ..
+            } => changed = Some((ep, hop)),
+            SessionEvent::Closed { error } => closed = Some(error),
+            other => panic!("evento inesperado: {other:?}"),
+        }
+    }
+    assert_eq!(changed, Some((endpoint(), Some(0))));
+    assert!(!states.contains(&SessionState::AwaitingAuth), "{states:?}");
+    assert!(closed.unwrap().expect("erro").contains("mudou"));
+    tokio::time::sleep(Duration::from_millis(500)).await;
+    assert_eq!(
+        target_log_lines(),
+        before,
+        "o destino não recebeu nenhuma conexão"
+    );
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn jump_host_timeout_por_salto_e_ciclo() {
+    ready().await;
+    let mut req = jump_request();
+    req.jumps[0].endpoint = HostEndpoint::new("10.255.255.1", 22);
+    req.jumps[0].connect_timeout = Duration::from_secs(2);
+    let t0 = Instant::now();
+    let mut h = start(req, jump_store(None, None));
+    let run = drain_until(&mut h, 10, |_| false).await;
+    let err = run.closed.unwrap().unwrap();
+    assert!(err.starts_with("Jump host 1: "), "{err}");
+    assert!(t0.elapsed() < Duration::from_secs(5));
+
+    // Ciclo: o destino aparece também como salto.
+    let mut req = jump_request();
+    req.jumps = vec![Hop {
+        endpoint: target_endpoint(),
+        ..bastion_hop()
+    }];
+    let mut h = start(req, jump_store(None, None));
+    let run = drain_until(&mut h, 10, |_| false).await;
+    assert!(run.closed.unwrap().unwrap().contains("duas vezes"));
+}
+
+/// Agente de verdade do sistema (macOS: launchd, `SSH_AUTH_SOCK` herdado). Só roda com
+/// `MYSSH_TEST_SYSTEM_AGENT=1`: adiciona a chave de teste ao agente e a remove no fim.
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn autenticacao_pelo_agente_do_sistema() {
+    if std::env::var_os("MYSSH_TEST_SYSTEM_AGENT").is_none() {
+        println!("pulado: defina MYSSH_TEST_SYSTEM_AGENT=1");
+        return;
+    }
+    ready().await;
+    let key = keys_dir().join("id_ed25519");
+    assert!(
+        Command::new("ssh-add")
+            .arg(&key)
+            .status()
+            .unwrap()
+            .success()
+    );
+    let h = connected(AuthMaterial::Agent).await;
+    drop(h);
+    let _ = Command::new("ssh-add").arg("-d").arg(&key).status();
 }

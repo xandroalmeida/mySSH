@@ -11,6 +11,7 @@ russh = "0.64"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }
 secrecy = "0.10"
 zeroize = "1"
+russh-sftp = "3"
 
 [dev-dependencies]
 myssh-store = { path = "../store" }

@@ -16,8 +16,10 @@ use alacritty_terminal::vte::ansi::Processor;
 use myssh_core::SessionState;
 use myssh_core::trust::{HostEndpoint, HostKey};
 use myssh_ssh::{
-    HostKeyDecision, HostKeyResponder, PtySize, SessionCommand, SessionEvent, SessionHandle,
+    AuthResponder, HostKeyDecision, HostKeyResponder, PtySize, SessionCommand, SessionEvent,
+    SessionHandle,
 };
+use secrecy::SecretString;
 
 use crate::keys::{is_multiline, sanitize_paste};
 use crate::theme::TermTheme;
@@ -83,6 +85,8 @@ impl EventListener for Listener {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostKeyPrompt {
     pub endpoint: HostEndpoint,
+    /// `Some(i)` = i-ésimo jump host; `None` = destino (ver `myssh_ssh::SessionEvent`).
+    pub hop: Option<usize>,
     pub key: HostKey,
 }
 
@@ -90,8 +94,19 @@ pub struct HostKeyPrompt {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct HostKeyAlert {
     pub endpoint: HostEndpoint,
+    /// `Some(i)` = i-ésimo jump host; `None` = destino.
+    pub hop: Option<usize>,
     pub presented: HostKey,
     pub known: Vec<HostKey>,
+}
+
+/// Pedido de keyboard-interactive/MFA aguardando resposta (`prompts` = texto, echo).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AuthPromptInfo {
+    pub hop: Option<usize>,
+    pub name: String,
+    pub instructions: String,
+    pub prompts: Vec<(String, bool)>,
 }
 
 pub struct TermSession {
@@ -104,6 +119,8 @@ pub struct TermSession {
     prompt: Option<HostKeyPrompt>,
     responder: Option<HostKeyResponder>,
     alert: Option<HostKeyAlert>,
+    auth_prompt: Option<AuthPromptInfo>,
+    auth_responder: Option<AuthResponder>,
     closed: Option<Option<String>>,
     title: Option<String>,
     cols: u16,
@@ -151,6 +168,8 @@ impl TermSession {
             prompt: None,
             responder: None,
             alert: None,
+            auth_prompt: None,
+            auth_responder: None,
             closed: None,
             title: None,
             cols,
@@ -203,6 +222,50 @@ impl TermSession {
         self.alert.as_ref()
     }
 
+    /// Pedido de keyboard-interactive pendente. A UI deve exibir e chamar [`Self::answer_auth`]
+    /// (ou [`Self::cancel_auth`]).
+    pub fn auth_prompt(&self) -> Option<&AuthPromptInfo> {
+        self.auth_prompt.as_ref()
+    }
+
+    /// Responde ao pedido (um segredo por prompt, na ordem).
+    pub fn answer_auth(&mut self, answers: Vec<SecretString>) {
+        self.auth_prompt = None;
+        if let Some(r) = self.auth_responder.take() {
+            r.answer(answers);
+        }
+    }
+
+    /// Cancela a autenticação pendente (a sessão termina com erro de autenticação cancelada).
+    pub fn cancel_auth(&mut self) {
+        self.auth_prompt = None;
+        self.auth_responder = None;
+    }
+
+    /// Reconexão **sem limpar a tela**: troca a conexão por `handle` (a anterior é encerrada), mantém
+    /// o scrollback e escreve uma linha `separator` na tela (vazio = nenhuma linha). Nada é reenviado ao servidor. Antes do
+    /// separador, desliga modos que a sessão anterior pode ter deixado ligados (tela alternativa,
+    /// mouse, bracketed paste, cursor oculto).
+    pub fn restart(&mut self, handle: SessionHandle, separator: &str) {
+        self.handle = handle;
+        self.state = SessionState::Connecting;
+        self.prompt = None;
+        self.responder = None;
+        self.alert = None;
+        self.auth_prompt = None;
+        self.auth_responder = None;
+        self.closed = None;
+        let sep = sanitize_title(separator);
+        let mut bytes = String::from(
+            "\x1b[?1049l\x1b[?1000l\x1b[?1002l\x1b[?1003l\x1b[?1006l\x1b[?2004l\x1b[?1l\x1b>\x1b[?25h\x1b[0m",
+        );
+        if !sep.is_empty() {
+            bytes.push_str(&format!("\r\n\x1b[2m{sep}\x1b[0m\r\n"));
+        }
+        self.parser.advance(&mut self.term, bytes.as_bytes());
+        self.term.scroll_display(Scroll::Bottom);
+    }
+
     pub fn answer_host_key(&mut self, decision: HostKeyDecision) {
         self.prompt = None;
         if let Some(r) = self.responder.take() {
@@ -250,26 +313,46 @@ impl TermSession {
                 Ok(SessionEvent::State(s)) => self.state = s,
                 Ok(SessionEvent::HostKeyUnknown {
                     endpoint,
+                    hop,
                     key,
                     responder,
                 }) => {
-                    self.prompt = Some(HostKeyPrompt { endpoint, key });
+                    self.prompt = Some(HostKeyPrompt { endpoint, hop, key });
                     self.responder = Some(responder);
                 }
                 Ok(SessionEvent::HostKeyChanged {
                     endpoint,
+                    hop,
                     presented,
                     known,
                 }) => {
                     self.alert = Some(HostKeyAlert {
                         endpoint,
+                        hop,
                         presented,
                         known,
                     });
                 }
+                Ok(SessionEvent::AuthPrompt {
+                    hop,
+                    name,
+                    instructions,
+                    prompts,
+                    responder,
+                }) => {
+                    self.auth_prompt = Some(AuthPromptInfo {
+                        hop,
+                        name,
+                        instructions,
+                        prompts,
+                    });
+                    self.auth_responder = Some(responder);
+                }
                 Ok(SessionEvent::Closed { error }) => {
                     self.prompt = None;
                     self.responder = None;
+                    self.auth_prompt = None;
+                    self.auth_responder = None;
                     self.closed = Some(error);
                 }
                 Err(_) => break,
@@ -557,6 +640,32 @@ mod tests {
     }
 
     #[test]
+    fn restart_mantem_scrollback_e_nao_envia_nada() {
+        let (mut s, tx, mut rx) = fake();
+        for i in 0..20 {
+            feed(&mut s, &tx, format!("antiga {i}\r\n").as_bytes());
+        }
+        feed(&mut s, &tx, b"\x1b[?1049h\x1b[?2004h");
+        assert!(s.is_alt_screen());
+        let hist = s.history_len();
+        let (cmd_tx, mut cmd_rx2) = mpsc::channel(64);
+        let (evt_tx2, evt_rx) = mpsc::channel(64);
+        s.restart(SessionHandle { cmd_tx, evt_rx }, "— reconectado —");
+        assert!(!s.is_alt_screen());
+        assert!(s.history_len() >= hist, "scrollback preservado");
+        assert!(s.screen_text().contains("— reconectado —"));
+        assert!(s.closed().is_none());
+        assert!(drain(&mut rx).is_empty());
+        assert!(drain(&mut cmd_rx2).is_empty(), "nada reenviado");
+        // A nova conexão alimenta o mesmo terminal.
+        evt_tx2
+            .try_send(SessionEvent::Data(b"nova\r\n".to_vec()))
+            .unwrap();
+        s.pump(1 << 20);
+        assert!(s.screen_text().contains("nova"));
+    }
+
+    #[test]
     fn alerta_de_chave_alterada() {
         let (mut s, tx, _rx) = fake();
         // O responder só é construível dentro do crate ssh: aqui só o alerta; o prompt é
@@ -568,11 +677,13 @@ mod tests {
         };
         tx.try_send(SessionEvent::HostKeyChanged {
             endpoint: HostEndpoint::new("h", 22),
+            hop: Some(0),
             presented: hk.clone(),
             known: vec![],
         })
         .unwrap();
         s.pump(10);
         assert_eq!(s.host_key_alert().unwrap().presented, hk);
+        assert_eq!(s.host_key_alert().unwrap().hop, Some(0));
     }
 }

@@ -1,6 +1,6 @@
 //! Testes de UI headless (egui_kittest) das abas de terminal.
 //!
-//! * Os testes sem `#[ignore]` não usam rede (jump host, keyboard-interactive, cofre bloqueado,
+//! * Os testes sem `#[ignore]` não usam rede (salto recusado, cofre bloqueado,
 //!   conexão recusada).
 //! * Os `#[ignore]` usam o servidor real do `testenv` (`./testenv/up.sh`, 127.0.0.1:2222):
 //!
@@ -8,6 +8,9 @@
 //!   MYSSH_TEST_SSH=127.0.0.1:2222 MYSSH_TEST_KEYS=/caminho/testenv/keys \
 //!     cargo test -p myssh-app real_ -- --ignored --nocapture --test-threads=1
 //!   ```
+//!
+//!   Os testes de jump host também usam o container `myssh-testsshd-target` (só alcançável a
+//!   partir do bastion; ver `testenv/up.sh`).
 //!
 //!   `--test-threads=1` é obrigatório por causa do `PerSourcePenalties` do sshd. A host key
 //!   do servidor é obtida com `ssh-keyscan` (fora do código sob teste) e nunca se desliga a
@@ -29,7 +32,12 @@ use myssh_store::Store;
 use crate::app::{App, Dialog, VaultMode};
 use crate::i18n;
 
-const SECRETS: [&str; 2] = ["tester-pass", "test-passphrase"];
+const SECRETS: [&str; 4] = [
+    "tester-pass",
+    "test-passphrase",
+    "ki-pass",
+    "mfa-code-123456",
+];
 
 // ------------------------------------------------------------------ infraestrutura
 
@@ -99,6 +107,49 @@ fn server_key() -> HostKey {
         key_base64: blob.into(),
         fingerprint_sha256: String::from_utf8_lossy(&fp.stdout).trim().to_string(),
     }
+}
+
+const TARGET_CONTAINER: &str = "myssh-testsshd-target";
+
+/// Host key do container-destino (lida de dentro do container, fora do código sob teste).
+fn target_key() -> HostKey {
+    let out = Command::new("docker")
+        .args([
+            "exec",
+            TARGET_CONTAINER,
+            "cat",
+            "/etc/ssh/ssh_host_ed25519_key.pub",
+        ])
+        .output()
+        .expect("docker exec");
+    let line = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    let mut it = line.split_whitespace();
+    let (algorithm, blob) = (it.next().unwrap(), it.next().unwrap());
+    let fp = Command::new("sh")
+        .arg("-c")
+        .arg(format!("echo '{line}' | ssh-keygen -lf - | cut -d' ' -f2"))
+        .output()
+        .expect("ssh-keygen");
+    HostKey {
+        algorithm: algorithm.into(),
+        key_base64: blob.into(),
+        fingerprint_sha256: String::from_utf8_lossy(&fp.stdout).trim().to_string(),
+    }
+}
+
+/// Perfil do destino do jump host (alcançável só pelo bastion), com `jump` = bastion.
+fn target_profile(name: &str, jump: ProfileId, auth: AuthMethod) -> Profile {
+    let mut pr = Profile::new(name, TARGET_CONTAINER, "tester");
+    pr.auth = auth;
+    pr.jump = Some(jump);
+    pr.connect_timeout_secs = 20;
+    pr
+}
+
+fn trust_target(app: &App) {
+    app.store
+        .trust(&HostEndpoint::new(TARGET_CONTAINER, 22), &target_key())
+        .unwrap();
 }
 
 /// O sshd do testenv aplica `PerSourcePenalties` (falha de autenticação e conexões que fecham
@@ -278,36 +329,49 @@ fn percentile(v: &mut [f64], p: f64) -> f64 {
 // ------------------------------------------------------------------ sem rede
 
 #[test]
-fn jump_host_nao_conecta_e_mostra_erro_claro() {
+fn jump_host_recusado_indica_o_salto_no_erro() {
     let mut app = make_app(Store::open_in_memory().unwrap());
-    let mut a = Profile::new("a", "127.0.0.1", "u");
-    a.port = 1; // se tentasse conectar direto, daria "recusada"
+    let mut a = Profile::new("bastion-a", "127.0.0.1", "u");
+    a.port = 1; // porta fechada
+    a.auth = AuthMethod::Agent; // sem pergunta de senha
     add_profile(&mut app, &a);
     let mut b = Profile::new("b", "127.0.0.1", "u");
-    b.port = 1;
+    b.port = 2; // endpoints distintos (o mesmo host:porta duas vezes na cadeia é ciclo)
+    b.auth = AuthMethod::Agent;
     b.jump = Some(a.id);
     add_profile(&mut app, &b);
     app.open_profile(b.id);
     let mut h = harness(app);
-    h.run_steps(5);
-    let app = h.state();
-    assert_eq!(status(app, 1), i18n::ST_ERROR);
-    assert!(app.tabs[1].body.is_closed());
-    assert!(!app.tabs[1].body.is_busy());
-    h.get_by_label_contains("Jump host ainda não suportado");
+    wait(&mut h, "erro do salto", 15, |a| {
+        status(a, 1) == i18n::ST_ERROR
+    });
+    assert!(h.state().tabs[1].body.is_closed());
+    // O erro vem do salto 1 (e não de uma conexão direta ao destino ignorando o salto).
+    assert!(
+        screen_or_error(h.state(), 1).contains("Jump host 1: Conexão recusada"),
+        "{}",
+        dump(h.state())
+    );
+}
+
+fn screen_or_error(app: &App, idx: usize) -> String {
+    app.tabs[idx].body.debug_screen()
 }
 
 #[test]
-fn keyboard_interactive_mostra_erro_claro() {
+fn keyboard_interactive_sem_servidor_vai_ate_a_rede() {
+    // Antes (M1) KI era recusado na UI; agora a conexão é tentada (aqui: porta fechada).
     let mut app = make_app(Store::open_in_memory().unwrap());
     let mut p = Profile::new("ki", "127.0.0.1", "u");
+    p.port = 1;
     p.auth = AuthMethod::KeyboardInteractive;
     add_profile(&mut app, &p);
     app.open_profile(p.id);
     let mut h = harness(app);
-    h.run_steps(5);
-    assert_eq!(status(h.state(), 1), i18n::ST_ERROR);
-    h.get_by_label_contains("Keyboard-interactive");
+    wait(&mut h, "erro de rede", 15, |a| {
+        status(a, 1) == i18n::ST_ERROR
+    });
+    assert!(screen_or_error(h.state(), 1).contains("recusada"));
 }
 
 #[test]
@@ -412,7 +476,7 @@ fn real_senha_perguntar_host_desconhecido_comando_e_reconectar() {
     type_line(&mut h, "echo ok-$((1+1))");
     wait(&mut h, "saída ok-2", 15, |a| screen(a, 1).contains("ok-2"));
 
-    // 4. desconectar e reconectar (nova sessão, tela limpa, sem reenviar comandos)
+    // 4. desconectar e reconectar (mesmo terminal: scrollback mantido + separador, sem reenviar nada)
     click(&mut h, i18n::TAB_DISCONNECT);
     wait(&mut h, "desconectado", 15, |a| {
         status(a, 1) == i18n::ST_DISCONNECTED
@@ -433,13 +497,20 @@ fn real_senha_perguntar_host_desconhecido_comando_e_reconectar() {
     );
     wait(&mut h, "prompt", 15, |a| !screen(a, 1).trim().is_empty());
     assert!(
-        !screen(h.state(), 1).contains("ok-2"),
-        "tela limpa na nova sessão"
+        screen(h.state(), 1).contains(i18n::RECONNECTED_SEPARATOR),
+        "separador de reconexão: {}",
+        screen(h.state(), 1)
+    );
+    assert_eq!(
+        screen(h.state(), 1).matches("ok-2").count(),
+        1,
+        "a saída anterior continua visível (scrollback mantido)"
     );
     type_line(&mut h, "echo ok-$((2+2))");
     wait(&mut h, "saída ok-4", 15, |a| screen(a, 1).contains("ok-4"));
-    assert!(
-        !screen(h.state(), 1).contains("ok-2"),
+    assert_eq!(
+        screen(h.state(), 1).matches("ok-2").count(),
+        1,
         "comando antigo não foi reenviado"
     );
 
@@ -904,4 +975,236 @@ fn real_capturas() {
     shot(&mut h, "25-hosts-confiaveis");
     h.state_mut().close_dialog();
     h.state_mut().close_all_tabs();
+}
+
+// ------------------------------------------------------------------ MFA e jump host (servidor real)
+
+#[test]
+#[ignore = "requer servidor de teste (MYSSH_TEST_SSH, MYSSH_TEST_KEYS)"]
+fn real_keyboard_interactive_modal_de_prompt() {
+    ready();
+    let mut app = make_app(Store::open_in_memory().unwrap());
+    trust_server(&app);
+    let mut p = profile("ki", AuthMethod::KeyboardInteractive);
+    p.username = "kionly".into();
+    add_profile(&mut app, &p);
+    app.open_profile(p.id);
+    let mut h = harness(app);
+
+    wait(
+        &mut h,
+        "pedido do servidor (keyboard-interactive)",
+        15,
+        |a| a.tabs[1].body.needs_modal(),
+    );
+    h.get_by_label(i18n::KI_TITLE);
+    h.get_by_label_contains("Password");
+    // O campo é mascarado (o servidor pediu sem eco).
+    type_password(&mut h, "ki-pass");
+    let value = h
+        .get_by_role(egui::accesskit::Role::PasswordInput)
+        .value()
+        .unwrap_or_default();
+    assert!(
+        !value.contains("ki-pass"),
+        "resposta exposta à acessibilidade"
+    );
+    click(&mut h, i18n::KI_SEND);
+    wait(&mut h, "conectado", 20, |a| {
+        status(a, 1) == i18n::ST_CONNECTED
+    });
+    wait(&mut h, "prompt do shell", 15, |a| {
+        !screen(a, 1).trim().is_empty()
+    });
+    assert_no_secrets("tela", &screen(h.state(), 1));
+    assert!(!screen(h.state(), 1).contains("ki-pass"));
+    drop(h);
+    cooldown();
+}
+
+#[test]
+#[ignore = "requer servidor de teste (MYSSH_TEST_SSH, MYSSH_TEST_KEYS)"]
+fn real_mfa_chave_mais_keyboard_interactive_cancelar() {
+    ready();
+    let mut app = make_app(Store::open_in_memory().unwrap());
+    trust_server(&app);
+    let key = AuthMethod::KeyFile {
+        path: keys_dir().join("id_ed25519"),
+        passphrase: None,
+    };
+    let mut p = profile("mfa", key);
+    p.username = "mfa".into();
+    add_profile(&mut app, &p);
+    app.open_profile(p.id);
+    let mut h = harness(app);
+    // A chave passa; o servidor pede o segundo fator. Cancelar encerra com erro claro.
+    wait(&mut h, "segundo fator", 15, |a| {
+        a.tabs[1].body.needs_modal()
+    });
+    click(&mut h, i18n::CANCEL);
+    wait(&mut h, "autenticação cancelada", 15, |a| {
+        status(a, 1) == i18n::ST_ERROR
+    });
+    assert!(screen_or_error(h.state(), 1).contains("Autenticação cancelada"));
+    // Tentar de novo e responder: conecta.
+    ready();
+    click(&mut h, i18n::TAB_RECONNECT);
+    wait(&mut h, "segundo fator de novo", 15, |a| {
+        a.tabs[1].body.needs_modal()
+    });
+    type_password(&mut h, "mfa-code-123456");
+    click(&mut h, i18n::KI_SEND);
+    wait(&mut h, "conectado", 20, |a| {
+        status(a, 1) == i18n::ST_CONNECTED
+    });
+    drop(h);
+    cooldown();
+}
+
+#[test]
+#[ignore = "requer servidor de teste e container myssh-testsshd-target (./testenv/up.sh)"]
+fn real_jump_host_conecta_e_pergunta_host_key_de_cada_salto() {
+    ready();
+    let mut app = make_app(Store::open_in_memory().unwrap());
+    let cid = saved_password(&app, "tester-pass");
+    let bastion = profile(
+        "bastion",
+        AuthMethod::Password {
+            credential: Some(cid),
+        },
+    );
+    add_profile(&mut app, &bastion);
+    let dest = target_profile(
+        "destino",
+        bastion.id,
+        AuthMethod::Password {
+            credential: Some(cid),
+        },
+    );
+    add_profile(&mut app, &dest);
+    app.open_profile(dest.id);
+    let mut h = harness(app);
+
+    // 1. host key do bastion (salto 1 de 1), depois a do destino ("via bastion")
+    wait(&mut h, "host key do bastion", 20, |a| {
+        status(a, 1) == i18n::ST_AWAITING_TRUST && a.tabs[1].body.needs_modal()
+    });
+    h.get_by_label_contains("Salto 1 de 1: bastion");
+    click(&mut h, i18n::HK_ACCEPT_SAVE);
+    wait(&mut h, "host key do destino", 20, |a| {
+        status(a, 1) == i18n::ST_AWAITING_TRUST
+            && a.tabs[1].body.needs_modal()
+            && a.store.list().map(|l| l.len() == 1).unwrap_or(false)
+    });
+    h.get_by_label_contains("via bastion bastion");
+    h.get_by_label_contains("SHA256:");
+    click(&mut h, i18n::HK_ACCEPT_SAVE);
+
+    // 2. conectado ao DESTINO (o hostname do container-destino)
+    wait(&mut h, "conectado", 20, |a| {
+        status(a, 1) == i18n::ST_CONNECTED
+    });
+    wait(&mut h, "prompt", 15, |a| !screen(a, 1).trim().is_empty());
+    assert_eq!(
+        h.state().store.list().unwrap().len(),
+        2,
+        "um host por salto"
+    );
+    let want = Command::new("docker")
+        .args(["exec", TARGET_CONTAINER, "hostname"])
+        .output()
+        .unwrap();
+    let want = String::from_utf8_lossy(&want.stdout).trim().to_string();
+    type_line(&mut h, "echo dest-$(hostname)");
+    wait(&mut h, "hostname do destino", 15, |a| {
+        screen(a, 1).contains(&format!("dest-{want}"))
+    });
+    assert_clean(h.state());
+    h.state_mut().close_all_tabs();
+    drop(h);
+    cooldown();
+}
+
+#[test]
+#[ignore = "requer servidor de teste e container myssh-testsshd-target (./testenv/up.sh)"]
+fn real_jump_host_pergunta_credenciais_de_cada_perfil_da_cadeia() {
+    ready();
+    let mut app = make_app(Store::open_in_memory().unwrap());
+    trust_server(&app);
+    trust_target(&app);
+    // Nenhuma das duas senhas está salva: o app pergunta primeiro a do bastion, depois a do destino.
+    let bastion = profile("bastion", AuthMethod::Password { credential: None });
+    add_profile(&mut app, &bastion);
+    let dest = target_profile(
+        "destino",
+        bastion.id,
+        AuthMethod::Password { credential: None },
+    );
+    add_profile(&mut app, &dest);
+    app.open_profile(dest.id);
+    let mut h = harness(app);
+
+    wait(&mut h, "senha do bastion", 10, |a| {
+        a.tabs[1].body.needs_modal()
+    });
+    h.get_by_label_contains("(jump host bastion)");
+    type_password(&mut h, "tester-pass");
+    click(&mut h, i18n::CONNECT);
+    wait(&mut h, "senha do destino", 10, |a| {
+        a.tabs[1].body.needs_modal()
+    });
+    assert!(
+        h.query_by_label_contains("(jump host bastion)").is_none(),
+        "agora é a senha do destino"
+    );
+    h.get_by_label_contains("Senha de tester@myssh-testsshd-target");
+    type_password(&mut h, "tester-pass");
+    click(&mut h, i18n::CONNECT);
+    wait(&mut h, "conectado", 20, |a| {
+        status(a, 1) == i18n::ST_CONNECTED
+    });
+    assert_clean(h.state());
+    drop(h);
+    cooldown();
+}
+
+#[test]
+#[ignore = "requer servidor de teste e container myssh-testsshd-target (./testenv/up.sh)"]
+fn real_jump_host_key_do_bastion_alterada_bloqueia_e_aponta_o_salto() {
+    ready();
+    let mut app = make_app(Store::open_in_memory().unwrap());
+    let (h_, p_) = target();
+    // Chave "conhecida" do bastion = a do destino (outra chave ed25519 qualquer).
+    app.store
+        .trust(&HostEndpoint::new(&h_, p_), &target_key())
+        .unwrap();
+    trust_target(&app);
+    let cid = saved_password(&app, "tester-pass");
+    let bastion = profile(
+        "bastion",
+        AuthMethod::Password {
+            credential: Some(cid),
+        },
+    );
+    add_profile(&mut app, &bastion);
+    let dest = target_profile(
+        "destino",
+        bastion.id,
+        AuthMethod::Password {
+            credential: Some(cid),
+        },
+    );
+    add_profile(&mut app, &dest);
+    app.open_profile(dest.id);
+    let mut h = harness(app);
+    wait(&mut h, "bloqueado", 20, |a| {
+        status(a, 1) == i18n::ST_BLOCKED
+    });
+    h.get_by_label_contains("Salto 1 de 1: bastion");
+    assert!(
+        h.query_by_label(i18n::HK_ACCEPT_SAVE).is_none(),
+        "mudança de chave nunca oferece aceitar"
+    );
+    drop(h);
+    cooldown();
 }

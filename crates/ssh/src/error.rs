@@ -14,12 +14,29 @@ pub(crate) const HOST_PROMPT_TIMEOUT: &str =
 pub(crate) const HOST_STORE: &str = "Falha ao consultar ou salvar os hosts confiáveis.";
 pub(crate) const HOST_CERT: &str = "Certificados de host ainda não são suportados.";
 pub(crate) const UI_GONE: &str = "Interface encerrada.";
+#[allow(dead_code)]
 pub(crate) const UNSUPPORTED_AUTH: &str = "Este método de autenticação ainda não é suportado.";
+pub(crate) const JUMP_LOOP: &str = "A cadeia de jump hosts passa duas vezes pelo mesmo servidor.";
+pub(crate) const JUMP_OPEN: &str = "O salto recusou encaminhar a conexão até o próximo servidor.";
+/// Prompt de keyboard-interactive cancelado (diálogo fechado ou sem resposta a tempo).
+pub const AUTH_CANCELLED: &str = "Autenticação cancelada.";
+pub(crate) const AUTH_PROMPT_TIMEOUT: &str = "Sem resposta ao pedido de autenticação: cancelado.";
+pub(crate) const KI_PROTOCOL: &str = "O servidor enviou um pedido de autenticação inválido.";
+pub(crate) const CONN_CLOSED: &str = "A conexão já foi encerrada.";
+pub(crate) const SFTP_FAILED: &str = "Não foi possível iniciar o subsistema SFTP.";
 pub(crate) const NO_AGENT: &str =
     "Agente SSH indisponível (SSH_AUTH_SOCK não definido ou inacessível).";
 pub(crate) const AGENT_NO_KEYS: &str = "O agente SSH não tem chaves aceitas por este servidor.";
 pub(crate) const KEY_READ: &str = "Não foi possível ler o arquivo da chave privada.";
 pub const KEY_DECODE: &str = "Chave privada inválida ou passphrase incorreta.";
+
+/// Prefixa o erro com o salto de origem (`hop` = índice do jump host; `None` = destino não leva prefixo).
+pub(crate) fn at_hop(hop: Option<usize>, msg: String) -> String {
+    match hop {
+        Some(i) => format!("Jump host {}: {msg}", i + 1),
+        None => msg,
+    }
+}
 
 pub(crate) fn io_message(e: &io::Error) -> String {
     use io::ErrorKind::*;
