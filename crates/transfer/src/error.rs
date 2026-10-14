@@ -16,6 +16,10 @@ pub enum TransferError {
     ConnectionLost,
     #[error("Nome inválido neste sistema: «{0}».")]
     InvalidLocalName(String),
+    #[error("Nome com caracteres de controle ou invisíveis: «{0}».")]
+    UnsafeName(String),
+    #[error("Varredura interrompida: {0}.")]
+    ScanLimit(String),
     #[error("Caminho fora da raiz da transferência: «{0}».")]
     OutsideRoot(String),
     #[error("origem alterada durante a transferência")]

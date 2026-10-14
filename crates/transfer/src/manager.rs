@@ -54,6 +54,8 @@ struct Shared {
     active: AtomicUsize,
     pool: tokio::sync::Mutex<Vec<Sftp>>,
     case_insensitive: AtomicBool,
+    scan_max_depth: AtomicUsize,
+    scan_max_entries: AtomicU64,
     os: LocalOs,
     stats: Stats,
 }
@@ -166,6 +168,8 @@ impl TransferManager {
                 active: AtomicUsize::new(0),
                 pool: tokio::sync::Mutex::new(Vec::new()),
                 case_insensitive: AtomicBool::new(os.default_case_insensitive()),
+                scan_max_depth: AtomicUsize::new(crate::scan::DEFAULT_MAX_DEPTH),
+                scan_max_entries: AtomicU64::new(crate::scan::DEFAULT_MAX_ENTRIES),
                 os,
                 stats: Stats::default(),
             }),
@@ -178,6 +182,17 @@ impl TransferManager {
     /// Vale para os próximos downloads.
     pub fn set_local_case_insensitive(&self, v: bool) {
         self.shared.case_insensitive.store(v, Ordering::Relaxed);
+    }
+
+    /// Limites da varredura de diretórios (padrão: 64 níveis, 1.000.000 de entradas). Ao exceder,
+    /// a transferência falha com erro claro. Vale para os próximos trabalhos.
+    pub fn set_scan_limits(&self, max_depth: usize, max_entries: u64) {
+        self.shared
+            .scan_max_depth
+            .store(max_depth, Ordering::Relaxed);
+        self.shared
+            .scan_max_entries
+            .store(max_entries, Ordering::Relaxed);
     }
 
     pub fn stats(&self) -> TransferStats {
@@ -301,6 +316,10 @@ async fn run_job(sh: Arc<Shared>, id: TransferId, req: TransferRequest, cancel: 
     let opts = ScanOpts {
         os: sh.os,
         case_insensitive: sh.case_insensitive.load(Ordering::Relaxed),
+        limits: crate::scan::ScanLimits {
+            max_depth: sh.scan_max_depth.load(Ordering::Relaxed),
+            max_entries: sh.scan_max_entries.load(Ordering::Relaxed),
+        },
     };
     let scanned = tokio::select! {
         _ = cancel.cancelled() => Err(TransferError::Cancelled),

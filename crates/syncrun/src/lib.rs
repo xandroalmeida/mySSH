@@ -175,16 +175,32 @@ pub(crate) async fn save_state(
     let mut tmp = path.as_os_str().to_owned();
     tmp.push(".tmp");
     let tmp = PathBuf::from(tmp);
+    // Um `.tmp` pré-existente (sobra de queda ou plantado, inclusive symlink) é removido sem
+    // seguir o link e recriado com `create_new` (O_EXCL), 0600: nunca escreve através dele.
+    match tokio::fs::symlink_metadata(&tmp).await {
+        Ok(_) => tokio::fs::remove_file(&tmp).await.map_err(io)?,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+        Err(e) => return Err(io(e)),
+    }
     {
         use tokio::io::AsyncWriteExt;
         let mut oo = tokio::fs::OpenOptions::new();
-        oo.write(true).create(true).truncate(true);
+        oo.write(true).create_new(true);
         #[cfg(unix)]
         oo.mode(0o600);
         let mut f = oo.open(&tmp).await.map_err(io)?;
-        f.write_all(&json).await.map_err(io)?;
-        f.sync_all().await.map_err(io)?;
+        let w = async {
+            f.write_all(&json).await?;
+            f.sync_all().await
+        }
+        .await;
+        if let Err(e) = w {
+            drop(f);
+            let _ = tokio::fs::remove_file(&tmp).await;
+            return Err(io(e));
+        }
     }
+    // O rename substitui o nome final (mesmo que seja um symlink), sem segui-lo.
     tokio::fs::rename(&tmp, path).await.map_err(io)
 }
 
@@ -426,5 +442,52 @@ impl SyncRunner {
             .await?
             .run()
             .await
+    }
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+    use myssh_sync::{Direction, Plan};
+    use std::os::unix::fs::{PermissionsExt, symlink};
+
+    fn vazio() -> (Plan, Journal) {
+        let plan = Plan {
+            direction: Direction::LocalToRemote,
+            mirror_deletes: false,
+            items: vec![],
+        };
+        let j = Journal::from_plan(&plan);
+        (plan, j)
+    }
+
+    #[tokio::test]
+    async fn journal_tmp_symlink_plantado_nao_e_seguido_e_arquivo_e_0600() {
+        let d = tempfile::tempdir().unwrap();
+        let victim = d.path().join("vitima.txt");
+        std::fs::write(&victim, "intacto").unwrap();
+        let jp = d.path().join("estado.json");
+        symlink(&victim, d.path().join("estado.json.tmp")).unwrap();
+        let (plan, j) = vazio();
+        save_state(&jp, "perfil", &plan, &j).await.unwrap();
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "intacto");
+        assert_eq!(
+            std::fs::metadata(&jp).unwrap().permissions().mode() & 0o777,
+            0o600
+        );
+        assert!(!d.path().join("estado.json.tmp").exists());
+        load_state(&jp).await.unwrap();
+
+        // Symlink plantado no próprio destino: substituído, não seguido.
+        std::fs::remove_file(&jp).unwrap();
+        symlink(&victim, &jp).unwrap();
+        save_state(&jp, "perfil", &plan, &j).await.unwrap();
+        assert_eq!(std::fs::read_to_string(&victim).unwrap(), "intacto");
+        assert!(
+            std::fs::symlink_metadata(&jp)
+                .unwrap()
+                .file_type()
+                .is_file()
+        );
     }
 }

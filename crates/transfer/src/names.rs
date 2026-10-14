@@ -42,6 +42,28 @@ pub fn validate_remote_name(name: &str) -> Result<(), TransferError> {
     Ok(())
 }
 
+/// Caractere que não deve aparecer em nomes de arquivo exibidos ou criados: controle C0
+/// (U+0000–U+001F), DEL, C1 (U+0080–U+009F), marcas/controles bidirecionais (U+061C, U+200E/F,
+/// U+202A–202E, U+2066–2069) e invisíveis (U+200B–200D, U+2060, U+FEFF). Servem para enganar a
+/// extensão exibida (`fatura\u{202E}fdp.exe`) ou injetar sequências de terminal.
+pub fn is_unsafe_char(c: char) -> bool {
+    c.is_control()
+        || matches!(
+            c,
+            '\u{061C}'
+                | '\u{200B}'..='\u{200F}'
+                | '\u{202A}'..='\u{202E}'
+                | '\u{2060}'
+                | '\u{2066}'..='\u{2069}'
+                | '\u{FEFF}'
+        )
+}
+
+/// O nome contém algum caractere de [`is_unsafe_char`].
+pub fn has_unsafe_chars(name: &str) -> bool {
+    name.chars().any(is_unsafe_char)
+}
+
 const WINDOWS_RESERVED: [&str; 22] = [
     "CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8",
     "COM9", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
@@ -55,6 +77,10 @@ pub fn validate_local_name(os: LocalOs, name: &str) -> Result<(), TransferError>
     }
     if name.len() > NAME_MAX {
         return bad();
+    }
+    // Em todos os SOs (não só no Windows): controle, bidi e invisíveis.
+    if has_unsafe_chars(name) {
+        return Err(TransferError::UnsafeName(display_name(name)));
     }
     if os == LocalOs::Windows {
         if name.chars().any(|c| {
@@ -120,10 +146,11 @@ pub fn rename_candidate(name: &str, n: u32) -> String {
     }
 }
 
-/// Texto seguro para mensagens (sem caracteres de controle, tamanho limitado).
+/// Texto seguro para mensagens e para a UI (caracteres de [`is_unsafe_char`] viram U+FFFD,
+/// tamanho limitado).
 pub fn display_name(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_control() { '\u{FFFD}' } else { c })
+        .map(|c| if is_unsafe_char(c) { '\u{FFFD}' } else { c })
         .take(120)
         .collect()
 }
@@ -251,6 +278,57 @@ mod tests {
             // 128 x "é" = 256 bytes
             assert!(validate_local_name(os, &"é".repeat(128)).is_err());
         }
+    }
+
+    #[test]
+    fn nomes_com_controle_bidi_e_invisiveis_rejeitados_em_todos_os_sos() {
+        let ruins = [
+            "a\u{1}b",
+            "a\u{1b}[31mb",
+            "a\nb",
+            "a\u{7f}b",
+            "a\u{80}b",
+            "a\u{9f}b",
+            "fatura\u{202E}fdp.exe",
+            "a\u{202A}b",
+            "a\u{2066}b",
+            "a\u{2069}b",
+            "a\u{200E}b",
+            "a\u{200F}b",
+            "a\u{061C}b",
+            "a\u{200B}b",
+            "a\u{200C}b",
+            "a\u{200D}b",
+            "a\u{2060}b",
+            "\u{FEFF}a",
+        ];
+        for os in [LocalOs::Windows, LocalOs::MacOs, LocalOs::Linux] {
+            for n in ruins {
+                assert!(
+                    matches!(
+                        validate_local_name(os, n),
+                        Err(TransferError::UnsafeName(_))
+                    ),
+                    "{os:?} {n:?}"
+                );
+                assert!(!display_name(n).chars().any(is_unsafe_char), "{n:?}");
+            }
+            for n in [
+                "ação.txt",
+                "日本語",
+                "a b",
+                "e\u{301}",
+                "😀.txt",
+                "a\u{a0}b",
+            ] {
+                assert!(validate_local_name(os, n).is_ok(), "{os:?} {n:?}");
+            }
+        }
+        let msg = TransferError::UnsafeName("x".into()).to_string();
+        assert!(
+            msg.contains("caracteres de controle ou invisíveis"),
+            "{msg}"
+        );
     }
 
     #[test]

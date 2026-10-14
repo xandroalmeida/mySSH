@@ -1494,3 +1494,119 @@ async fn desempenho_200mib_e_terminal_responsivo() {
     );
     r.cleanup().await;
 }
+
+// ----------------------------------------------------------------- revisão de segurança
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn varredura_respeita_limites_de_profundidade_e_entradas() {
+    let conn = connect().await;
+    let r = Remote::new(&conn, "scanlim").await;
+    let s = rsftp(&conn).await;
+    for d in ["arv", "arv/a", "arv/a/b", "arv/a/b/c"] {
+        r.browser.mkdir(&r.p(d)).await.unwrap();
+    }
+    s.put(r.p("arv/a/b/c/f.txt"), b"x").await.unwrap();
+    for i in 0..5 {
+        s.put(r.p(&format!("arv/n{i}.txt")), b"x").await.unwrap();
+    }
+    let mut mgr = manager(&conn, 1);
+    let dst = tmp();
+
+    mgr.set_scan_limits(2, 1_000);
+    let run = run_simple(&mut mgr, req(Direction::Download, dst.path(), &r.p("arv"))).await;
+    assert_eq!(run.finished, Some((0, 1, 0)), "{run:#?}");
+    assert!(
+        run.errors.iter().any(|(_, m)| m.contains("profundidade")),
+        "{run:#?}"
+    );
+
+    mgr.set_scan_limits(64, 3);
+    let run = run_simple(&mut mgr, req(Direction::Download, dst.path(), &r.p("arv"))).await;
+    assert_eq!(run.finished, Some((0, 1, 0)), "{run:#?}");
+    assert!(
+        run.errors.iter().any(|(_, m)| m.contains("entradas")),
+        "{run:#?}"
+    );
+
+    // Limites padrão: passa.
+    mgr.set_scan_limits(64, 1_000_000);
+    let run = run_simple(&mut mgr, req(Direction::Download, dst.path(), &r.p("arv"))).await;
+    assert_eq!(run.finished.map(|f| f.1), Some(0), "{run:#?}");
+    r.cleanup().await;
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn nomes_inseguros_ocultos_na_listagem_e_recusados_no_download() {
+    let conn = connect().await;
+    let r = Remote::new(&conn, "unsafe").await;
+    let s = rsftp(&conn).await;
+    r.browser.mkdir(&r.p("d")).await.unwrap();
+    let ruim = "fatura\u{202E}fdp.exe";
+    let ctrl = "esc\u{1b}[31mx";
+    s.put(r.p("d/ok.txt"), b"ok").await.unwrap();
+    s.put(r.p(&format!("d/{ruim}")), b"mau").await.unwrap();
+    s.put(r.p(&format!("d/{ctrl}")), b"mau").await.unwrap();
+
+    let l = r.browser.list_with_report(&r.p("d")).await.unwrap();
+    let nomes: Vec<_> = l.entries.iter().map(|e| e.name.as_str()).collect();
+    assert_eq!(nomes, ["ok.txt"]);
+    assert_eq!(l.hidden_unsafe.len(), 2, "{l:?}");
+    for h in &l.hidden_unsafe {
+        assert!(
+            !h.chars().any(myssh_transfer::names::is_unsafe_char),
+            "{h:?}"
+        );
+    }
+    assert_eq!(r.browser.list(&r.p("d")).await.unwrap().len(), 1);
+
+    let mut mgr = manager(&conn, 1);
+    let dst = tmp();
+    let run = run_simple(&mut mgr, req(Direction::Download, dst.path(), &r.p("d"))).await;
+    assert_eq!(run.finished, Some((1, 2, 0)), "{run:#?}");
+    assert!(
+        run.errors
+            .iter()
+            .any(|(_, m)| m.contains("caracteres de controle ou invisíveis")),
+        "{run:#?}"
+    );
+    let baixados: Vec<_> = std::fs::read_dir(dst.path().join("d"))
+        .unwrap()
+        .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+        .collect();
+    assert_eq!(baixados, ["ok.txt"]);
+    r.cleanup().await;
+}
+
+#[cfg(unix)]
+#[tokio::test(flavor = "multi_thread")]
+#[ignore]
+async fn download_publica_com_modo_padrao_do_usuario_e_sem_sobras() {
+    use std::os::unix::fs::PermissionsExt;
+    let conn = connect().await;
+    let r = Remote::new(&conn, "modo").await;
+    let s = rsftp(&conn).await;
+    s.put(r.p("a.txt"), b"conteudo").await.unwrap();
+    let mut mgr = manager(&conn, 1);
+    let dst = tmp();
+    let run = run_simple(
+        &mut mgr,
+        req(Direction::Download, dst.path(), &r.p("a.txt")),
+    )
+    .await;
+    assert_eq!(run.finished, Some((1, 0, 0)), "{run:#?}");
+    // Referência: arquivo criado normalmente pelo usuário (umask).
+    let ref_ = dst.path().join("referencia");
+    std::fs::write(&ref_, "x").unwrap();
+    let esperado = std::fs::metadata(&ref_).unwrap().permissions().mode() & 0o777;
+    let got = std::fs::metadata(dst.path().join("a.txt"))
+        .unwrap()
+        .permissions()
+        .mode()
+        & 0o777;
+    assert_eq!(got, esperado);
+    let n = std::fs::read_dir(dst.path()).unwrap().count();
+    assert_eq!(n, 2, "sem temporários/sidecars/sondas sobrando");
+    r.cleanup().await;
+}
