@@ -10,6 +10,12 @@ publish = false
 name = "myssh"
 path = "src/main.rs"
 
+[features]
+# Ganchos de demonstração/teste (MYSSH_DEMO_SHOTS, MYSSH_DEMO_SSH, aceitação automática de
+# host key). Sempre presentes em builds de debug e de teste; em release só com `--features demo`.
+default = []
+demo = []
+
 [dependencies]
 myssh-core = { path = "../core" }
 myssh-store = { path = "../store" }

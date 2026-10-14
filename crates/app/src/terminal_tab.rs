@@ -1270,6 +1270,7 @@ impl TabBody for TerminalTab {
         matches!(self.phase, Phase::Live) && self.sess.as_ref().is_some_and(|s| s.is_connected())
     }
 
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn demo_accept_host_key(&mut self) {
         if let Some(s) = self.sess.as_mut()
             && s.host_key_prompt().is_some()
@@ -1278,6 +1279,7 @@ impl TabBody for TerminalTab {
         }
     }
 
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn simulate_busy(&mut self, busy: bool) {
         self.simulate_busy = busy;
     }

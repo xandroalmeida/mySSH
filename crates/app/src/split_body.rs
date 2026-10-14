@@ -482,12 +482,14 @@ impl TabBody for SplitBody {
         }
     }
 
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn demo_accept_host_key(&mut self) {
         for p in &mut self.panes {
             p.body.demo_accept_host_key();
         }
     }
 
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn simulate_busy(&mut self, busy: bool) {
         for p in &mut self.panes {
             p.body.simulate_busy(busy);

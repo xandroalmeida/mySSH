@@ -2,6 +2,10 @@
 
 mod app;
 mod config_io;
+#[cfg(any(test, debug_assertions, feature = "demo"))]
+mod demo;
+#[cfg(not(any(test, debug_assertions, feature = "demo")))]
+#[path = "demo_off.rs"]
 mod demo;
 mod dialogs;
 mod dialogs_extra;
@@ -54,7 +58,6 @@ fn main() -> eframe::Result {
             .expect("runtime tokio"),
     );
 
-    let demo = demo::Demo::from_env();
     let (dir, overridden) = match paths::data_dir() {
         Some(x) => x,
         None => {
@@ -62,10 +65,7 @@ fn main() -> eframe::Result {
             std::process::exit(1);
         }
     };
-    if demo.is_some() && !overridden {
-        eprintln!("MYSSH_DEMO_SHOTS exige MYSSH_DATA_DIR (para não tocar nos dados reais).");
-        std::process::exit(2);
-    }
+    let demo = demo::Demo::from_env(overridden);
 
     let mut store_warning = None;
     let store = match paths::prepare_db(&dir)

@@ -1147,6 +1147,7 @@ impl App {
     }
 
     /// Há operação em andamento (usado pela demo para esperar).
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     pub fn is_idle(&self) -> bool {
         self.pending.is_none()
     }

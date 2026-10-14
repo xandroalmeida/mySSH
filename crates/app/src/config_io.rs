@@ -14,8 +14,38 @@ const MAX_BYTES: u64 = 16 * 1024 * 1024;
 /// Grava a configuração em `path`. Devolve o aviso de sucesso.
 pub fn export_to(store: &Store, path: &Path) -> Result<String, String> {
     let json = store.export_config_json().map_err(|e| e.to_string())?;
-    std::fs::write(path, json).map_err(|_| i18n::CFG_ERR_WRITE.to_string())?;
+    write_private(path, json.as_bytes()).map_err(|_| i18n::CFG_ERR_WRITE.to_string())?;
     Ok(i18n::cfg_exported(&path.display().to_string()))
+}
+
+/// Grava em arquivo temporário novo (0600 em unix, `create_new`) na mesma pasta e renomeia
+/// sobre o destino: o resultado final tem sempre 0600 e nunca fica meio escrito.
+fn write_private(path: &Path, data: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    let name = path.file_name().ok_or(std::io::ErrorKind::InvalidInput)?;
+    let tmp = path.with_file_name(format!(
+        ".{}.{}.tmp",
+        name.to_string_lossy(),
+        std::process::id()
+    ));
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
+    }
+    let result = (|| {
+        let mut f = opts.open(&tmp)?;
+        f.write_all(data)?;
+        f.sync_all()?;
+        drop(f);
+        std::fs::rename(&tmp, path)
+    })();
+    if result.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+    }
+    result
 }
 
 /// Importa a configuração de `path` (nunca sobrescreve; IDs repetidos ganham novos IDs).
@@ -64,6 +94,23 @@ mod tests {
         let again = import_from(&b, &path).unwrap();
         assert!(again.ids_regenerated > 0);
         assert_eq!(b.list_profiles(&ProfileFilter::default()).unwrap().len(), 2);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exporta_com_0600_mesmo_sobre_arquivo_frouxo() {
+        use std::os::unix::fs::PermissionsExt;
+        let tmp = tempfile::tempdir().unwrap();
+        let s = Store::open_in_memory().unwrap();
+        let path = tmp.path().join("cfg.json");
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+        export_to(&s, &path).unwrap();
+        assert_eq!(mode(&path), 0o600);
+        std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
+        export_to(&s, &path).unwrap();
+        assert_eq!(mode(&path), 0o600);
+        // sem sobras do temporário
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 1);
     }
 
     #[test]

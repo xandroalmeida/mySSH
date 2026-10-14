@@ -80,6 +80,15 @@ jobs:
       #     Import-PfxCertificate -FilePath cert.pfx -CertStoreLocation Cert:\CurrentUser\My `
       #       -Password (ConvertTo-SecureString $env:WINDOWS_CERTIFICATE_PASSWORD -AsPlainText -Force)
 
+      # O cargo-packager NÃO compila: empacota o que já está em target/release.
+      # Build padrão (sem a feature `demo`: sem ganchos de demonstração/aceitação automática).
+      - name: Compilar release
+        run: cargo build --release -p myssh-app --locked
+
+      - name: Garantir que o release não contém ganchos de demonstração (unix)
+        if: runner.os != 'Windows'
+        run: "! strings target/release/myssh | grep -q MYSSH_DEMO"
+
       - name: Empacotar (sem assinatura)
         run: cargo packager --release -p myssh-app --formats ${{ matrix.formats }} --out-dir dist
 

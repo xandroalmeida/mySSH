@@ -165,8 +165,10 @@ pub trait TabBody {
     #[cfg(test)]
     fn debug_send(&self, _bytes: &[u8]) {}
     /// Somente demo (`MYSSH_DEMO_SSH`): responde "aceitar e salvar" ao diálogo de host key.
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn demo_accept_host_key(&mut self) {}
     /// Somente protótipo/demo: força `is_busy` para exercitar a confirmação ao fechar.
+    #[cfg(any(test, debug_assertions, feature = "demo"))]
     fn simulate_busy(&mut self, _busy: bool) {}
 }
 

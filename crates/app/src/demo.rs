@@ -210,14 +210,36 @@ fn accept_ssh(app: &mut App, _: &egui::Context) {
     }
 }
 
+/// Abre mais 9 abas do mesmo perfil (a chave do host já foi salva no passo anterior).
+fn open_more(app: &mut App, _: &egui::Context) {
+    if let Some(id) = id_of(app, "servidor-de-teste") {
+        for _ in 0..9 {
+            app.open_profile(id);
+        }
+    }
+}
+
+fn open_files(app: &mut App, _: &egui::Context) {
+    if let Some(t) = app.tabs.last_mut() {
+        app.active = Some(t.id);
+        t.body.toggle_files();
+    }
+}
+
 pub(crate) const SSH_STEPS: &[(Option<&str>, ActFn)] = &[
     (Some("30-ssh-host-desconhecido"), open_ssh),
     (Some("31-ssh-conectado"), accept_ssh),
+    (Some("32-dez-abas"), open_more),
+    (Some("33-painel-de-arquivos"), open_files),
 ];
 
 impl Demo {
-    pub fn from_env() -> Option<Self> {
+    pub fn from_env(data_dir_overridden: bool) -> Option<Self> {
         let dir = PathBuf::from(std::env::var_os("MYSSH_DEMO_SHOTS").filter(|d| !d.is_empty())?);
+        if !data_dir_overridden {
+            eprintln!("MYSSH_DEMO_SHOTS exige MYSSH_DATA_DIR (para não tocar nos dados reais).");
+            std::process::exit(2);
+        }
         if let Err(e) = std::fs::create_dir_all(&dir) {
             eprintln!("[demo] não foi possível criar {}: {e}", dir.display());
             std::process::exit(2);
@@ -260,7 +282,8 @@ impl Demo {
             let total = self.idle_after.unwrap_or_default();
             if since.elapsed() >= total {
                 log("ocioso: fim");
-                ctx.send_viewport_cmd(ViewportCommand::Close);
+                // Sessões ativas pedem confirmação ao fechar: a demo confirma sozinha.
+                app.confirm_quit(ctx);
             } else {
                 ctx.request_repaint_after(total - since.elapsed());
             }
