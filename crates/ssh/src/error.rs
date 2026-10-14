@@ -28,6 +28,10 @@ pub(crate) const NO_AGENT: &str =
     "Agente SSH indisponível (SSH_AUTH_SOCK não definido ou inacessível).";
 pub(crate) const AGENT_NO_KEYS: &str = "O agente SSH não tem chaves aceitas por este servidor.";
 pub(crate) const KEY_READ: &str = "Não foi possível ler o arquivo da chave privada.";
+pub(crate) const KEY_NOT_FILE: &str =
+    "O caminho da chave privada não é um arquivo comum (pasta, pipe ou dispositivo).";
+pub(crate) const KEY_TOO_BIG: &str =
+    "O arquivo da chave privada é grande demais para ser uma chave.";
 pub const KEY_DECODE: &str = "Chave privada inválida ou passphrase incorreta.";
 
 /// Prefixa o erro com o salto de origem (`hop` = índice do jump host; `None` = destino não leva prefixo).

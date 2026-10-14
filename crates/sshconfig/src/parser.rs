@@ -5,6 +5,12 @@ use crate::paths::{Tokens, expand_path, join_home};
 use crate::{ImportOptions, Warning};
 
 pub const MAX_INCLUDE_DEPTH: usize = 8;
+/// Orçamento global por importação: arquivos incluídos lidos (contando repetições).
+pub const MAX_INCLUDE_FILES: usize = 256;
+/// Orçamento global por importação: bytes lidos de arquivos incluídos (contando repetições).
+pub const MAX_INCLUDE_TOTAL_BYTES: usize = 4 * 1024 * 1024;
+/// Máximo de caracteres do nome de diretiva exibido nos avisos.
+const MAX_DIRECTIVE_NAME_CHARS: usize = 64;
 
 const COMMAND_KEYS: &[&str] = &[
     "proxycommand",
@@ -105,6 +111,9 @@ struct Parser<'a> {
     fs: &'a dyn IncludeSource,
     blocks: Vec<Block>,
     global_warnings: Vec<Warning>,
+    files_read: usize,
+    bytes_read: usize,
+    budget_warned: bool,
 }
 
 pub fn parse(content: &str, opts: &ImportOptions, fs: &dyn IncludeSource) -> Parsed {
@@ -116,6 +125,9 @@ pub fn parse(content: &str, opts: &ImportOptions, fs: &dyn IncludeSource) -> Par
             ..Block::default()
         }],
         global_warnings: Vec::new(),
+        files_read: 0,
+        bytes_read: 0,
+        budget_warned: false,
     };
     let mut stack = vec![opts.root_name.clone()];
     p.parse_content(content, &opts.root_name, 0, &mut stack, Some(0));
@@ -272,6 +284,24 @@ impl Parser<'_> {
             let matches = self.fs.expand(&abs);
             // Padrão sem correspondência não é erro (como no ssh).
             for path in matches {
+                if self.files_read >= MAX_INCLUDE_FILES
+                    || self.bytes_read >= MAX_INCLUDE_TOTAL_BYTES
+                {
+                    if !self.budget_warned {
+                        self.budget_warned = true;
+                        self.warn(
+                            cur,
+                            line,
+                            file,
+                            format!(
+                                "Includes restantes ignorados: orçamento da importação esgotado \
+                                 ({MAX_INCLUDE_FILES} arquivos ou {} MiB no total).",
+                                MAX_INCLUDE_TOTAL_BYTES / (1024 * 1024)
+                            ),
+                        );
+                    }
+                    return;
+                }
                 if stack.contains(&path) {
                     self.warn(
                         cur,
@@ -281,8 +311,14 @@ impl Parser<'_> {
                     );
                     continue;
                 }
+                self.files_read += 1;
                 match self.fs.read(&path) {
+                    Ok(content) if self.bytes_read + content.len() > MAX_INCLUDE_TOTAL_BYTES => {
+                        drop(content);
+                        self.bytes_read = MAX_INCLUDE_TOTAL_BYTES; // esgota: os próximos já avisam
+                    }
                     Ok(content) => {
+                        self.bytes_read += content.len();
                         stack.push(path.clone());
                         self.parse_content(&content, &path, depth + 1, stack, cur);
                         stack.pop();
@@ -315,10 +351,21 @@ fn is_rel_to_ssh(p: &str) -> bool {
     !abs
 }
 
+/// Nome da diretiva para avisos: só o primeiro token e só se parecer uma palavra-chave (ASCII
+/// alfanumérico), truncado. Nunca a linha bruta nem texto arbitrário: um `Include` de arquivo
+/// qualquer (como `/etc/passwd`) não deve vazar conteúdo na UI.
 fn name_of(raw: &str) -> String {
     let s = raw.trim_start();
     let end = s
         .find(|c: char| c.is_whitespace() || c == '=')
         .unwrap_or(s.len());
-    s[..end].to_string()
+    let name = &s[..end];
+    if name.is_empty() || !name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return "(nome inválido)".into();
+    }
+    if name.len() > MAX_DIRECTIVE_NAME_CHARS {
+        format!("{}…", &name[..MAX_DIRECTIVE_NAME_CHARS])
+    } else {
+        name.to_string()
+    }
 }

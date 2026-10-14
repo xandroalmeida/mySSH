@@ -54,6 +54,27 @@ pub enum AuthMaterial {
     KeyboardInteractive,
 }
 
+impl AuthMaterial {
+    /// Descarta a credencial (os `SecretString` se zeram ao cair) e deixa `Agent`, que não carrega
+    /// segredo. Usado logo depois de a autenticação concluir.
+    pub(crate) fn scrub(&mut self) {
+        *self = AuthMaterial::Agent;
+    }
+
+    /// `true` se ainda guarda segredo em memória (senha ou passphrase).
+    #[cfg(test)]
+    pub(crate) fn holds_secret(&self) -> bool {
+        matches!(
+            self,
+            AuthMaterial::Password(_)
+                | AuthMaterial::KeyFile {
+                    passphrase: Some(_),
+                    ..
+                }
+        )
+    }
+}
+
 impl std::fmt::Debug for AuthMaterial {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -293,15 +314,44 @@ type Chan = russh::Channel<client::Msg>;
 
 // ------------------------------------------------------------------ chaves e agente
 
+/// Tamanho máximo aceito para um arquivo de chave privada (chaves reais têm poucos KiB).
+const MAX_KEY_FILE: u64 = 64 * 1024;
+
+/// Lê o arquivo da chave: só arquivo comum (`metadata` segue symlinks) de até [`MAX_KEY_FILE`].
+/// A checagem de `metadata` vem **antes** do `open`, pois abrir um FIFO bloquearia; `/dev/zero`
+/// e afins não são `is_file`. Limitação: a troca do arquivo por um FIFO entre a checagem e o
+/// `open` (TOCTOU) exigiria atacante local com escrita na pasta da chave; a leitura em si é
+/// sempre limitada por `take`.
+fn read_key_file(path: &std::path::Path) -> Result<Zeroizing<String>, String> {
+    use std::io::Read;
+    let meta = std::fs::metadata(path).map_err(|_| error::KEY_READ.to_string())?;
+    if !meta.is_file() {
+        return Err(error::KEY_NOT_FILE.to_string());
+    }
+    if meta.len() > MAX_KEY_FILE {
+        return Err(error::KEY_TOO_BIG.to_string());
+    }
+    let file = std::fs::File::open(path).map_err(|_| error::KEY_READ.to_string())?;
+    let mut buf = Zeroizing::new(Vec::new());
+    file.take(MAX_KEY_FILE + 1)
+        .read_to_end(&mut buf)
+        .map_err(|_| error::KEY_READ.to_string())?;
+    if buf.len() as u64 > MAX_KEY_FILE {
+        return Err(error::KEY_TOO_BIG.to_string());
+    }
+    let text =
+        String::from_utf8(std::mem::take(&mut *buf)).map_err(|_| error::KEY_DECODE.to_string())?;
+    Ok(Zeroizing::new(text))
+}
+
 async fn load_key(
-    path: &PathBuf,
+    path: &std::path::Path,
     passphrase: Option<&SecretString>,
 ) -> Result<russh::keys::PrivateKey, String> {
-    let text = Zeroizing::new(
-        tokio::fs::read_to_string(path)
-            .await
-            .map_err(|_| error::KEY_READ.to_string())?,
-    );
+    let p = path.to_path_buf();
+    let text = tokio::task::spawn_blocking(move || read_key_file(&p))
+        .await
+        .map_err(|_| error::KEY_READ.to_string())??;
     decode_secret_key(&text, passphrase.map(|p| p.expose_secret()))
         .map_err(|_| error::KEY_DECODE.to_string())
 }
@@ -309,8 +359,7 @@ async fn load_key(
 /// Diz se a chave privada em `path` exige passphrase (leitura síncrona: chamar fora da thread
 /// de UI). Erros são mensagens pt-BR sanitizadas.
 pub fn key_requires_passphrase(path: &std::path::Path) -> Result<bool, String> {
-    let text =
-        Zeroizing::new(std::fs::read_to_string(path).map_err(|_| error::KEY_READ.to_string())?);
+    let text = read_key_file(path)?;
     match decode_secret_key(&text, None) {
         Ok(_) => Ok(false),
         Err(russh::keys::Error::KeyIsEncrypted) => Ok(true),
@@ -410,11 +459,10 @@ enum KiMode<'a> {
     SkipPlainPassword,
 }
 
+/// Texto vindo do servidor (nome/instruções/prompt): sanitizador único com o título do terminal
+/// (controles, bidi, zero-width) e limite de tamanho.
 fn clean(s: &str, keep_newlines: bool) -> String {
-    s.chars()
-        .filter(|c| !c.is_control() || (keep_newlines && *c == '\n'))
-        .take(KI_MAX_TEXT)
-        .collect()
+    crate::sanitize::sanitize_text(s, KI_MAX_TEXT, keep_newlines)
 }
 
 /// "Password:", "user@host's password:", "Senha:" (e nada além disso).
@@ -511,7 +559,12 @@ async fn keyboard_interactive(
                     )
                     .await?;
                     v.resize_with(n, || SecretString::from(String::new()));
-                    v.iter().map(|s| s.expose_secret().to_string()).collect()
+                    // O `String` entregue ao russh é consumido por ele (não zera ao enviar:
+                    // limitação da biblioteca). Nossa cópia segura (`v`) cai e zera aqui mesmo.
+                    let answers: Vec<String> =
+                        v.iter().map(|s| s.expose_secret().to_string()).collect();
+                    drop(v);
+                    answers
                 };
                 resp = session
                     .authenticate_keyboard_interactive_respond(answers)
@@ -1012,6 +1065,101 @@ mod tests {
         assert_eq!(clean("a\x1b[31mb\u{7}c\nd", false), "a[31mbcd");
         assert_eq!(clean("a\nb", true), "a\nb");
         assert_eq!(clean(&"x".repeat(5000), false).len(), KI_MAX_TEXT);
+    }
+
+    #[test]
+    fn credenciais_sao_descartadas_apos_autenticar() {
+        let mut a = AuthMaterial::Password(SecretString::from("segredo".to_string()));
+        assert!(a.holds_secret());
+        a.scrub();
+        assert!(!a.holds_secret());
+        let mut k = AuthMaterial::KeyFile {
+            path: "/x".into(),
+            passphrase: Some(SecretString::from("frase".to_string())),
+        };
+        assert!(k.holds_secret());
+        k.scrub();
+        assert!(!k.holds_secret());
+        let mut req = crate::ConnectRequest {
+            endpoint: HostEndpoint::new("h", 22),
+            username: "u".into(),
+            auth: AuthMaterial::Password(SecretString::from("a".to_string())),
+            pty: crate::PtySize {
+                cols: 80,
+                rows: 24,
+                pix_w: 0,
+                pix_h: 0,
+            },
+            term: "xterm".into(),
+            connect_timeout: Duration::from_secs(1),
+            keepalive: None,
+            jumps: vec![Hop {
+                endpoint: HostEndpoint::new("j", 22),
+                username: "u".into(),
+                auth: AuthMaterial::Password(SecretString::from("b".to_string())),
+                connect_timeout: Duration::from_secs(1),
+            }],
+        };
+        req.scrub_credentials();
+        assert!(!req.auth.holds_secret() && !req.jumps[0].auth.holds_secret());
+    }
+
+    #[test]
+    fn prompt_do_servidor_sem_bidi_nem_zero_width() {
+        // "Password:" disfarçado com override RTL e caracteres invisíveis.
+        assert_eq!(
+            clean("Pass\u{202E}word\u{200B}:\u{FEFF}\u{2066}", false),
+            "Password:"
+        );
+        assert_eq!(clean("a\u{202D}b\nc", true), "ab\nc");
+    }
+
+    fn tmp_dir(tag: &str) -> std::path::PathBuf {
+        let d = std::env::temp_dir().join(format!("myssh-ssh-{tag}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn chave_diretorio_e_arquivo_grande_sao_recusados() {
+        let d = tmp_dir("key-big");
+        let e = key_requires_passphrase(&d).unwrap_err();
+        assert_eq!(e, error::KEY_NOT_FILE);
+        let big = d.join("big");
+        std::fs::write(&big, vec![b'A'; 200 * 1024]).unwrap();
+        assert_eq!(
+            key_requires_passphrase(&big).unwrap_err(),
+            error::KEY_TOO_BIG
+        );
+        let _ = std::fs::remove_dir_all(&d);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn chave_fifo_e_dev_zero_nao_travam() {
+        let d = tmp_dir("key-fifo");
+        let fifo = d.join("fifo");
+        let st = std::process::Command::new("mkfifo")
+            .arg(&fifo)
+            .status()
+            .unwrap();
+        assert!(st.success());
+        // Antes da correção `read_to_string` bloqueava para sempre no FIFO: roda numa thread.
+        let (tx, rx) = std::sync::mpsc::channel();
+        let f = fifo.clone();
+        std::thread::spawn(move || {
+            let _ = tx.send(key_requires_passphrase(&f));
+        });
+        let r = rx
+            .recv_timeout(Duration::from_secs(5))
+            .expect("FIFO travou a leitura da chave");
+        assert_eq!(r.unwrap_err(), error::KEY_NOT_FILE);
+        assert_eq!(
+            key_requires_passphrase(std::path::Path::new("/dev/zero")).unwrap_err(),
+            error::KEY_NOT_FILE
+        );
+        let _ = std::fs::remove_dir_all(&d);
     }
 
     #[tokio::test]

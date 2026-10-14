@@ -21,6 +21,7 @@ use myssh_ssh::{
 };
 use secrecy::SecretString;
 
+use crate::filter::StreamFilter;
 use crate::keys::{is_multiline, sanitize_paste};
 use crate::theme::TermTheme;
 use crate::title::sanitize_title;
@@ -113,6 +114,9 @@ pub struct TermSession {
     pub term: Term<Listener>,
     id: u64,
     parser: Processor,
+    /// Limita strings de controle e neutraliza push/pop de título antes do parser.
+    filter: StreamFilter,
+    filtered: Vec<u8>,
     listener_rx: std_mpsc::Receiver<ListenerMsg>,
     handle: SessionHandle,
     state: SessionState,
@@ -162,6 +166,8 @@ impl TermSession {
             term,
             id: NEXT_ID.fetch_add(1, Ordering::Relaxed),
             parser: Processor::new(),
+            filter: StreamFilter::new(),
+            filtered: Vec::new(),
             listener_rx: rx,
             handle,
             state: SessionState::Connecting,
@@ -262,7 +268,7 @@ impl TermSession {
         if !sep.is_empty() {
             bytes.push_str(&format!("\r\n\x1b[2m{sep}\x1b[0m\r\n"));
         }
-        self.parser.advance(&mut self.term, bytes.as_bytes());
+        self.advance_filtered(bytes.as_bytes());
         self.term.scroll_display(Scroll::Bottom);
     }
 
@@ -299,6 +305,7 @@ impl TermSession {
     pub fn pump(&mut self, budget: usize) -> bool {
         let mut used = 0usize;
         let mut more = false;
+        self.expire_sync();
         loop {
             if used >= budget {
                 more = true;
@@ -308,7 +315,7 @@ impl TermSession {
                 Ok(SessionEvent::Data(bytes)) => {
                     used += bytes.len();
                     self.bytes_received += bytes.len() as u64;
-                    self.parser.advance(&mut self.term, &bytes);
+                    self.advance_filtered(&bytes);
                 }
                 Ok(SessionEvent::State(s)) => self.state = s,
                 Ok(SessionEvent::HostKeyUnknown {
@@ -358,8 +365,38 @@ impl TermSession {
                 Err(_) => break,
             }
         }
+        self.expire_sync();
         self.flush_listener();
         more
+    }
+
+    /// Passa os bytes pelo filtro de segurança e depois ao parser VTE.
+    fn advance_filtered(&mut self, bytes: &[u8]) {
+        self.filtered.clear();
+        self.filter.filter(bytes, &mut self.filtered);
+        self.parser.advance(&mut self.term, &self.filtered);
+        // Não retém um buffer grande entre chamadas.
+        if self.filtered.capacity() > 1 << 20 {
+            self.filtered = Vec::new();
+        }
+    }
+
+    /// Encerra um *synchronized update* (`CSI ? 2026 h`) cujo prazo venceu sem o `ESU`; sem isso
+    /// um servidor poderia congelar a tela indefinidamente.
+    fn expire_sync(&mut self) {
+        if let Some(deadline) = self.parser.sync_timeout().sync_timeout()
+            && std::time::Instant::now() >= deadline
+        {
+            self.parser.stop_sync(&mut self.term);
+        }
+    }
+
+    /// Tempo até o fim do *synchronized update* em andamento (a UI deve repintar então).
+    pub fn sync_deadline(&self) -> Option<std::time::Duration> {
+        self.parser
+            .sync_timeout()
+            .sync_timeout()
+            .map(|d| d.saturating_duration_since(std::time::Instant::now()))
     }
 
     fn flush_listener(&mut self) {
@@ -586,6 +623,32 @@ mod tests {
             s.title().unwrap().chars().count(),
             crate::title::MAX_TITLE_CHARS
         );
+    }
+
+    #[test]
+    fn synchronized_update_sem_esu_expira() {
+        let (mut s, tx, _rx) = fake();
+        feed(&mut s, &tx, b"\x1b[?2026hsegredo");
+        assert!(!s.screen_text().contains("segredo"), "retido no sync");
+        assert!(s.sync_deadline().is_some());
+        std::thread::sleep(std::time::Duration::from_millis(200));
+        s.pump(1 << 20); // sem nenhum dado novo
+        assert!(
+            s.screen_text().contains("segredo"),
+            "prazo vencido: desenha"
+        );
+        assert!(s.sync_deadline().is_none());
+    }
+
+    #[test]
+    fn push_de_titulo_e_neutralizado() {
+        let (mut s, tx, _rx) = fake();
+        feed(
+            &mut s,
+            &tx,
+            b"\x1b]2;um\x07\x1b[22;0t\x1b]2;dois\x07\x1b[23;0t",
+        );
+        assert_eq!(s.title(), Some("dois"), "pop não restaura título antigo");
     }
 
     #[test]

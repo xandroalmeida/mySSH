@@ -24,6 +24,7 @@
 
 mod connection;
 mod error;
+mod sanitize;
 mod session;
 mod trust;
 
@@ -31,6 +32,7 @@ pub use connection::{
     AuthMaterial, Connection, EventSink, Hop, Sftp, ShellChannel, key_requires_passphrase,
 };
 pub use error::{AUTH_CANCELLED, AUTH_REJECTED, KEY_DECODE};
+pub use sanitize::sanitize_text;
 pub use session::{
     AuthResponder, ConnectRequest, HostKeyDecision, HostKeyResponder, Notify, PtySize,
     SessionCommand, SessionEvent, SessionHandle, spawn,

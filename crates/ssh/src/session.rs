@@ -39,6 +39,17 @@ pub struct ConnectRequest {
     pub jumps: Vec<Hop>,
 }
 
+impl ConnectRequest {
+    /// Descarta (zera) as credenciais do destino e de todos os saltos. Depois disto o pedido não
+    /// serve mais para autenticar.
+    pub(crate) fn scrub_credentials(&mut self) {
+        self.auth.scrub();
+        for h in &mut self.jumps {
+            h.auth.scrub();
+        }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum HostKeyDecision {
     Reject,
@@ -201,11 +212,13 @@ async fn run(
     emit: EventSink,
     slot: ConnSlot,
 ) {
-    let end = run_inner(&req, trust, &mut cmd_rx, &emit, &slot).await;
+    let mut req = req;
+    let end = run_inner(&mut req, trust, &mut cmd_rx, &emit, &slot).await;
     if let Ok(mut g) = slot.lock() {
         *g = None;
     }
-    // `req` (com senha/passphrase) é descartado aqui.
+    // Senha/passphrase já foram descartadas logo após a autenticação (`ConnectRequest::scrub`);
+    // `req` cai aqui de qualquer forma.
     drop(req);
     match end {
         End::Clean => {
@@ -220,7 +233,7 @@ async fn run(
 }
 
 async fn run_inner(
-    req: &ConnectRequest,
+    req: &mut ConnectRequest,
     trust: Arc<dyn HostTrustStore>,
     cmd_rx: &mut mpsc::Receiver<SessionCommand>,
     emit: &EventSink,
@@ -232,7 +245,11 @@ async fn run_inner(
     let pty = Mutex::new(req.pty);
     let established = tokio::select! {
         r = async {
-            let conn = Connection::connect(req, &trust, emit).await?;
+            let conn = Connection::connect(req, &trust, emit).await;
+            // Autenticação concluída (ou falhou): as credenciais não são mais necessárias e não
+            // devem ficar na memória durante toda a sessão.
+            req.scrub_credentials();
+            let conn = conn?;
             let size = *pty.lock().map_err(|_| error::CONNECTION_LOST.to_string())?;
             let shell = tokio::time::timeout(req.connect_timeout, conn.open_shell(size, &req.term))
                 .await
