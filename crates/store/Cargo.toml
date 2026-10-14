@@ -1,0 +1,17 @@
+[package]
+name = "myssh-store"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Persistência local (SQLite) de perfis, pastas, credenciais (metadados) e host keys do mySSH"
+
+[dependencies]
+myssh-core = { path = "../core" }
+rusqlite = { version = "0.37", features = ["bundled"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["v4", "serde"] }
+
+[dev-dependencies]
+tempfile = "3"
