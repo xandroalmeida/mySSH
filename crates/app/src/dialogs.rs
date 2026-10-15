@@ -73,9 +73,9 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-delete",
-                    i18n::DELETE_TITLE,
+                    i18n::DELETE_TITLE(),
                     &i18n::delete_body(&name),
-                    i18n::DELETE,
+                    i18n::DELETE(),
                     Next::ConfirmDelete(id),
                 );
                 (Dialog::ConfirmDelete(id), next)
@@ -100,9 +100,9 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-close",
-                    i18n::CLOSE_TAB_TITLE,
+                    i18n::CLOSE_TAB_TITLE(),
                     &with_transfers(i18n::close_tab_body(&title), n, ns),
-                    i18n::CLOSE_TAB_CONFIRM,
+                    i18n::CLOSE_TAB_CONFIRM(),
                     Next::ConfirmCloseTab(id),
                 );
                 (Dialog::ConfirmCloseTab(id), next)
@@ -111,13 +111,13 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-quit",
-                    i18n::QUIT_TITLE,
+                    i18n::QUIT_TITLE(),
                     &with_transfers(
-                        i18n::QUIT_BODY.to_string(),
+                        i18n::QUIT_BODY().to_string(),
                         self.active_transfers(),
                         self.active_syncs(),
                     ),
-                    i18n::QUIT_CONFIRM,
+                    i18n::QUIT_CONFIRM(),
                     Next::ConfirmQuit,
                 );
                 (Dialog::ConfirmQuit, next)
@@ -153,9 +153,9 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-close-pane",
-                    i18n::CLOSE_PANE_TITLE,
+                    i18n::CLOSE_PANE_TITLE(),
                     &with_transfers(i18n::close_pane_body(&title), n, ns),
-                    i18n::CLOSE_PANE_CONFIRM,
+                    i18n::CLOSE_PANE_CONFIRM(),
                     Next::ConfirmClosePane(tab, pane),
                 );
                 (Dialog::ConfirmClosePane { tab, pane }, next)
@@ -164,13 +164,13 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-end-all",
-                    i18n::END_ALL_TITLE,
+                    i18n::END_ALL_TITLE(),
                     &with_transfers(
                         i18n::end_all_body(self.active_sessions()),
                         self.active_transfers(),
                         self.active_syncs(),
                     ),
-                    i18n::END_ALL_CONFIRM,
+                    i18n::END_ALL_CONFIRM(),
                     Next::EndAllSessions,
                 );
                 (Dialog::ConfirmEndAll, next)
@@ -179,9 +179,9 @@ impl App {
                 let next = confirm(
                     ctx,
                     "confirm-forget",
-                    i18n::FORGET_TITLE,
+                    i18n::FORGET_TITLE(),
                     &i18n::forget_body(&ep.host, ep.port),
-                    i18n::FORGET_CONFIRM,
+                    i18n::FORGET_CONFIRM(),
                     Next::ConfirmForget(ep.clone()),
                 );
                 let next = match next {
@@ -254,9 +254,9 @@ impl App {
         let resp = egui::Modal::new(egui::Id::new("profile-dialog")).show(ctx, |ui| {
             ui.set_width(540.0);
             ui.heading(if editing {
-                i18n::EDIT_PROFILE_TITLE
+                i18n::EDIT_PROFILE_TITLE()
             } else {
-                i18n::NEW_PROFILE_TITLE
+                i18n::NEW_PROFILE_TITLE()
             });
             ui.add_space(6.0);
             egui::ScrollArea::vertical()
@@ -270,13 +270,13 @@ impl App {
             match d.issue {
                 Some(VaultIssue::Unavailable) => {
                     ui.horizontal_wrapped(|ui| {
-                        ui.label(i18n::SESSION_ONLY_HELP);
-                        if ui.button(i18n::USE_SESSION_ONLY).clicked() {
+                        ui.label(i18n::SESSION_ONLY_HELP());
+                        if ui.button(i18n::USE_SESSION_ONLY()).clicked() {
                             next = Next::UseSession;
                         }
                     });
                 }
-                Some(VaultIssue::Locked) if ui.button(i18n::UNLOCK_VAULT).clicked() => {
+                Some(VaultIssue::Locked) if ui.button(i18n::UNLOCK_VAULT()).clicked() => {
                     next = Next::Unlock;
                 }
                 Some(VaultIssue::Locked) => {}
@@ -286,16 +286,16 @@ impl App {
             ui.horizontal(|ui| {
                 if d.saving {
                     ui.spinner();
-                    ui.label(i18n::SAVING);
+                    ui.label(i18n::SAVING());
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add_enabled(!d.saving, egui::Button::new(i18n::SAVE))
+                        .add_enabled(!d.saving, egui::Button::new(i18n::SAVE()))
                         .clicked()
                     {
                         next = Next::Save;
                     }
-                    if ui.button(i18n::CANCEL).clicked() {
+                    if ui.button(i18n::CANCEL()).clicked() {
                         next = Next::Close;
                     }
                 });
@@ -324,28 +324,28 @@ impl App {
             .num_columns(2)
             .spacing([10.0, 8.0])
             .show(ui, |ui| {
-                ui.label(i18n::F_NAME);
+                ui.label(i18n::F_NAME());
                 ui.add(egui::TextEdit::singleline(&mut f.name).desired_width(f32::INFINITY));
                 ui.end_row();
 
-                ui.label(i18n::F_HOST);
+                ui.label(i18n::F_HOST());
                 ui.horizontal(|ui| {
                     ui.add(egui::TextEdit::singleline(&mut f.host).desired_width(250.0));
-                    ui.label(i18n::F_PORT);
+                    ui.label(i18n::F_PORT());
                     ui.add(egui::TextEdit::singleline(&mut f.port).desired_width(60.0));
                 });
                 ui.end_row();
 
-                ui.label(i18n::F_USER);
+                ui.label(i18n::F_USER());
                 ui.add(egui::TextEdit::singleline(&mut f.username).desired_width(250.0));
                 ui.end_row();
 
-                ui.label(i18n::F_AUTH);
+                ui.label(i18n::F_AUTH());
                 ui.horizontal_wrapped(|ui| {
-                    ui.radio_value(&mut f.auth, AuthKind::Password, i18n::AUTH_PASSWORD);
-                    ui.radio_value(&mut f.auth, AuthKind::Key, i18n::AUTH_KEY);
-                    ui.radio_value(&mut f.auth, AuthKind::Agent, i18n::AUTH_AGENT);
-                    ui.radio_value(&mut f.auth, AuthKind::KeyboardInteractive, i18n::AUTH_KI);
+                    ui.radio_value(&mut f.auth, AuthKind::Password, i18n::AUTH_PASSWORD());
+                    ui.radio_value(&mut f.auth, AuthKind::Key, i18n::AUTH_KEY());
+                    ui.radio_value(&mut f.auth, AuthKind::Agent, i18n::AUTH_AGENT());
+                    ui.radio_value(&mut f.auth, AuthKind::KeyboardInteractive, i18n::AUTH_KI());
                 });
                 ui.end_row();
 
@@ -353,12 +353,12 @@ impl App {
                     AuthKind::Password => {
                         ui.label("");
                         ui.vertical(|ui| {
-                            ui.radio_value(&mut f.password_mode, SecretMode::Ask, i18n::PW_ASK);
-                            ui.radio_value(&mut f.password_mode, SecretMode::Save, i18n::PW_SAVE);
+                            ui.radio_value(&mut f.password_mode, SecretMode::Ask, i18n::PW_ASK());
+                            ui.radio_value(&mut f.password_mode, SecretMode::Save, i18n::PW_SAVE());
                         });
                         ui.end_row();
                         if f.password_mode == SecretMode::Save {
-                            ui.label(i18n::F_PASSWORD);
+                            ui.label(i18n::F_PASSWORD());
                             let keeps = editing
                                 && f.existing.as_ref().is_some_and(|p| {
                                     matches!(
@@ -371,27 +371,27 @@ impl App {
                             ui.add(
                                 egui::TextEdit::singleline(&mut f.password)
                                     .password(true)
-                                    .hint_text(if keeps { i18n::KEEP_SAVED } else { "" })
+                                    .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
                                     .desired_width(250.0),
                             );
                             ui.end_row();
                         }
                     }
                     AuthKind::Key => {
-                        ui.label(i18n::F_KEY_PATH);
+                        ui.label(i18n::F_KEY_PATH());
                         ui.horizontal(|ui| {
                             ui.add(
                                 egui::TextEdit::singleline(&mut f.key_path).desired_width(250.0),
                             );
-                            if ui.button(i18n::BROWSE).clicked() {
+                            if ui.button(i18n::BROWSE()).clicked() {
                                 *next = Next::PickKey;
                             }
                         });
                         ui.end_row();
-                        ui.label(i18n::F_PASSPHRASE);
+                        ui.label(i18n::F_PASSPHRASE());
                         ui.vertical(|ui| {
-                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Ask, i18n::PP_ASK);
-                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Save, i18n::PP_SAVE);
+                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Ask, i18n::PP_ASK());
+                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Save, i18n::PP_SAVE());
                         });
                         ui.end_row();
                         if f.passphrase_mode == SecretMode::Save {
@@ -409,7 +409,7 @@ impl App {
                             ui.add(
                                 egui::TextEdit::singleline(&mut f.passphrase)
                                     .password(true)
-                                    .hint_text(if keeps { i18n::KEEP_SAVED } else { "" })
+                                    .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
                                     .desired_width(250.0),
                             );
                             ui.end_row();
@@ -417,26 +417,26 @@ impl App {
                     }
                     AuthKind::Agent => {
                         ui.label("");
-                        ui.weak(i18n::AGENT_HELP);
+                        ui.weak(i18n::AGENT_HELP());
                         ui.end_row();
                     }
                     AuthKind::KeyboardInteractive => {
                         ui.label("");
-                        ui.weak(i18n::KI_HELP);
+                        ui.weak(i18n::KI_HELP());
                         ui.end_row();
                     }
                 }
 
-                ui.label(i18n::F_FOLDER);
+                ui.label(i18n::F_FOLDER());
                 ui.horizontal(|ui| {
                     let cur = f.folder.map_or_else(
-                        || i18n::NO_FOLDER.to_string(),
+                        || i18n::NO_FOLDER().to_string(),
                         |id| folder_path(&self.folders, id),
                     );
                     egui::ComboBox::from_id_salt("form-folder")
                         .selected_text(cur)
                         .show_ui(ui, |ui| {
-                            ui.selectable_value(&mut f.folder, None, i18n::NO_FOLDER);
+                            ui.selectable_value(&mut f.folder, None, i18n::NO_FOLDER());
                             for fo in &self.folders {
                                 ui.selectable_value(
                                     &mut f.folder,
@@ -445,20 +445,20 @@ impl App {
                                 );
                             }
                         });
-                    ui.label(i18n::OR_NEW_FOLDER);
+                    ui.label(i18n::OR_NEW_FOLDER());
                     ui.add(egui::TextEdit::singleline(&mut f.new_folder).desired_width(120.0));
                 });
                 ui.end_row();
 
-                ui.label(i18n::F_TAGS);
+                ui.label(i18n::F_TAGS());
                 ui.add(
                     egui::TextEdit::singleline(&mut f.tags)
-                        .hint_text(i18n::TAGS_HINT)
+                        .hint_text(i18n::TAGS_HINT())
                         .desired_width(f32::INFINITY),
                 );
                 ui.end_row();
 
-                ui.label(i18n::F_ENV);
+                ui.label(i18n::F_ENV());
                 ui.horizontal(|ui| {
                     egui::ComboBox::from_id_salt("form-env")
                         .selected_text(env::name(f.environment))
@@ -472,40 +472,40 @@ impl App {
                                 ui.selectable_value(&mut f.environment, e, env::name(e));
                             }
                         });
-                    ui.checkbox(&mut f.favorite, i18n::F_FAVORITE);
+                    ui.checkbox(&mut f.favorite, i18n::F_FAVORITE());
                 });
                 ui.end_row();
 
-                ui.label(i18n::F_JUMP);
+                ui.label(i18n::F_JUMP());
                 let cur = f
                     .jump
                     .and_then(|j| self.profile(j))
-                    .map_or_else(|| i18n::NO_JUMP.to_string(), |p| p.name.clone());
+                    .map_or_else(|| i18n::NO_JUMP().to_string(), |p| p.name.clone());
                 egui::ComboBox::from_id_salt("form-jump")
                     .selected_text(cur)
                     .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut f.jump, None, i18n::NO_JUMP);
+                        ui.selectable_value(&mut f.jump, None, i18n::NO_JUMP());
                         for p in self.profiles.iter().filter(|p| Some(p.id) != own_id) {
                             ui.selectable_value(&mut f.jump, Some(p.id), &p.name);
                         }
                     });
                 ui.end_row();
 
-                ui.label(i18n::F_KEEPALIVE);
+                ui.label(i18n::F_KEEPALIVE());
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut f.keepalive)
-                            .hint_text(i18n::KEEPALIVE_OFF)
+                            .hint_text(i18n::KEEPALIVE_OFF())
                             .desired_width(70.0),
                     );
-                    ui.label(i18n::F_TIMEOUT);
+                    ui.label(i18n::F_TIMEOUT());
                     ui.add(egui::TextEdit::singleline(&mut f.timeout).desired_width(50.0));
                 });
                 ui.end_row();
             });
         ui.add_space(6.0);
         let font = self.settings.terminal_font_size;
-        egui::CollapsingHeader::new(RichText::new(i18n::TH_TITLE).strong())
+        egui::CollapsingHeader::new(RichText::new(i18n::TH_TITLE()).strong())
             .id_salt("profile-theme")
             .default_open(!crate::theming::is_inherited(&f.theme))
             .show(ui, |ui| crate::theming::editor(ui, &mut f.theme, font));
@@ -526,7 +526,7 @@ impl App {
         let max_h = (ctx.content_rect().height() - 140.0).max(240.0);
         let resp = egui::Modal::new(egui::Id::new("settings-dialog")).show(ctx, |ui| {
             ui.set_width(520.0);
-            ui.heading(i18n::SETTINGS_TITLE);
+            ui.heading(i18n::SETTINGS_TITLE());
             ui.add_space(6.0);
             egui::ScrollArea::vertical()
                 .max_height(max_h)
@@ -537,26 +537,26 @@ impl App {
                         .num_columns(2)
                         .spacing([10.0, 10.0])
                         .show(ui, |ui| {
-                            ui.label(i18n::S_THEME);
+                            ui.label(i18n::S_THEME());
                             ui.vertical(|ui| {
                                 ui.horizontal(|ui| {
                                     ui.radio_value(
                                         &mut s.theme,
                                         ThemePref::System,
-                                        i18n::THEME_SYSTEM,
+                                        i18n::THEME_SYSTEM(),
                                     );
                                     ui.radio_value(
                                         &mut s.theme,
                                         ThemePref::Light,
-                                        i18n::THEME_LIGHT,
+                                        i18n::THEME_LIGHT(),
                                     );
-                                    ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK);
+                                    ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK());
                                 });
-                                ui.weak(i18n::TH_SYSTEM_HELP);
+                                ui.weak(i18n::TH_SYSTEM_HELP());
                             });
                             ui.end_row();
 
-                            ui.label(i18n::S_FONT);
+                            ui.label(i18n::S_FONT());
                             ui.vertical(|ui| {
                                 ui.add(
                                     egui::Slider::new(
@@ -567,26 +567,26 @@ impl App {
                                     .step_by(0.5),
                                 );
                                 ui.label(
-                                    RichText::new(i18n::FONT_SAMPLE)
+                                    RichText::new(i18n::FONT_SAMPLE())
                                         .monospace()
                                         .size(s.terminal_font_size),
                                 );
                             });
                             ui.end_row();
 
-                            ui.label(i18n::S_PASTE);
-                            ui.checkbox(&mut s.confirm_multiline_paste, i18n::S_PASTE_HELP);
+                            ui.label(i18n::S_PASTE());
+                            ui.checkbox(&mut s.confirm_multiline_paste, i18n::S_PASTE_HELP());
                             ui.end_row();
 
-                            ui.label(i18n::S_LOCK_SUSPEND);
-                            ui.checkbox(&mut s.vault_lock_on_suspend, i18n::S_LOCK_SUSPEND_HELP);
+                            ui.label(i18n::S_LOCK_SUSPEND());
+                            ui.checkbox(&mut s.vault_lock_on_suspend, i18n::S_LOCK_SUSPEND_HELP());
                             ui.end_row();
 
-                            ui.label(i18n::S_PROD);
-                            ui.checkbox(&mut s.prod_warning, i18n::S_PROD_HELP);
+                            ui.label(i18n::S_PROD());
+                            ui.checkbox(&mut s.prod_warning, i18n::S_PROD_HELP());
                             ui.end_row();
 
-                            ui.label(i18n::S_FILES_POLICY);
+                            ui.label(i18n::S_FILES_POLICY());
                             ui.vertical(|ui| {
                                 ui.horizontal(|ui| {
                                     for p in crate::files::plan::POLICIES {
@@ -597,65 +597,65 @@ impl App {
                                         );
                                     }
                                 });
-                                ui.weak(i18n::S_FILES_POLICY_HELP);
+                                ui.weak(i18n::S_FILES_POLICY_HELP());
                             });
                             ui.end_row();
 
-                            ui.label(i18n::S_VAULT_TIMEOUT);
+                            ui.label(i18n::S_VAULT_TIMEOUT());
                             ui.horizontal(|ui| {
                                 ui.add(
                                     egui::DragValue::new(&mut s.vault_lock_minutes)
                                         .range(0..=LOCK_MAX_MINUTES)
                                         .suffix(" min"),
                                 );
-                                ui.weak(i18n::S_VAULT_TIMEOUT_HELP);
+                                ui.weak(i18n::S_VAULT_TIMEOUT_HELP());
                             });
                             ui.end_row();
                         });
                     ui.separator();
-                    ui.label(RichText::new(i18n::S_VAULT).strong());
+                    ui.label(RichText::new(i18n::S_VAULT()).strong());
                     if session_only {
-                        ui.colored_label(warn_color(ui), i18n::S_VAULT_SESSION_ONLY);
+                        ui.colored_label(warn_color(ui), i18n::S_VAULT_SESSION_ONLY());
                     }
                     ui.horizontal(|ui| {
                         if locked {
-                            ui.label(i18n::VAULT_LOCKED_BADGE);
-                            if ui.button(i18n::UNLOCK_VAULT).clicked() {
+                            ui.label(i18n::VAULT_LOCKED_BADGE());
+                            if ui.button(i18n::UNLOCK_VAULT()).clicked() {
                                 unlock = true;
                             }
-                        } else if ui.button(i18n::LOCK_NOW).clicked() {
+                        } else if ui.button(i18n::LOCK_NOW()).clicked() {
                             lock_now = true;
                         }
                     });
-                    ui.weak(i18n::LOCK_NOW_HELP);
+                    ui.weak(i18n::LOCK_NOW_HELP());
                     ui.separator();
-                    ui.label(RichText::new(i18n::S_CONFIG).strong());
+                    ui.label(RichText::new(i18n::S_CONFIG()).strong());
                     ui.horizontal(|ui| {
                         if ui
-                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_EXPORT))
+                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_EXPORT()))
                             .clicked()
                         {
                             cfg_action = Some(Next::ExportConfig);
                         }
                         if ui
-                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_IMPORT))
+                            .add_enabled(!cfg_busy, egui::Button::new(i18n::CFG_IMPORT()))
                             .clicked()
                         {
                             cfg_action = Some(Next::ImportConfig);
                         }
                     });
-                    ui.colored_label(warn_color(ui), i18n::CFG_WARN);
+                    ui.colored_label(warn_color(ui), i18n::CFG_WARN());
                     ui.separator();
-                    let head = ui.label(RichText::new(i18n::S_TRUSTED).strong());
+                    let head = ui.label(RichText::new(i18n::S_TRUSTED()).strong());
                     if scroll_trusted {
                         head.scroll_to_me(Some(egui::Align::TOP));
                     }
-                    ui.weak(i18n::TRUSTED_HELP);
+                    ui.weak(i18n::TRUSTED_HELP());
                     if let Some(e) = &self.trusted_error {
                         ui.colored_label(error_color(ui), e);
                     }
                     if self.trusted.is_empty() {
-                        ui.label(i18n::TRUSTED_EMPTY);
+                        ui.label(i18n::TRUSTED_EMPTY());
                     }
                     for (ep, key) in &self.trusted {
                         ui.horizontal(|ui| {
@@ -671,7 +671,7 @@ impl App {
                                 )
                                 .selectable(true),
                             );
-                            if ui.button(i18n::TRUSTED_FORGET).clicked() {
+                            if ui.button(i18n::TRUSTED_FORGET()).clicked() {
                                 forget = Some(ep.clone());
                             }
                         });
@@ -686,7 +686,7 @@ impl App {
                 });
             ui.separator();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(i18n::CLOSE).clicked() {
+                if ui.button(i18n::CLOSE()).clicked() {
                     close = true;
                 }
             });
@@ -702,7 +702,7 @@ impl App {
         }
         if lock_now {
             self.vault.lock();
-            self.set_notice(i18n::VAULT_LOCKED_NOTICE);
+            self.set_notice(i18n::VAULT_LOCKED_NOTICE());
         }
         if unlock {
             self.unlock_vault(ctx);
@@ -717,12 +717,12 @@ fn quick_dialog(ctx: &egui::Context, q: &mut QuickDialog) -> Next {
     let mut next = Next::Keep;
     let resp = egui::Modal::new(egui::Id::new("quick-dialog")).show(ctx, |ui| {
         ui.set_width(420.0);
-        ui.heading(i18n::QUICK_TITLE);
+        ui.heading(i18n::QUICK_TITLE());
         ui.add_space(6.0);
-        ui.label(i18n::QUICK_HELP);
+        ui.label(i18n::QUICK_HELP());
         let te = ui.add(
             egui::TextEdit::singleline(&mut q.text)
-                .hint_text(i18n::QUICK_HINT)
+                .hint_text(i18n::QUICK_HINT())
                 .desired_width(f32::INFINITY),
         );
         if !te.has_focus() && q.text.is_empty() {
@@ -733,13 +733,13 @@ fn quick_dialog(ctx: &egui::Context, q: &mut QuickDialog) -> Next {
             ui.colored_label(error_color(ui), e);
         }
         ui.add_space(6.0);
-        ui.weak(i18n::QUICK_NOTE);
+        ui.weak(i18n::QUICK_NOTE());
         ui.separator();
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(i18n::CONNECT).clicked() || enter {
+            if ui.button(i18n::CONNECT()).clicked() || enter {
                 next = Next::Quick(q.text.clone());
             }
-            if ui.button(i18n::CANCEL).clicked() {
+            if ui.button(i18n::CANCEL()).clicked() {
                 next = Next::Close;
             }
         });
@@ -784,7 +784,7 @@ fn confirm(
             if ui.button(confirm_label).clicked() {
                 result = on_confirm.take().unwrap_or(Next::Close);
             }
-            if ui.button(i18n::CANCEL).clicked() {
+            if ui.button(i18n::CANCEL()).clicked() {
                 result = Next::Close;
             }
         });

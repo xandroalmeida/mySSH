@@ -35,25 +35,25 @@ impl App {
         let max_h = (ctx.content_rect().height() - 280.0).max(200.0);
         let resp = egui::Modal::new(egui::Id::new("import-dialog")).show(ctx, |ui| {
             ui.set_width(680.0);
-            ui.heading(i18n::IMPORT_TITLE);
+            ui.heading(i18n::IMPORT_TITLE());
             ui.add_space(6.0);
             match d.stage {
                 ImportStage::Intro => {
-                    ui.label(i18n::IMPORT_INTRO);
+                    ui.label(i18n::IMPORT_INTRO());
                     if let Some(e) = &d.error {
                         ui.add_space(4.0);
                         ui.colored_label(error_color(ui), e);
                     }
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button(i18n::IMPORT_USE_DEFAULT).clicked() {
+                        if ui.button(i18n::IMPORT_USE_DEFAULT()).clicked() {
                             next = Next::ImportLoad(None);
                         }
-                        if ui.button(i18n::IMPORT_PICK_FILE).clicked() {
+                        if ui.button(i18n::IMPORT_PICK_FILE()).clicked() {
                             next = Next::ImportPick;
                         }
                         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            if ui.button(i18n::CANCEL).clicked() {
+                            if ui.button(i18n::CANCEL()).clicked() {
                                 next = Next::Close;
                             }
                         });
@@ -63,14 +63,14 @@ impl App {
                     ui.horizontal(|ui| {
                         ui.spinner();
                         ui.label(if d.stage == ImportStage::Loading {
-                            i18n::IMPORT_LOADING
+                            i18n::IMPORT_LOADING()
                         } else {
-                            i18n::IMPORT_SAVING
+                            i18n::IMPORT_SAVING()
                         });
                     });
                     if d.stage == ImportStage::Loading {
                         ui.add_space(8.0);
-                        if ui.button(i18n::CANCEL).clicked() {
+                        if ui.button(i18n::CANCEL()).clicked() {
                             next = Next::Close;
                         }
                     }
@@ -97,13 +97,13 @@ impl App {
     ) {
         let total = d.preview.items.len();
         ui.label(i18n::import_summary(total, d.preview.conflict_count()));
-        ui.weak(i18n::IMPORT_TARGET);
+        ui.weak(i18n::IMPORT_TARGET());
         if !d.preview.global_warnings.is_empty() {
             ui.add_space(4.0);
             egui::CollapsingHeader::new(
                 RichText::new(format!(
                     "{} ({})",
-                    i18n::IMPORT_GLOBAL_WARNINGS,
+                    i18n::IMPORT_GLOBAL_WARNINGS(),
                     d.preview.global_warnings.len()
                 ))
                 .strong(),
@@ -118,16 +118,16 @@ impl App {
         }
         ui.add_space(4.0);
         if total == 0 {
-            ui.label(i18n::IMPORT_NONE);
+            ui.label(i18n::IMPORT_NONE());
         } else {
             ui.horizontal(|ui| {
-                if ui.small_button(i18n::IMPORT_SELECT_ALL).clicked() {
+                if ui.small_button(i18n::IMPORT_SELECT_ALL()).clicked() {
                     d.preview.select_all(true);
                 }
-                if ui.small_button(i18n::IMPORT_SELECT_NEW).clicked() {
+                if ui.small_button(i18n::IMPORT_SELECT_NEW()).clicked() {
                     d.preview.select_all(false);
                 }
-                if ui.small_button(i18n::IMPORT_SELECT_NONE).clicked() {
+                if ui.small_button(i18n::IMPORT_SELECT_NONE()).clicked() {
                     d.preview.select_none();
                 }
             });
@@ -154,11 +154,11 @@ impl App {
                                         .weak(),
                                 );
                                 if let Some(j) = &item.cand.jump_alias {
-                                    ui.weak(format!("{}: {j}", i18n::IMPORT_JUMP));
+                                    ui.weak(format!("{}: {j}", i18n::IMPORT_JUMP()));
                                 }
                                 if item.conflict.is_some() {
                                     ui.label(
-                                        RichText::new(format!(" {} ", i18n::IMPORT_EXISTS))
+                                        RichText::new(format!(" {} ", i18n::IMPORT_EXISTS()))
                                             .small()
                                             .strong()
                                             .color(egui::Color32::BLACK)
@@ -166,10 +166,10 @@ impl App {
                                                 230, 180, 20,
                                             )),
                                     )
-                                    .on_hover_text(i18n::IMPORT_EXISTS_HELP);
+                                    .on_hover_text(i18n::IMPORT_EXISTS_HELP());
                                 }
                                 if item.invalid {
-                                    ui.colored_label(error_color(ui), i18n::IMPORT_INVALID);
+                                    ui.colored_label(error_color(ui), i18n::IMPORT_INVALID());
                                 }
                             });
                             ui.indent(("import-warn", i), |ui| {
@@ -194,7 +194,7 @@ impl App {
                 {
                     *next = Next::ImportConfirm;
                 }
-                if ui.button(i18n::CANCEL).clicked() {
+                if ui.button(i18n::CANCEL()).clicked() {
                     *next = Next::Close;
                 }
             });
@@ -208,14 +208,14 @@ impl App {
             TabKind::Welcome => None,
         });
         let title = match d.dir {
-            Dir::Vertical => i18n::SPLIT_PICK_TITLE_SIDE,
-            Dir::Horizontal => i18n::SPLIT_PICK_TITLE_STACK,
+            Dir::Vertical => i18n::SPLIT_PICK_TITLE_SIDE(),
+            Dir::Horizontal => i18n::SPLIT_PICK_TITLE_STACK(),
         };
         let resp = egui::Modal::new(egui::Id::new("split-dialog")).show(ctx, |ui| {
             ui.set_width(440.0);
             ui.heading(title);
             ui.add_space(6.0);
-            ui.label(i18n::SPLIT_PICK_HELP);
+            ui.label(i18n::SPLIT_PICK_HELP());
             ui.add_space(4.0);
             egui::ScrollArea::vertical()
                 .max_height((ctx.content_rect().height() - 300.0).max(160.0))
@@ -223,7 +223,7 @@ impl App {
                 .show(ui, |ui| {
                     let same = format!(
                         "{} ({})",
-                        i18n::SPLIT_SAME,
+                        i18n::SPLIT_SAME(),
                         base.clone().unwrap_or_default()
                     );
                     ui.selectable_value(&mut d.choice, None, same);
@@ -240,10 +240,10 @@ impl App {
                 });
             ui.separator();
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(i18n::SPLIT_OPEN).clicked() {
+                if ui.button(i18n::SPLIT_OPEN()).clicked() {
                     next = Next::SplitConfirm(d.dir, d.choice);
                 }
-                if ui.button(i18n::CANCEL).clicked() {
+                if ui.button(i18n::CANCEL()).clicked() {
                     next = Next::Close;
                 }
             });

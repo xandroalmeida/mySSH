@@ -27,10 +27,10 @@ pub fn parse_overwrite(s: &str) -> Option<Overwrite> {
 
 pub fn overwrite_label(o: Overwrite) -> &'static str {
     match o {
-        Overwrite::Ask => i18n::FILES_POLICY_ASK,
-        Overwrite::Overwrite => i18n::FILES_POLICY_OVERWRITE,
-        Overwrite::Skip => i18n::FILES_POLICY_SKIP,
-        Overwrite::Rename => i18n::FILES_POLICY_RENAME,
+        Overwrite::Ask => i18n::FILES_POLICY_ASK(),
+        Overwrite::Overwrite => i18n::FILES_POLICY_OVERWRITE(),
+        Overwrite::Skip => i18n::FILES_POLICY_SKIP(),
+        Overwrite::Rename => i18n::FILES_POLICY_RENAME(),
     }
 }
 

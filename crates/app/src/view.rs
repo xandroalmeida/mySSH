@@ -74,40 +74,40 @@ impl App {
             ui.add_space(4.0);
             ui.horizontal(|ui| {
                 if ui
-                    .button(i18n::NEW_PROFILE)
+                    .button(i18n::NEW_PROFILE())
                     .on_hover_text(shortcuts::label(Action::NewProfile))
                     .clicked()
                 {
                     self.new_profile_dialog();
                 }
-                if ui.button(i18n::QUICK_CONNECT).clicked() {
+                if ui.button(i18n::QUICK_CONNECT()).clicked() {
                     self.dialog = Dialog::Quick(QuickDialog {
                         text: String::new(),
                         error: None,
                     });
                 }
                 ui.add_enabled_ui(can_split, |ui| {
-                    ui.menu_button(i18n::SPLIT, |ui| self.split_menu(ui, splitting));
+                    ui.menu_button(i18n::SPLIT(), |ui| self.split_menu(ui, splitting));
                 });
-                if ui.button(i18n::IMPORT_SSH).clicked() {
+                if ui.button(i18n::IMPORT_SSH()).clicked() {
                     self.open_import_ssh();
                 }
-                if ui.button(i18n::SETTINGS).clicked() {
+                if ui.button(i18n::SETTINGS()).clicked() {
                     self.open_settings();
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add(egui::Button::new(i18n::ABOUT_BUTTON).frame(false))
-                        .on_hover_text(i18n::ABOUT_BUTTON_HELP)
+                        .add(egui::Button::new(i18n::ABOUT_BUTTON()).frame(false))
+                        .on_hover_text(i18n::ABOUT_BUTTON_HELP())
                         .clicked()
                     {
                         self.open_about();
                     }
                     ui.separator();
                     if ui
-                        .add_enabled(sessions > 0, egui::Button::new(i18n::END_ALL))
-                        .on_hover_text(i18n::END_ALL_HELP)
-                        .on_disabled_hover_text(i18n::END_ALL_NONE)
+                        .add_enabled(sessions > 0, egui::Button::new(i18n::END_ALL()))
+                        .on_hover_text(i18n::END_ALL_HELP())
+                        .on_disabled_hover_text(i18n::END_ALL_NONE())
                         .clicked()
                     {
                         self.request_end_all();
@@ -115,25 +115,25 @@ impl App {
                     ui.separator();
                     if locked {
                         let b = egui::Button::new(
-                            RichText::new(i18n::VAULT_LOCKED_BADGE).color(warn_color(ui)),
+                            RichText::new(i18n::VAULT_LOCKED_BADGE()).color(warn_color(ui)),
                         );
                         if ui
                             .add(b)
-                            .on_hover_text(i18n::VAULT_UNLOCK_BTN_HELP)
+                            .on_hover_text(i18n::VAULT_UNLOCK_BTN_HELP())
                             .clicked()
                         {
                             let ctx = ui.ctx().clone();
                             self.unlock_vault(&ctx);
                         }
                     } else if ui
-                        .button(i18n::VAULT_OPEN_BADGE)
-                        .on_hover_text(i18n::VAULT_LOCK_BTN_HELP)
+                        .button(i18n::VAULT_OPEN_BADGE())
+                        .on_hover_text(i18n::VAULT_LOCK_BTN_HELP())
                         .clicked()
                     {
                         self.lock_vault();
                     }
                     if self.vault_mode == VaultMode::SessionOnly {
-                        ui.weak(i18n::VAULT_SESSION_BADGE);
+                        ui.weak(i18n::VAULT_SESSION_BADGE());
                     }
                 });
             });
@@ -146,9 +146,9 @@ impl App {
                 ui.horizontal_wrapped(|ui| {
                     ui.colored_label(
                         warn_color(ui),
-                        format!("⚠ {} ({reason})", i18n::KEYRING_UNAVAILABLE),
+                        format!("⚠ {} ({reason})", i18n::KEYRING_UNAVAILABLE()),
                     );
-                    if ui.button(i18n::USE_SESSION_ONLY).clicked() {
+                    if ui.button(i18n::USE_SESSION_ONLY()).clicked() {
                         use_session = true;
                     }
                 });
@@ -163,15 +163,15 @@ impl App {
 
     fn split_menu(&mut self, ui: &mut egui::Ui, splitting: bool) {
         let entries = [
-            (Dir::Vertical, i18n::SPLIT_SIDE, Action::SplitSide),
-            (Dir::Horizontal, i18n::SPLIT_STACK, Action::SplitStack),
+            (Dir::Vertical, i18n::SPLIT_SIDE(), Action::SplitSide),
+            (Dir::Horizontal, i18n::SPLIT_STACK(), Action::SplitStack),
         ];
         for (dir, name, action) in entries {
             ui.label(RichText::new(name).strong());
             if ui
                 .button(format!(
                     "  {}    {}",
-                    i18n::SPLIT_SAME,
+                    i18n::SPLIT_SAME(),
                     shortcuts::label(action)
                 ))
                 .clicked()
@@ -179,7 +179,7 @@ impl App {
                 self.split_active(dir, None);
                 ui.close();
             }
-            if ui.button(format!("  {}", i18n::SPLIT_OTHER)).clicked() {
+            if ui.button(format!("  {}", i18n::SPLIT_OTHER())).clicked() {
                 self.open_split_picker(dir);
                 ui.close();
             }
@@ -190,7 +190,7 @@ impl App {
                 splitting,
                 egui::Button::new(format!(
                     "{}    {}",
-                    i18n::SPLIT_CLOSE_PANE,
+                    i18n::SPLIT_CLOSE_PANE(),
                     shortcuts::label(Action::ClosePane)
                 )),
             )
@@ -249,7 +249,7 @@ impl App {
                 let search = ui.add(
                     egui::TextEdit::singleline(&mut self.filter.search)
                         .id(egui::Id::new(SEARCH_ID))
-                        .hint_text(i18n::SEARCH_HINT)
+                        .hint_text(i18n::SEARCH_HINT())
                         .desired_width(f32::INFINITY),
                 );
                 if std::mem::take(&mut self.focus_search) {
@@ -270,38 +270,38 @@ impl App {
 
     fn filters_ui(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
-            ui.checkbox(&mut self.filter.favorites_only, i18n::FILTER_FAVORITES);
-            if self.filter.is_active() && ui.small_button(i18n::FILTER_CLEAR).clicked() {
+            ui.checkbox(&mut self.filter.favorites_only, i18n::FILTER_FAVORITES());
+            if self.filter.is_active() && ui.small_button(i18n::FILTER_CLEAR()).clicked() {
                 self.filter = Default::default();
             }
         });
         ui.horizontal(|ui| {
-            ui.label(i18n::FILTER_ENV);
-            let cur = self.filter.environment.map_or(i18n::ALL, env::name);
+            ui.label(i18n::FILTER_ENV());
+            let cur = self.filter.environment.map_or(i18n::ALL(), env::name);
             egui::ComboBox::from_id_salt("filter-env")
                 .selected_text(cur)
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut self.filter.environment, None, i18n::ALL);
+                    ui.selectable_value(&mut self.filter.environment, None, i18n::ALL());
                     for e in ENVIRONMENTS {
                         ui.selectable_value(&mut self.filter.environment, Some(e), env::name(e));
                     }
                 });
         });
         ui.horizontal(|ui| {
-            ui.label(i18n::FILTER_FOLDER);
+            ui.label(i18n::FILTER_FOLDER());
             let cur = match self.filter.folder {
-                FolderSel::All => i18n::ALL_F.to_string(),
-                FolderSel::Unfiled => i18n::NO_FOLDER.to_string(),
+                FolderSel::All => i18n::ALL_F().to_string(),
+                FolderSel::Unfiled => i18n::NO_FOLDER().to_string(),
                 FolderSel::Folder(id) => folder_path(&self.folders, id),
             };
             egui::ComboBox::from_id_salt("filter-folder")
                 .selected_text(cur)
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut self.filter.folder, FolderSel::All, i18n::ALL_F);
+                    ui.selectable_value(&mut self.filter.folder, FolderSel::All, i18n::ALL_F());
                     ui.selectable_value(
                         &mut self.filter.folder,
                         FolderSel::Unfiled,
-                        i18n::NO_FOLDER,
+                        i18n::NO_FOLDER(),
                     );
                     let mut fs: Vec<_> = self
                         .folders
@@ -322,19 +322,19 @@ impl App {
             ui.add_enabled_ui(sel.is_some(), |ui| {
                 let id = sel.unwrap_or_default();
                 if ui
-                    .button(i18n::OPEN)
+                    .button(i18n::OPEN())
                     .on_hover_text(shortcuts::label(Action::NewTab))
                     .clicked()
                 {
                     *action = Some(RowAction::Open(id));
                 }
-                if ui.button(i18n::EDIT).clicked() {
+                if ui.button(i18n::EDIT()).clicked() {
                     *action = Some(RowAction::Edit(id));
                 }
-                if ui.button(i18n::DUPLICATE).clicked() {
+                if ui.button(i18n::DUPLICATE()).clicked() {
                     *action = Some(RowAction::Duplicate(id));
                 }
-                if ui.button(i18n::DELETE).clicked() {
+                if ui.button(i18n::DELETE()).clicked() {
                     *action = Some(RowAction::Delete(id));
                 }
             });
@@ -350,9 +350,9 @@ impl App {
         if visible.is_empty() {
             ui.add_space(8.0);
             ui.weak(if self.profiles.is_empty() {
-                i18n::NO_PROFILES
+                i18n::NO_PROFILES()
             } else {
-                i18n::NO_MATCH
+                i18n::NO_MATCH()
             });
             return;
         }
@@ -387,20 +387,20 @@ impl App {
         }
         resp.context_menu(|ui| {
             let fav_label = if p.favorite {
-                i18n::UNFAVORITE
+                i18n::UNFAVORITE()
             } else {
-                i18n::FAVORITE
+                i18n::FAVORITE()
             };
             let mut picked = None;
-            if ui.button(i18n::OPEN).clicked() {
+            if ui.button(i18n::OPEN()).clicked() {
                 picked = Some(RowAction::Open(p.id));
-            } else if ui.button(i18n::EDIT).clicked() {
+            } else if ui.button(i18n::EDIT()).clicked() {
                 picked = Some(RowAction::Edit(p.id));
-            } else if ui.button(i18n::DUPLICATE).clicked() {
+            } else if ui.button(i18n::DUPLICATE()).clicked() {
                 picked = Some(RowAction::Duplicate(p.id));
             } else if ui.button(fav_label).clicked() {
                 picked = Some(RowAction::ToggleFavorite(p.id));
-            } else if ui.button(i18n::DELETE).clicked() {
+            } else if ui.button(i18n::DELETE()).clicked() {
                 picked = Some(RowAction::Delete(p.id));
             }
             if picked.is_some() {
@@ -465,7 +465,7 @@ impl App {
                             }
                             if ui
                                 .small_button("×")
-                                .on_hover_text(i18n::CLOSE_TAB)
+                                .on_hover_text(i18n::CLOSE_TAB())
                                 .clicked()
                             {
                                 close = Some(t.id);
@@ -530,7 +530,7 @@ impl App {
                 }
                 None => {
                     ui.add_space(24.0);
-                    ui.vertical_centered(|ui| ui.weak(i18n::NO_TABS));
+                    ui.vertical_centered(|ui| ui.weak(i18n::NO_TABS()));
                 }
             }
         });

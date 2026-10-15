@@ -220,10 +220,10 @@ fn paint_icon(ui: &egui::Ui, cell: Rect, kind: Kind, color: Color32) {
 
 pub fn kind_label(k: Kind) -> &'static str {
     match k {
-        Kind::Dir => i18n::FILES_KIND_DIR,
-        Kind::File => i18n::FILES_KIND_FILE,
-        Kind::Symlink => i18n::FILES_KIND_LINK,
-        Kind::Other => i18n::FILES_KIND_OTHER,
+        Kind::Dir => i18n::FILES_KIND_DIR(),
+        Kind::File => i18n::FILES_KIND_FILE(),
+        Kind::Symlink => i18n::FILES_KIND_LINK(),
+        Kind::Other => i18n::FILES_KIND_OTHER(),
     }
 }
 
@@ -258,30 +258,30 @@ pub fn column_ui(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mu
         }
         ui.horizontal_wrapped(|ui| {
             if ui
-                .add_enabled(pane.can_back(), egui::Button::new(i18n::FILES_BACK))
+                .add_enabled(pane.can_back(), egui::Button::new(i18n::FILES_BACK()))
                 .clicked()
             {
                 acts.push(Act::Back(side));
             }
-            if ui.button(i18n::FILES_UP).clicked() {
+            if ui.button(i18n::FILES_UP()).clicked() {
                 acts.push(Act::Up(side));
             }
-            if ui.button(i18n::FILES_REFRESH).clicked() {
+            if ui.button(i18n::FILES_REFRESH()).clicked() {
                 acts.push(Act::Refresh(side));
             }
-            if ui.button(i18n::FILES_HOME).clicked() {
+            if ui.button(i18n::FILES_HOME()).clicked() {
                 acts.push(Act::Home(side));
             }
-            ui.checkbox(&mut pane.show_hidden, i18n::FILES_HIDDEN)
-                .on_hover_text(i18n::FILES_HIDDEN_HINT);
+            ui.checkbox(&mut pane.show_hidden, i18n::FILES_HIDDEN())
+                .on_hover_text(i18n::FILES_HIDDEN_HINT());
         });
         let r = ui.add(
             egui::TextEdit::singleline(&mut pane.edit)
-                .hint_text(i18n::FILES_PATH_HINT)
+                .hint_text(i18n::FILES_PATH_HINT())
                 .font(TextStyle::Monospace)
                 .desired_width(f32::INFINITY),
         );
-        let field_name = format!("{} ({})", i18n::FILES_PATH_LABEL, cx.label);
+        let field_name = format!("{} ({})", i18n::FILES_PATH_LABEL(), cx.label);
         r.widget_info(|| text_info(&field_name, &pane.edit));
         if r.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter)) {
             let p = pane.edit.trim().to_string();
@@ -336,16 +336,16 @@ fn header_row(ui: &mut egui::Ui, pane: &mut PaneState) {
     let (rect, _) = ui.allocate_exact_size(vec2(ui.available_width(), 22.0), Sense::hover());
     let c = cols(rect);
     let mut items = vec![
-        (SortKey::Name, i18n::FILES_COL_NAME, {
+        (SortKey::Name, i18n::FILES_COL_NAME(), {
             let mut n = c.name;
             n.min.x += 20.0;
             n
         }),
-        (SortKey::Size, i18n::FILES_COL_SIZE, c.size),
-        (SortKey::Modified, i18n::FILES_COL_MODIFIED, c.date),
+        (SortKey::Size, i18n::FILES_COL_SIZE(), c.size),
+        (SortKey::Modified, i18n::FILES_COL_MODIFIED(), c.date),
     ];
     if let Some(k) = c.kind {
-        items.push((SortKey::Kind, i18n::FILES_COL_KIND, k));
+        items.push((SortKey::Kind, i18n::FILES_COL_KIND(), k));
     }
     for (key, label, cell) in items {
         let arrow = if pane.sort.key == key {
@@ -407,11 +407,11 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
     let n_sel = pane.sel.names.len();
     let can_transfer = cx.can_transfer;
     list_resp.context_menu(|ui| {
-        if ui.button(i18n::FILES_NEW_DIR).clicked() {
+        if ui.button(i18n::FILES_NEW_DIR()).clicked() {
             acts.push(Act::NewDir(side));
             ui.close();
         }
-        if ui.button(i18n::FILES_REFRESH).clicked() {
+        if ui.button(i18n::FILES_REFRESH()).clicked() {
             acts.push(Act::Refresh(side));
             ui.close();
         }
@@ -420,7 +420,7 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
     if pane.loading && pane.entries.is_empty() {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label(i18n::FILES_LOADING);
+            ui.label(i18n::FILES_LOADING());
         });
     }
     if let Some(err) = pane.error.clone() {
@@ -431,7 +431,7 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
                 Color32::from_rgb(180, 30, 30)
             };
             ui.colored_label(c, format!("⚠ {err}"));
-            if ui.button(i18n::FILES_RETRY).clicked() {
+            if ui.button(i18n::FILES_RETRY()).clicked() {
                 acts.push(Act::Refresh(side));
             }
         });
@@ -439,7 +439,7 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
 
     let vis = pane.visible();
     if vis.is_empty() && !pane.loading && pane.error.is_none() {
-        ui.weak(i18n::FILES_EMPTY);
+        ui.weak(i18n::FILES_EMPTY());
     }
     let entries = std::mem::take(&mut pane.entries);
     let names: Vec<&str> = vis.iter().map(|i| entries[*i].name.as_str()).collect();
@@ -620,9 +620,9 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
                         .add_enabled(
                             can_transfer,
                             egui::Button::new(if up {
-                                i18n::FILES_CM_UPLOAD
+                                i18n::FILES_CM_UPLOAD()
                             } else {
-                                i18n::FILES_CM_DOWNLOAD
+                                i18n::FILES_CM_DOWNLOAD()
                             }),
                         )
                         .clicked()
@@ -630,22 +630,22 @@ fn list_area(ui: &mut egui::Ui, pane: &mut PaneState, cx: &ColCtx, acts: &mut Ve
                     acts.push(Act::Transfer(side));
                     ui.close();
                 }
-                if ui.button(i18n::FILES_NEW_DIR).clicked() {
+                if ui.button(i18n::FILES_NEW_DIR()).clicked() {
                     acts.push(Act::NewDir(side));
                     ui.close();
                 }
                 if ui
-                    .add_enabled(n_sel <= 1, egui::Button::new(i18n::FILES_RENAME))
+                    .add_enabled(n_sel <= 1, egui::Button::new(i18n::FILES_RENAME()))
                     .clicked()
                 {
                     acts.push(Act::Rename(side));
                     ui.close();
                 }
-                if ui.button(i18n::FILES_DELETE).clicked() {
+                if ui.button(i18n::FILES_DELETE()).clicked() {
                     acts.push(Act::Delete(side));
                     ui.close();
                 }
-                if ui.button(i18n::FILES_REFRESH).clicked() {
+                if ui.button(i18n::FILES_REFRESH()).clicked() {
                     acts.push(Act::Refresh(side));
                     ui.close();
                 }

@@ -43,11 +43,11 @@ impl std::fmt::Display for FormError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Profile(e) => e.fmt(f),
-            Self::Port => f.write_str(i18n::ERR_PORT),
-            Self::Keepalive => f.write_str(i18n::ERR_KEEPALIVE),
-            Self::Timeout => f.write_str(i18n::ERR_TIMEOUT),
-            Self::KeyPath => f.write_str(i18n::ERR_KEY_PATH),
-            Self::SecretRequired => f.write_str(i18n::ERR_SECRET_REQUIRED),
+            Self::Port => f.write_str(i18n::ERR_PORT()),
+            Self::Keepalive => f.write_str(i18n::ERR_KEEPALIVE()),
+            Self::Timeout => f.write_str(i18n::ERR_TIMEOUT()),
+            Self::KeyPath => f.write_str(i18n::ERR_KEY_PATH()),
+            Self::SecretRequired => f.write_str(i18n::ERR_SECRET_REQUIRED()),
         }
     }
 }

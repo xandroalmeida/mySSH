@@ -212,7 +212,7 @@ impl SplitBody {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui
                             .small_button("×")
-                            .on_hover_text(i18n::SPLIT_CLOSE_PANE)
+                            .on_hover_text(i18n::SPLIT_CLOSE_PANE())
                             .clicked()
                         {
                             *close = Some(pane.id);

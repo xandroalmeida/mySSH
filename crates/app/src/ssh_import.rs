@@ -163,10 +163,10 @@ pub fn load(path: &Path, home: &str, user: &str) -> Result<ImportPreview, String
     std::fs::File::open(path)
         .and_then(|f| f.take(MAX_FILE_BYTES).read_to_string(&mut content))
         .map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => i18n::IMPORT_ERR_NOT_FOUND.to_string(),
-            std::io::ErrorKind::PermissionDenied => i18n::IMPORT_ERR_DENIED.to_string(),
-            std::io::ErrorKind::InvalidData => i18n::IMPORT_ERR_NOT_TEXT.to_string(),
-            _ => i18n::IMPORT_ERR_READ.to_string(),
+            std::io::ErrorKind::NotFound => i18n::IMPORT_ERR_NOT_FOUND().to_string(),
+            std::io::ErrorKind::PermissionDenied => i18n::IMPORT_ERR_DENIED().to_string(),
+            std::io::ErrorKind::InvalidData => i18n::IMPORT_ERR_NOT_TEXT().to_string(),
+            _ => i18n::IMPORT_ERR_READ().to_string(),
         })?;
     let mut opts = ImportOptions::new(home, user);
     opts.root_name = path.to_string_lossy().into_owned();
@@ -175,7 +175,7 @@ pub fn load(path: &Path, home: &str, user: &str) -> Result<ImportPreview, String
 
 /// Como [`load`], com o home e o usuário do ambiente.
 pub fn load_with_env(path: &Path) -> Result<ImportPreview, String> {
-    let (home, user) = home_and_user().ok_or_else(|| i18n::IMPORT_ERR_NO_HOME.to_string())?;
+    let (home, user) = home_and_user().ok_or_else(|| i18n::IMPORT_ERR_NO_HOME().to_string())?;
     load(path, &home, &user)
 }
 
@@ -390,12 +390,12 @@ Host dup
     fn erros_de_leitura_em_pt_br() {
         let tmp = tempfile::tempdir().unwrap();
         let e = load(&tmp.path().join("nao-existe"), "/h", "u").unwrap_err();
-        assert_eq!(e, i18n::IMPORT_ERR_NOT_FOUND);
+        assert_eq!(e, i18n::IMPORT_ERR_NOT_FOUND());
         let bin = tmp.path().join("bin");
         std::fs::write(&bin, [0xff, 0xfe, 0x00]).unwrap();
         assert_eq!(
             load(&bin, "/h", "u").unwrap_err(),
-            i18n::IMPORT_ERR_NOT_TEXT
+            i18n::IMPORT_ERR_NOT_TEXT()
         );
     }
 }

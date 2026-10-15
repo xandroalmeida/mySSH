@@ -71,26 +71,26 @@ pub fn editor(ui: &mut egui::Ui, ov: &mut ThemeOverride, global_font: f32) {
         .num_columns(2)
         .spacing([10.0, 8.0])
         .show(ui, |ui| {
-            ui.label(i18n::TH_PALETTE);
+            ui.label(i18n::TH_PALETTE());
             let cur = ov
                 .palette
                 .as_deref()
                 .and_then(palette_name)
-                .unwrap_or(i18n::TH_INHERIT);
+                .unwrap_or(i18n::TH_INHERIT());
             egui::ComboBox::from_id_salt("theme-palette")
                 .selected_text(cur)
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut ov.palette, None, i18n::TH_INHERIT);
+                    ui.selectable_value(&mut ov.palette, None, i18n::TH_INHERIT());
                     for p in PALETTES {
                         ui.selectable_value(&mut ov.palette, Some(p.id.to_string()), p.name);
                     }
                 });
             ui.end_row();
 
-            ui.label(i18n::TH_FONT);
+            ui.label(i18n::TH_FONT());
             ui.horizontal(|ui| {
                 let mut own = ov.font_size_tenths.is_some();
-                if ui.checkbox(&mut own, i18n::TH_FONT_OWN).changed() {
+                if ui.checkbox(&mut own, i18n::TH_FONT_OWN()).changed() {
                     ov.font_size_tenths = own.then(|| (global_font * 10.0).round() as u16);
                 }
                 if let Some(t) = &mut ov.font_size_tenths {
@@ -111,10 +111,10 @@ pub fn editor(ui: &mut egui::Ui, ov: &mut ThemeOverride, global_font: f32) {
             });
             ui.end_row();
 
-            ui.label(i18n::TH_ACCENT);
+            ui.label(i18n::TH_ACCENT());
             ui.horizontal(|ui| {
                 let mut own = ov.accent.is_some();
-                if ui.checkbox(&mut own, i18n::TH_ACCENT_OWN).changed() {
+                if ui.checkbox(&mut own, i18n::TH_ACCENT_OWN()).changed() {
                     ov.accent = own.then(|| {
                         ov.palette
                             .as_deref()
@@ -125,19 +125,19 @@ pub fn editor(ui: &mut egui::Ui, ov: &mut ThemeOverride, global_font: f32) {
                 if let Some(rgb) = &mut ov.accent {
                     ui.color_edit_button_srgb(rgb);
                 } else {
-                    ui.weak(i18n::TH_ACCENT_NONE);
+                    ui.weak(i18n::TH_ACCENT_NONE());
                 }
             });
             ui.end_row();
         });
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(!is_inherited(ov), egui::Button::new(i18n::TH_RESET).small())
+            .add_enabled(!is_inherited(ov), egui::Button::new(i18n::TH_RESET()).small())
             .clicked()
         {
             *ov = ThemeOverride::default();
         }
-        ui.weak(i18n::TH_SCOPE_HELP);
+        ui.weak(i18n::TH_SCOPE_HELP());
     });
     ui.add_space(4.0);
     preview(ui, &resolve(ov, global_dark, global_font));

@@ -105,10 +105,10 @@ pub fn build_info() -> BuildInfo {
 pub fn commit_label(commit: &str, dirty: bool) -> String {
     let commit = commit.trim();
     if commit.is_empty() {
-        return i18n::ABOUT_UNKNOWN.to_string();
+        return i18n::ABOUT_UNKNOWN().to_string();
     }
     if dirty {
-        format!("{commit} {}", i18n::ABOUT_DIRTY)
+        format!("{commit} {}", i18n::ABOUT_DIRTY())
     } else {
         commit.to_string()
     }
@@ -395,7 +395,7 @@ fn info_row(ui: &mut egui::Ui, label: &str, value: &str) {
 fn link(ui: &mut egui::Ui, text: &str, url: &str) {
     let r = ui
         .add(egui::Link::new(RichText::new(text).size(12.5)))
-        .on_hover_text(format!("{} — {url}", i18n::ABOUT_LINK_HELP));
+        .on_hover_text(format!("{} — {url}", i18n::ABOUT_LINK_HELP()));
     if r.clicked() {
         ui.ctx().open_url(egui::OpenUrl::new_tab(url));
     }
@@ -419,7 +419,7 @@ pub(crate) fn show(ctx: &egui::Context, st: &mut AboutState, data_dir: Option<&P
     let dir_text = shown_dir
         .as_deref()
         .map(|d| abbreviate_home(d, home_dir().as_deref()))
-        .unwrap_or_else(|| i18n::ABOUT_UNKNOWN.to_string());
+        .unwrap_or_else(|| i18n::ABOUT_UNKNOWN().to_string());
     let tex = icon_texture(ctx);
 
     let modal = egui::Modal::new(Id::new("about-dialog"))
@@ -496,7 +496,7 @@ fn card_content(
     ui.vertical_centered(|ui| {
         let size = 112.0;
         let (rect, resp) = ui.allocate_exact_size(Vec2::splat(size), egui::Sense::hover());
-        resp.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, i18n::ABOUT_TITLE));
+        resp.widget_info(|| WidgetInfo::labeled(WidgetType::Label, true, i18n::ABOUT_TITLE()));
         ui.painter().image(
             tex.id(),
             rect,
@@ -531,7 +531,7 @@ fn card_content(
     ui.vertical_centered(|ui| {
         ui.add(
             egui::Label::new(
-                RichText::new(i18n::ABOUT_TAGLINE)
+                RichText::new(i18n::ABOUT_TAGLINE())
                     .size(13.0)
                     .color(TEXT_DIM),
             )
@@ -546,19 +546,19 @@ fn card_content(
     // Informações
     ui.scope(|ui| {
         ui.spacing_mut().item_spacing.y = 6.0;
-        info_row(ui, i18n::ABOUT_VERSION, info.version);
+        info_row(ui, i18n::ABOUT_VERSION(), info.version);
         info_row(
             ui,
-            i18n::ABOUT_COMMIT,
+            i18n::ABOUT_COMMIT(),
             &commit_label(info.commit, info.dirty),
         );
-        info_row(ui, i18n::ABOUT_BUILD, info.date);
+        info_row(ui, i18n::ABOUT_BUILD(), info.date);
         info_row(
             ui,
-            i18n::ABOUT_PLATFORM,
+            i18n::ABOUT_PLATFORM(),
             &format!("{} ({})", info.os, info.arch),
         );
-        info_row(ui, i18n::ABOUT_DATA, dir_text);
+        info_row(ui, i18n::ABOUT_DATA(), dir_text);
     });
 
     ui.add_space(12.0);
@@ -569,7 +569,7 @@ fn card_content(
     ui.horizontal_wrapped(|ui| {
         ui.spacing_mut().item_spacing.x = 4.0;
         ui.label(
-            RichText::new(i18n::ABOUT_MADE_WITH)
+            RichText::new(i18n::ABOUT_MADE_WITH())
                 .size(12.5)
                 .color(TEXT_DIM),
         );
@@ -586,12 +586,12 @@ fn card_content(
     ui.horizontal(|ui| {
         ui.spacing_mut().item_spacing.x = 6.0;
         ui.label(
-            RichText::new(i18n::ABOUT_LICENSE_LABEL)
+            RichText::new(i18n::ABOUT_LICENSE_LABEL())
                 .size(12.5)
                 .color(TEXT_DIM),
         );
         ui.label(
-            RichText::new(i18n::ABOUT_LICENSE)
+            RichText::new(i18n::ABOUT_LICENSE())
                 .monospace()
                 .size(12.0)
                 .color(TEXT_VALUE),
@@ -633,28 +633,28 @@ fn card_content(
     // Botões
     ui.horizontal(|ui| {
         let copy_label = if st.copied {
-            i18n::ABOUT_COPIED
+            i18n::ABOUT_COPIED()
         } else {
-            i18n::ABOUT_COPY
+            i18n::ABOUT_COPY()
         };
         if ui
             .button(copy_label)
-            .on_hover_text(i18n::ABOUT_COPY_HELP)
+            .on_hover_text(i18n::ABOUT_COPY_HELP())
             .clicked()
         {
             ctx.copy_text(report_text(info, dir_text));
             st.copied = true;
         }
         if ui
-            .add_enabled(dir.is_some(), egui::Button::new(i18n::ABOUT_OPEN_DATA))
-            .on_hover_text(i18n::ABOUT_OPEN_DATA_HELP)
+            .add_enabled(dir.is_some(), egui::Button::new(i18n::ABOUT_OPEN_DATA()))
+            .on_hover_text(i18n::ABOUT_OPEN_DATA_HELP())
             .clicked()
             && let Some(d) = dir
         {
             open_folder(d);
         }
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            if ui.button(i18n::CLOSE).clicked() {
+            if ui.button(i18n::CLOSE()).clicked() {
                 next = Next::Close;
             }
         });
@@ -781,7 +781,7 @@ mod tests {
     #[test]
     fn abre_e_fecha_com_esc() {
         let mut h = harness(memory_app());
-        h.get_by_label(i18n::ABOUT_BUTTON).click();
+        h.get_by_label(i18n::ABOUT_BUTTON()).click();
         h.run_steps(3);
         assert!(is_about(&h));
         h.key_press(egui::Key::Escape);
@@ -795,7 +795,7 @@ mod tests {
         h.state_mut().open_about();
         h.run_steps(3);
         assert!(is_about(&h));
-        h.get_by_label(i18n::CLOSE).click();
+        h.get_by_label(i18n::CLOSE()).click();
         h.run_steps(3);
         assert!(!is_about(&h));
     }
@@ -805,7 +805,7 @@ mod tests {
         let mut h = harness(memory_app());
         h.state_mut().open_about();
         h.run_steps(3);
-        h.get_by_label(i18n::ABOUT_COPY).click();
+        h.get_by_label(i18n::ABOUT_COPY()).click();
         let mut copied = None;
         for _ in 0..4 {
             h.step();
@@ -821,7 +821,7 @@ mod tests {
         assert!(t.contains("Commit: "));
         assert!(t.contains(&format!("Plataforma: {}", std::env::consts::OS)));
         h.run_steps(2);
-        assert!(h.query_by_label(i18n::ABOUT_COPIED).is_some());
+        assert!(h.query_by_label(i18n::ABOUT_COPIED()).is_some());
     }
 
     #[test]

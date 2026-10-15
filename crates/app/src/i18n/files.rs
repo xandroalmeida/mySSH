@@ -2,74 +2,185 @@
 
 use crate::files::fmt::fmt_size;
 
-pub const FILES_BUTTON: &str = "Arquivos";
-pub const FILES_BUTTON_HINT: &str = "Mostrar/ocultar o painel de arquivos (SFTP)";
-pub const FILES_TITLE: &str = "Arquivos";
-pub const FILES_CLOSE: &str = "Fechar painel";
-pub const FILES_LOCAL: &str = "Local";
-pub const FILES_REMOTE: &str = "Remoto";
-pub const FILES_BACK: &str = "Voltar";
-pub const FILES_UP: &str = "Subir";
-pub const FILES_REFRESH: &str = "Atualizar";
-pub const FILES_HOME: &str = "Início";
-pub const FILES_HIDDEN: &str = "Ocultos";
-pub const FILES_HIDDEN_HINT: &str = "Mostrar arquivos ocultos (nomes que começam com ponto)";
-pub const FILES_PATH_LABEL: &str = "Caminho";
-pub const FILES_NAME_FIELD: &str = "Nome do item";
-pub const FILES_PATH_HINT: &str = "Caminho (Enter para ir)";
-pub const FILES_COL_NAME: &str = "Nome";
-pub const FILES_COL_SIZE: &str = "Tamanho";
-pub const FILES_COL_MODIFIED: &str = "Modificado";
-pub const FILES_COL_KIND: &str = "Tipo";
-pub const FILES_KIND_DIR: &str = "Pasta";
-pub const FILES_KIND_FILE: &str = "Arquivo";
-pub const FILES_KIND_LINK: &str = "Link";
-pub const FILES_KIND_OTHER: &str = "Outro";
-pub const FILES_UPLOAD: &str = "⬆ Enviar";
-pub const FILES_DOWNLOAD: &str = "⬇ Baixar";
-pub const FILES_UPLOAD_HINT: &str =
-    "Enviar os itens selecionados da coluna local para a pasta remota aberta";
-pub const FILES_DOWNLOAD_HINT: &str =
-    "Baixar os itens selecionados da coluna remota para a pasta local aberta";
-pub const FILES_CM_UPLOAD: &str = "Enviar para o remoto";
-pub const FILES_CM_DOWNLOAD: &str = "Baixar para a pasta local";
-pub const FILES_NEW_DIR: &str = "Nova pasta…";
-pub const FILES_RENAME: &str = "Renomear…";
-pub const FILES_DELETE: &str = "Excluir…";
-pub const FILES_EMPTY: &str = "Pasta vazia.";
-pub const FILES_LOADING: &str = "Carregando…";
-pub const FILES_RETRY: &str = "Tentar novamente";
-pub const FILES_REMOTE_UNAVAILABLE: &str =
-    "Navegação remota indisponível: o SFTP ainda não está ligado a esta sessão.";
-pub const FILES_REMOTE_OPENING: &str = "Abrindo o canal SFTP…";
-pub const FILES_NO_CONNECTION: &str = "Sem conexão: conecte a sessão para navegar no servidor.";
+pub fn FILES_BUTTON() -> &'static str {
+    "Arquivos"
+}
+pub fn FILES_BUTTON_HINT() -> &'static str {
+    "Mostrar/ocultar o painel de arquivos (SFTP)"
+}
+pub fn FILES_TITLE() -> &'static str {
+    "Arquivos"
+}
+pub fn FILES_CLOSE() -> &'static str {
+    "Fechar painel"
+}
+pub fn FILES_LOCAL() -> &'static str {
+    "Local"
+}
+pub fn FILES_REMOTE() -> &'static str {
+    "Remoto"
+}
+pub fn FILES_BACK() -> &'static str {
+    "Voltar"
+}
+pub fn FILES_UP() -> &'static str {
+    "Subir"
+}
+pub fn FILES_REFRESH() -> &'static str {
+    "Atualizar"
+}
+pub fn FILES_HOME() -> &'static str {
+    "Início"
+}
+pub fn FILES_HIDDEN() -> &'static str {
+    "Ocultos"
+}
+pub fn FILES_HIDDEN_HINT() -> &'static str {
+    "Mostrar arquivos ocultos (nomes que começam com ponto)"
+}
+pub fn FILES_PATH_LABEL() -> &'static str {
+    "Caminho"
+}
+pub fn FILES_NAME_FIELD() -> &'static str {
+    "Nome do item"
+}
+pub fn FILES_PATH_HINT() -> &'static str {
+    "Caminho (Enter para ir)"
+}
+pub fn FILES_COL_NAME() -> &'static str {
+    "Nome"
+}
+pub fn FILES_COL_SIZE() -> &'static str {
+    "Tamanho"
+}
+pub fn FILES_COL_MODIFIED() -> &'static str {
+    "Modificado"
+}
+pub fn FILES_COL_KIND() -> &'static str {
+    "Tipo"
+}
+pub fn FILES_KIND_DIR() -> &'static str {
+    "Pasta"
+}
+pub fn FILES_KIND_FILE() -> &'static str {
+    "Arquivo"
+}
+pub fn FILES_KIND_LINK() -> &'static str {
+    "Link"
+}
+pub fn FILES_KIND_OTHER() -> &'static str {
+    "Outro"
+}
+pub fn FILES_UPLOAD() -> &'static str {
+    "⬆ Enviar"
+}
+pub fn FILES_DOWNLOAD() -> &'static str {
+    "⬇ Baixar"
+}
+pub fn FILES_UPLOAD_HINT() -> &'static str {
+    "Enviar os itens selecionados da coluna local para a pasta remota aberta"
+}
+pub fn FILES_DOWNLOAD_HINT() -> &'static str {
+    "Baixar os itens selecionados da coluna remota para a pasta local aberta"
+}
+pub fn FILES_CM_UPLOAD() -> &'static str {
+    "Enviar para o remoto"
+}
+pub fn FILES_CM_DOWNLOAD() -> &'static str {
+    "Baixar para a pasta local"
+}
+pub fn FILES_NEW_DIR() -> &'static str {
+    "Nova pasta…"
+}
+pub fn FILES_RENAME() -> &'static str {
+    "Renomear…"
+}
+pub fn FILES_DELETE() -> &'static str {
+    "Excluir…"
+}
+pub fn FILES_EMPTY() -> &'static str {
+    "Pasta vazia."
+}
+pub fn FILES_LOADING() -> &'static str {
+    "Carregando…"
+}
+pub fn FILES_RETRY() -> &'static str {
+    "Tentar novamente"
+}
+pub fn FILES_REMOTE_UNAVAILABLE() -> &'static str {
+    "Navegação remota indisponível: o SFTP ainda não está ligado a esta sessão."
+}
+pub fn FILES_REMOTE_OPENING() -> &'static str {
+    "Abrindo o canal SFTP…"
+}
+pub fn FILES_NO_CONNECTION() -> &'static str {
+    "Sem conexão: conecte a sessão para navegar no servidor."
+}
 pub fn files_sftp_failed(e: &str) -> String {
     format!("Não foi possível abrir o SFTP: {e}")
 }
-pub const FILES_NOTHING_SELECTED: &str = "Selecione itens para transferir.";
-pub const FILES_NO_REMOTE_DIR: &str = "A pasta remota ainda não foi carregada.";
-pub const FILES_DROP_HINT: &str = "Solte aqui para enviar para a pasta remota";
-pub const FILES_POLICY_LABEL: &str = "Se já existir:";
-pub const FILES_POLICY_ASK: &str = "Perguntar";
-pub const FILES_POLICY_OVERWRITE: &str = "Sobrescrever";
-pub const FILES_POLICY_SKIP: &str = "Pular";
-pub const FILES_POLICY_RENAME: &str = "Renomear";
-pub const FILES_POLICY_HINT: &str = "Política de sobrescrita das próximas transferências";
+pub fn FILES_NOTHING_SELECTED() -> &'static str {
+    "Selecione itens para transferir."
+}
+pub fn FILES_NO_REMOTE_DIR() -> &'static str {
+    "A pasta remota ainda não foi carregada."
+}
+pub fn FILES_DROP_HINT() -> &'static str {
+    "Solte aqui para enviar para a pasta remota"
+}
+pub fn FILES_POLICY_LABEL() -> &'static str {
+    "Se já existir:"
+}
+pub fn FILES_POLICY_ASK() -> &'static str {
+    "Perguntar"
+}
+pub fn FILES_POLICY_OVERWRITE() -> &'static str {
+    "Sobrescrever"
+}
+pub fn FILES_POLICY_SKIP() -> &'static str {
+    "Pular"
+}
+pub fn FILES_POLICY_RENAME() -> &'static str {
+    "Renomear"
+}
+pub fn FILES_POLICY_HINT() -> &'static str {
+    "Política de sobrescrita das próximas transferências"
+}
 
-pub const FILES_ERR_NOT_FOUND: &str = "Não encontrado.";
-pub const FILES_ERR_PERMISSION: &str = "Permissão negada.";
-pub const FILES_ERR_EXISTS: &str = "Já existe um item com esse nome.";
+pub fn FILES_ERR_NOT_FOUND() -> &'static str {
+    "Não encontrado."
+}
+pub fn FILES_ERR_PERMISSION() -> &'static str {
+    "Permissão negada."
+}
+pub fn FILES_ERR_EXISTS() -> &'static str {
+    "Já existe um item com esse nome."
+}
 pub fn files_err_io(e: &str) -> String {
     format!("Erro de E/S: {e}")
 }
 
-pub const FILES_NAME_EMPTY: &str = "Informe um nome.";
-pub const FILES_NAME_INVALID: &str = "Nome inválido: não use “/”, “.” nem “..”.";
-pub const FILES_NEWDIR_TITLE: &str = "Nova pasta";
-pub const FILES_RENAME_TITLE: &str = "Renomear";
-pub const FILES_NAME_LABEL: &str = "Nome";
-pub const FILES_CREATE: &str = "Criar";
-pub const FILES_RENAME_CONFIRM: &str = "Renomear";
+pub fn FILES_NAME_EMPTY() -> &'static str {
+    "Informe um nome."
+}
+pub fn FILES_NAME_INVALID() -> &'static str {
+    "Nome inválido: não use “/”, “.” nem “..”."
+}
+pub fn FILES_NEWDIR_TITLE() -> &'static str {
+    "Nova pasta"
+}
+pub fn FILES_RENAME_TITLE() -> &'static str {
+    "Renomear"
+}
+pub fn FILES_NAME_LABEL() -> &'static str {
+    "Nome"
+}
+pub fn FILES_CREATE() -> &'static str {
+    "Criar"
+}
+pub fn FILES_RENAME_CONFIRM() -> &'static str {
+    "Renomear"
+}
 
 pub fn files_delete_title(remote: bool, n: usize) -> String {
     let onde = if remote { "remota" } else { "local" };
@@ -79,29 +190,56 @@ pub fn files_delete_title(remote: bool, n: usize) -> String {
         format!("Excluir {n} itens ({onde})?")
     }
 }
-pub const FILES_DELETE_PERMANENT: &str =
-    "A exclusão é permanente: os itens não vão para a lixeira e não podem ser recuperados.";
-pub const FILES_DELETE_RECURSIVE: &str =
-    "A seleção inclui pastas: todo o conteúdo delas será excluído, recursivamente.";
-pub const FILES_DELETE_ACK: &str =
-    "Entendo que isto exclui o conteúdo das pastas de forma permanente";
-pub const FILES_DELETE_CONFIRM: &str = "Excluir";
+pub fn FILES_DELETE_PERMANENT() -> &'static str {
+    "A exclusão é permanente: os itens não vão para a lixeira e não podem ser recuperados."
+}
+pub fn FILES_DELETE_RECURSIVE() -> &'static str {
+    "A seleção inclui pastas: todo o conteúdo delas será excluído, recursivamente."
+}
+pub fn FILES_DELETE_ACK() -> &'static str {
+    "Entendo que isto exclui o conteúdo das pastas de forma permanente"
+}
+pub fn FILES_DELETE_CONFIRM() -> &'static str {
+    "Excluir"
+}
 pub fn files_delete_more(n: usize) -> String {
     format!("… e mais {n}")
 }
 
 // Conflito
-pub const CONFLICT_TITLE: &str = "Já existe um item com esse nome";
-pub const CONFLICT_EXISTING: &str = "No destino (já existe)";
-pub const CONFLICT_INCOMING: &str = "O que seria gravado";
-pub const CONFLICT_SIZE: &str = "Tamanho";
-pub const CONFLICT_DATE: &str = "Modificado";
-pub const CONFLICT_UNKNOWN: &str = "desconhecido";
-pub const CONFLICT_OVERWRITE: &str = "Sobrescrever";
-pub const CONFLICT_SKIP: &str = "Pular";
-pub const CONFLICT_RENAME: &str = "Renomear";
-pub const CONFLICT_ALL: &str = "Aplicar a todos os conflitos desta transferência";
-pub const CONFLICT_CANCEL: &str = "Cancelar transferência";
+pub fn CONFLICT_TITLE() -> &'static str {
+    "Já existe um item com esse nome"
+}
+pub fn CONFLICT_EXISTING() -> &'static str {
+    "No destino (já existe)"
+}
+pub fn CONFLICT_INCOMING() -> &'static str {
+    "O que seria gravado"
+}
+pub fn CONFLICT_SIZE() -> &'static str {
+    "Tamanho"
+}
+pub fn CONFLICT_DATE() -> &'static str {
+    "Modificado"
+}
+pub fn CONFLICT_UNKNOWN() -> &'static str {
+    "desconhecido"
+}
+pub fn CONFLICT_OVERWRITE() -> &'static str {
+    "Sobrescrever"
+}
+pub fn CONFLICT_SKIP() -> &'static str {
+    "Pular"
+}
+pub fn CONFLICT_RENAME() -> &'static str {
+    "Renomear"
+}
+pub fn CONFLICT_ALL() -> &'static str {
+    "Aplicar a todos os conflitos desta transferência"
+}
+pub fn CONFLICT_CANCEL() -> &'static str {
+    "Cancelar transferência"
+}
 pub fn conflict_pending(n: usize) -> String {
     if n > 1 {
         format!("({} conflitos aguardando)", n)
@@ -111,19 +249,45 @@ pub fn conflict_pending(n: usize) -> String {
 }
 
 // Fila
-pub const XFER_QUEUED: &str = "Na fila";
-pub const XFER_SCANNING: &str = "Contando";
-pub const XFER_RUNNING: &str = "Transferindo";
-pub const XFER_DONE: &str = "Concluída";
-pub const XFER_FAILED: &str = "Com falhas";
-pub const XFER_FAILED_BAR: &str = "Falhou: há arquivos com erro";
-pub const XFER_CANCELLED: &str = "Cancelada";
-pub const XFER_CANCELLING: &str = "Cancelando…";
-pub const XFER_CANCEL: &str = "Cancelar";
-pub const XFER_CANCEL_HINT: &str = "Cancela esta transferência e remove os arquivos temporários";
-pub const XFER_CANCEL_ALL: &str = "Cancelar todas";
-pub const XFER_CLEAR: &str = "Limpar concluídas";
-pub const XFER_ETA: &str = "falta";
+pub fn XFER_QUEUED() -> &'static str {
+    "Na fila"
+}
+pub fn XFER_SCANNING() -> &'static str {
+    "Contando"
+}
+pub fn XFER_RUNNING() -> &'static str {
+    "Transferindo"
+}
+pub fn XFER_DONE() -> &'static str {
+    "Concluída"
+}
+pub fn XFER_FAILED() -> &'static str {
+    "Com falhas"
+}
+pub fn XFER_FAILED_BAR() -> &'static str {
+    "Falhou: há arquivos com erro"
+}
+pub fn XFER_CANCELLED() -> &'static str {
+    "Cancelada"
+}
+pub fn XFER_CANCELLING() -> &'static str {
+    "Cancelando…"
+}
+pub fn XFER_CANCEL() -> &'static str {
+    "Cancelar"
+}
+pub fn XFER_CANCEL_HINT() -> &'static str {
+    "Cancela esta transferência e remove os arquivos temporários"
+}
+pub fn XFER_CANCEL_ALL() -> &'static str {
+    "Cancelar todas"
+}
+pub fn XFER_CLEAR() -> &'static str {
+    "Limpar concluídas"
+}
+pub fn XFER_ETA() -> &'static str {
+    "falta"
+}
 pub fn xfer_title(total: usize, active: usize) -> String {
     format!("Transferências ({active} ativas de {total})")
 }
@@ -159,6 +323,9 @@ pub fn transfers_warning(n: usize) -> String {
 }
 
 // Configurações
-pub const S_FILES_POLICY: &str = "Se o arquivo já existir";
-pub const S_FILES_POLICY_HELP: &str =
-    "Padrão das transferências; pode ser mudado em cada uma no painel de arquivos.";
+pub fn S_FILES_POLICY() -> &'static str {
+    "Se o arquivo já existir"
+}
+pub fn S_FILES_POLICY_HELP() -> &'static str {
+    "Padrão das transferências; pode ser mudado em cada uma no painel de arquivos."
+}

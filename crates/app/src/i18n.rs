@@ -1,4 +1,9 @@
-//! Textos de interface (pt-BR), centralizados.
+//! Textos de interface, centralizados, em inglês, pt-BR e espanhol (ver `myssh_i18n`).
+//!
+//! Textos fixos são funções em MAIÚSCULAS (`i18n::SAVE()`), herdeiras das antigas constantes:
+//! o valor depende do idioma ativo, escolhido com `tr!(pt_br, en, es)`.
+
+#![allow(non_snake_case)]
 
 use crate::shortcuts::Action;
 
@@ -11,64 +16,162 @@ pub use files::*;
 pub use m2b::*;
 pub use sync::*;
 
-pub const TITLE: &str = "mySSH";
-pub const STORE_FALLBACK: &str = "Não foi possível abrir o banco de dados local: perfis e configurações não serão salvos nesta execução.";
+pub fn TITLE() -> &'static str {
+    "mySSH"
+}
+pub fn STORE_FALLBACK() -> &'static str {
+    "Não foi possível abrir o banco de dados local: perfis e configurações não serão salvos nesta execução."
+}
 
 // Barra superior / geral
-pub const NEW_PROFILE: &str = "Novo perfil";
-pub const QUICK_CONNECT: &str = "Conexão rápida";
-pub const SETTINGS: &str = "Configurações";
-pub const CANCEL: &str = "Cancelar";
-pub const SAVE: &str = "Salvar";
-pub const SAVING: &str = "Salvando…";
-pub const CLOSE: &str = "Fechar";
-pub const CONNECT: &str = "Conectar";
-pub const OPEN: &str = "Abrir";
-pub const EDIT: &str = "Editar";
-pub const DUPLICATE: &str = "Duplicar";
-pub const DELETE: &str = "Excluir";
-pub const FAVORITE: &str = "Favoritar";
-pub const UNFAVORITE: &str = "Remover dos favoritos";
-pub const ALL: &str = "Todos";
-pub const ALL_F: &str = "Todas";
-pub const BROWSE: &str = "Escolher…";
-pub const PICK_KEY_TITLE: &str = "Escolher chave privada";
+pub fn NEW_PROFILE() -> &'static str {
+    "Novo perfil"
+}
+pub fn QUICK_CONNECT() -> &'static str {
+    "Conexão rápida"
+}
+pub fn SETTINGS() -> &'static str {
+    "Configurações"
+}
+pub fn CANCEL() -> &'static str {
+    "Cancelar"
+}
+pub fn SAVE() -> &'static str {
+    "Salvar"
+}
+pub fn SAVING() -> &'static str {
+    "Salvando…"
+}
+pub fn CLOSE() -> &'static str {
+    "Fechar"
+}
+pub fn CONNECT() -> &'static str {
+    "Conectar"
+}
+pub fn OPEN() -> &'static str {
+    "Abrir"
+}
+pub fn EDIT() -> &'static str {
+    "Editar"
+}
+pub fn DUPLICATE() -> &'static str {
+    "Duplicar"
+}
+pub fn DELETE() -> &'static str {
+    "Excluir"
+}
+pub fn FAVORITE() -> &'static str {
+    "Favoritar"
+}
+pub fn UNFAVORITE() -> &'static str {
+    "Remover dos favoritos"
+}
+pub fn ALL() -> &'static str {
+    "Todos"
+}
+pub fn ALL_F() -> &'static str {
+    "Todas"
+}
+pub fn BROWSE() -> &'static str {
+    "Escolher…"
+}
+pub fn PICK_KEY_TITLE() -> &'static str {
+    "Escolher chave privada"
+}
 
 // Ambientes
-pub const ENV_NONE: &str = "Sem ambiente";
-pub const ENV_PROD: &str = "PRODUÇÃO";
-pub const ENV_STAGING: &str = "HOMOLOGAÇÃO";
-pub const ENV_DEV: &str = "DEV";
+pub fn ENV_NONE() -> &'static str {
+    "Sem ambiente"
+}
+pub fn ENV_PROD() -> &'static str {
+    "PRODUÇÃO"
+}
+pub fn ENV_STAGING() -> &'static str {
+    "HOMOLOGAÇÃO"
+}
+pub fn ENV_DEV() -> &'static str {
+    "DEV"
+}
 
 // Sidebar
-pub const SEARCH_HINT: &str = "Buscar (nome, host, usuário, tag)";
-pub const FILTER_FAVORITES: &str = "Somente favoritos";
-pub const FILTER_CLEAR: &str = "Limpar filtros";
-pub const FILTER_ENV: &str = "Ambiente:";
-pub const FILTER_FOLDER: &str = "Pasta:";
-pub const NO_FOLDER: &str = "Sem pasta";
-pub const NO_PROFILES: &str = "Nenhum perfil ainda. Use “Novo perfil” ou “Conexão rápida”.";
-pub const NO_MATCH: &str = "Nenhum perfil corresponde aos filtros.";
+pub fn SEARCH_HINT() -> &'static str {
+    "Buscar (nome, host, usuário, tag)"
+}
+pub fn FILTER_FAVORITES() -> &'static str {
+    "Somente favoritos"
+}
+pub fn FILTER_CLEAR() -> &'static str {
+    "Limpar filtros"
+}
+pub fn FILTER_ENV() -> &'static str {
+    "Ambiente:"
+}
+pub fn FILTER_FOLDER() -> &'static str {
+    "Pasta:"
+}
+pub fn NO_FOLDER() -> &'static str {
+    "Sem pasta"
+}
+pub fn NO_PROFILES() -> &'static str {
+    "Nenhum perfil ainda. Use “Novo perfil” ou “Conexão rápida”."
+}
+pub fn NO_MATCH() -> &'static str {
+    "Nenhum perfil corresponde aos filtros."
+}
 
 // Abas
-pub const CLOSE_TAB: &str = "Fechar aba";
-pub const NO_TABS: &str = "Nenhuma aba aberta. Selecione um perfil e use “Abrir”.";
-pub const WELCOME_TITLE: &str = "Início";
-pub const WELCOME_HEADING: &str = "Bem-vindo ao mySSH";
-pub const WELCOME_BODY: &str = "Crie um perfil, ou use a conexão rápida, para abrir uma sessão.";
-pub const QUICK_NOT_SAVED: &str = "Conexão rápida: este perfil não foi salvo.";
-pub const AUTH_LABEL: &str = "Autenticação";
-pub const AUTH_SUMMARY_PASSWORD_SAVED: &str = "senha (salva no cofre)";
-pub const AUTH_SUMMARY_PASSWORD_ASK: &str = "senha (perguntar ao conectar)";
-pub const AUTH_SUMMARY_KEY: &str = "chave privada";
-pub const AUTH_SUMMARY_AGENT: &str = "agente SSH";
-pub const AUTH_SUMMARY_KI: &str = "keyboard-interactive";
+pub fn CLOSE_TAB() -> &'static str {
+    "Fechar aba"
+}
+pub fn NO_TABS() -> &'static str {
+    "Nenhuma aba aberta. Selecione um perfil e use “Abrir”."
+}
+pub fn WELCOME_TITLE() -> &'static str {
+    "Início"
+}
+pub fn WELCOME_HEADING() -> &'static str {
+    "Bem-vindo ao mySSH"
+}
+pub fn WELCOME_BODY() -> &'static str {
+    "Crie um perfil, ou use a conexão rápida, para abrir uma sessão."
+}
+pub fn QUICK_NOT_SAVED() -> &'static str {
+    "Conexão rápida: este perfil não foi salvo."
+}
+pub fn AUTH_LABEL() -> &'static str {
+    "Autenticação"
+}
+pub fn AUTH_SUMMARY_PASSWORD_SAVED() -> &'static str {
+    "senha (salva no cofre)"
+}
+pub fn AUTH_SUMMARY_PASSWORD_ASK() -> &'static str {
+    "senha (perguntar ao conectar)"
+}
+pub fn AUTH_SUMMARY_KEY() -> &'static str {
+    "chave privada"
+}
+pub fn AUTH_SUMMARY_AGENT() -> &'static str {
+    "agente SSH"
+}
+pub fn AUTH_SUMMARY_KI() -> &'static str {
+    "keyboard-interactive"
+}
 
-pub const CLOSE_TAB_TITLE: &str = "Fechar aba com sessão ativa?";
-pub const CLOSE_TAB_CONFIRM: &str = "Fechar aba";
-pub const QUIT_TITLE: &str = "Sair do mySSH?";
-pub const QUIT_BODY: &str = "Há abas com sessão ativa. Sair encerra todas elas.";
-pub const QUIT_CONFIRM: &str = "Sair";
+pub fn CLOSE_TAB_TITLE() -> &'static str {
+    "Fechar aba com sessão ativa?"
+}
+pub fn CLOSE_TAB_CONFIRM() -> &'static str {
+    "Fechar aba"
+}
+pub fn QUIT_TITLE() -> &'static str {
+    "Sair do mySSH?"
+}
+pub fn QUIT_BODY() -> &'static str {
+    "Há abas com sessão ativa. Sair encerra todas elas."
+}
+pub fn QUIT_CONFIRM() -> &'static str {
+    "Sair"
+}
 
 pub fn close_tab_body(title: &str) -> String {
     format!("A sessão em “{title}” está ativa. Fechar a aba encerra a sessão.")
@@ -89,45 +192,118 @@ pub fn shortcut_name(a: Action) -> &'static str {
 }
 
 // Diálogo de perfil
-pub const NEW_PROFILE_TITLE: &str = "Novo perfil";
-pub const EDIT_PROFILE_TITLE: &str = "Editar perfil";
-pub const F_NAME: &str = "Nome";
-pub const F_HOST: &str = "Host";
-pub const F_PORT: &str = "Porta";
-pub const F_USER: &str = "Usuário";
-pub const F_AUTH: &str = "Autenticação";
-pub const AUTH_PASSWORD: &str = "Senha";
-pub const AUTH_KEY: &str = "Chave";
-pub const AUTH_AGENT: &str = "Agente";
-pub const AUTH_KI: &str = "Keyboard-interactive";
-pub const PW_ASK: &str = "Perguntar sempre (não salvar)";
-pub const PW_SAVE: &str = "Salvar no cofre do sistema";
-pub const F_PASSWORD: &str = "Senha";
-pub const KEEP_SAVED: &str = "em branco = manter a senha salva";
-pub const F_KEY_PATH: &str = "Arquivo da chave";
-pub const F_PASSPHRASE: &str = "Passphrase";
-pub const PP_ASK: &str = "Perguntar quando necessário";
-pub const PP_SAVE: &str = "Salvar no cofre do sistema";
-pub const AGENT_HELP: &str = "Usa as chaves do agente SSH local (SSH_AUTH_SOCK / Pageant).";
-pub const KI_HELP: &str = "Respostas (MFA/OTP) são pedidas na conexão e nunca salvas.";
-pub const F_FOLDER: &str = "Pasta";
-pub const OR_NEW_FOLDER: &str = "ou nova:";
-pub const F_TAGS: &str = "Tags";
-pub const TAGS_HINT: &str = "separadas por vírgula";
-pub const F_ENV: &str = "Ambiente";
-pub const F_FAVORITE: &str = "Favorito";
-pub const F_JUMP: &str = "Jump host";
-pub const NO_JUMP: &str = "(nenhum)";
-pub const F_KEEPALIVE: &str = "Keepalive (s)";
-pub const KEEPALIVE_OFF: &str = "vazio = desligado";
-pub const F_TIMEOUT: &str = "Timeout (s)";
+pub fn NEW_PROFILE_TITLE() -> &'static str {
+    "Novo perfil"
+}
+pub fn EDIT_PROFILE_TITLE() -> &'static str {
+    "Editar perfil"
+}
+pub fn F_NAME() -> &'static str {
+    "Nome"
+}
+pub fn F_HOST() -> &'static str {
+    "Host"
+}
+pub fn F_PORT() -> &'static str {
+    "Porta"
+}
+pub fn F_USER() -> &'static str {
+    "Usuário"
+}
+pub fn F_AUTH() -> &'static str {
+    "Autenticação"
+}
+pub fn AUTH_PASSWORD() -> &'static str {
+    "Senha"
+}
+pub fn AUTH_KEY() -> &'static str {
+    "Chave"
+}
+pub fn AUTH_AGENT() -> &'static str {
+    "Agente"
+}
+pub fn AUTH_KI() -> &'static str {
+    "Keyboard-interactive"
+}
+pub fn PW_ASK() -> &'static str {
+    "Perguntar sempre (não salvar)"
+}
+pub fn PW_SAVE() -> &'static str {
+    "Salvar no cofre do sistema"
+}
+pub fn F_PASSWORD() -> &'static str {
+    "Senha"
+}
+pub fn KEEP_SAVED() -> &'static str {
+    "em branco = manter a senha salva"
+}
+pub fn F_KEY_PATH() -> &'static str {
+    "Arquivo da chave"
+}
+pub fn F_PASSPHRASE() -> &'static str {
+    "Passphrase"
+}
+pub fn PP_ASK() -> &'static str {
+    "Perguntar quando necessário"
+}
+pub fn PP_SAVE() -> &'static str {
+    "Salvar no cofre do sistema"
+}
+pub fn AGENT_HELP() -> &'static str {
+    "Usa as chaves do agente SSH local (SSH_AUTH_SOCK / Pageant)."
+}
+pub fn KI_HELP() -> &'static str {
+    "Respostas (MFA/OTP) são pedidas na conexão e nunca salvas."
+}
+pub fn F_FOLDER() -> &'static str {
+    "Pasta"
+}
+pub fn OR_NEW_FOLDER() -> &'static str {
+    "ou nova:"
+}
+pub fn F_TAGS() -> &'static str {
+    "Tags"
+}
+pub fn TAGS_HINT() -> &'static str {
+    "separadas por vírgula"
+}
+pub fn F_ENV() -> &'static str {
+    "Ambiente"
+}
+pub fn F_FAVORITE() -> &'static str {
+    "Favorito"
+}
+pub fn F_JUMP() -> &'static str {
+    "Jump host"
+}
+pub fn NO_JUMP() -> &'static str {
+    "(nenhum)"
+}
+pub fn F_KEEPALIVE() -> &'static str {
+    "Keepalive (s)"
+}
+pub fn KEEPALIVE_OFF() -> &'static str {
+    "vazio = desligado"
+}
+pub fn F_TIMEOUT() -> &'static str {
+    "Timeout (s)"
+}
 
-pub const ERR_PORT: &str = "Porta inválida (1 a 65535).";
-pub const ERR_KEEPALIVE: &str = "Keepalive inválido: use um número de segundos ou deixe vazio.";
-pub const ERR_TIMEOUT: &str = "Timeout inválido: use um número de segundos maior que zero.";
-pub const ERR_KEY_PATH: &str = "Informe o arquivo da chave privada.";
-pub const ERR_SECRET_REQUIRED: &str =
-    "Digite o segredo para salvá-lo no cofre, ou escolha “perguntar”.";
+pub fn ERR_PORT() -> &'static str {
+    "Porta inválida (1 a 65535)."
+}
+pub fn ERR_KEEPALIVE() -> &'static str {
+    "Keepalive inválido: use um número de segundos ou deixe vazio."
+}
+pub fn ERR_TIMEOUT() -> &'static str {
+    "Timeout inválido: use um número de segundos maior que zero."
+}
+pub fn ERR_KEY_PATH() -> &'static str {
+    "Informe o arquivo da chave privada."
+}
+pub fn ERR_SECRET_REQUIRED() -> &'static str {
+    "Digite o segredo para salvá-lo no cofre, ou escolha “perguntar”."
+}
 
 pub fn cred_label_password(profile: &str) -> String {
     format!("Senha de {profile}")
@@ -145,8 +321,12 @@ pub fn profile_deleted(name: &str) -> String {
     format!("Perfil “{name}” excluído.")
 }
 
-pub const COPY_SUFFIX: &str = "(cópia)";
-pub const DELETE_TITLE: &str = "Excluir perfil?";
+pub fn COPY_SUFFIX() -> &'static str {
+    "(cópia)"
+}
+pub fn DELETE_TITLE() -> &'static str {
+    "Excluir perfil?"
+}
 pub fn delete_body(name: &str) -> String {
     format!(
         "O perfil “{name}” será excluído. A senha/passphrase salva é removida do cofre se nenhum outro perfil a usa."
@@ -154,84 +334,214 @@ pub fn delete_body(name: &str) -> String {
 }
 
 // Cofre
-pub const KEYRING_UNAVAILABLE: &str =
-    "Cofre do sistema indisponível: não é possível salvar senhas com segurança.";
-pub const KEYRING_LOCKED: &str = "cofre do sistema bloqueado ou acesso negado";
-pub const USE_SESSION_ONLY: &str = "Usar só nesta sessão";
-pub const SESSION_ONLY_HELP: &str = "Você pode guardar o segredo só em memória: ele some ao fechar o app e nunca é gravado em disco.";
-pub const SESSION_VAULT_ON: &str = "Cofre em memória ativado: segredos valem apenas nesta sessão.";
-pub const VAULT_LOCKED_BADGE: &str = "🔒 Cofre bloqueado";
-pub const VAULT_SESSION_BADGE: &str = "Cofre: só nesta sessão";
-pub const UNLOCK_VAULT: &str = "Desbloquear cofre";
-pub const VAULT_UNLOCKED: &str = "Cofre desbloqueado.";
-pub const VAULT_LOCKED_NOTICE: &str = "Cofre bloqueado.";
-pub const ERR_VAULT_UNAVAILABLE: &str = "O cofre do sistema está indisponível.";
-pub const ERR_VAULT_LOCKED: &str = "O cofre está bloqueado. Desbloqueie para salvar o segredo.";
-pub const ERR_SECRET_NOT_FOUND: &str = "Segredo não encontrado no cofre.";
-pub const ERR_SECRET_TOO_LONG: &str = "Segredo grande demais para o cofre do sistema.";
-pub const ERR_VAULT_BACKEND: &str = "Falha no cofre do sistema.";
+pub fn KEYRING_UNAVAILABLE() -> &'static str {
+    "Cofre do sistema indisponível: não é possível salvar senhas com segurança."
+}
+pub fn KEYRING_LOCKED() -> &'static str {
+    "cofre do sistema bloqueado ou acesso negado"
+}
+pub fn USE_SESSION_ONLY() -> &'static str {
+    "Usar só nesta sessão"
+}
+pub fn SESSION_ONLY_HELP() -> &'static str {
+    "Você pode guardar o segredo só em memória: ele some ao fechar o app e nunca é gravado em disco."
+}
+pub fn SESSION_VAULT_ON() -> &'static str {
+    "Cofre em memória ativado: segredos valem apenas nesta sessão."
+}
+pub fn VAULT_LOCKED_BADGE() -> &'static str {
+    "🔒 Cofre bloqueado"
+}
+pub fn VAULT_SESSION_BADGE() -> &'static str {
+    "Cofre: só nesta sessão"
+}
+pub fn UNLOCK_VAULT() -> &'static str {
+    "Desbloquear cofre"
+}
+pub fn VAULT_UNLOCKED() -> &'static str {
+    "Cofre desbloqueado."
+}
+pub fn VAULT_LOCKED_NOTICE() -> &'static str {
+    "Cofre bloqueado."
+}
+pub fn ERR_VAULT_UNAVAILABLE() -> &'static str {
+    "O cofre do sistema está indisponível."
+}
+pub fn ERR_VAULT_LOCKED() -> &'static str {
+    "O cofre está bloqueado. Desbloqueie para salvar o segredo."
+}
+pub fn ERR_SECRET_NOT_FOUND() -> &'static str {
+    "Segredo não encontrado no cofre."
+}
+pub fn ERR_SECRET_TOO_LONG() -> &'static str {
+    "Segredo grande demais para o cofre do sistema."
+}
+pub fn ERR_VAULT_BACKEND() -> &'static str {
+    "Falha no cofre do sistema."
+}
 
 // Conexão rápida
-pub const QUICK_TITLE: &str = "Conexão rápida";
-pub const QUICK_HELP: &str = "Formato: usuário@host[:porta]";
-pub const QUICK_HINT: &str = "ex.: deploy@servidor.exemplo.com:2222";
-pub const QUICK_NOTE: &str = "O perfil não é salvo. A senha, se houver, é pedida ao conectar.";
-pub const QUICK_ERR_EMPTY: &str = "Digite usuário@host[:porta].";
-pub const QUICK_ERR_USER: &str = "Informe o usuário antes do @ (usuário@host).";
-pub const QUICK_ERR_HOST: &str = "Host inválido.";
+pub fn QUICK_TITLE() -> &'static str {
+    "Conexão rápida"
+}
+pub fn QUICK_HELP() -> &'static str {
+    "Formato: usuário@host[:porta]"
+}
+pub fn QUICK_HINT() -> &'static str {
+    "ex.: deploy@servidor.exemplo.com:2222"
+}
+pub fn QUICK_NOTE() -> &'static str {
+    "O perfil não é salvo. A senha, se houver, é pedida ao conectar."
+}
+pub fn QUICK_ERR_EMPTY() -> &'static str {
+    "Digite usuário@host[:porta]."
+}
+pub fn QUICK_ERR_USER() -> &'static str {
+    "Informe o usuário antes do @ (usuário@host)."
+}
+pub fn QUICK_ERR_HOST() -> &'static str {
+    "Host inválido."
+}
 
 // Configurações
-pub const SETTINGS_TITLE: &str = "Configurações";
-pub const S_THEME: &str = "Tema";
-pub const THEME_SYSTEM: &str = "Sistema";
-pub const THEME_LIGHT: &str = "Claro";
-pub const THEME_DARK: &str = "Escuro";
-pub const S_FONT: &str = "Fonte do terminal";
-pub const FONT_SAMPLE: &str = "user@host:~$ ls -la  áéíõç";
-pub const S_PASTE: &str = "Colagem";
-pub const S_PASTE_HELP: &str = "Confirmar colagem com várias linhas";
-pub const S_PROD: &str = "Produção";
-pub const S_PROD_HELP: &str = "Mostrar faixa e borda vermelhas em abas de produção";
-pub const S_VAULT_TIMEOUT: &str = "Bloquear cofre após";
-pub const S_VAULT_TIMEOUT_HELP: &str = "de inatividade (0 = nunca)";
-pub const S_VAULT: &str = "Cofre de segredos";
-pub const S_VAULT_SESSION_ONLY: &str = "Cofre em memória: senhas salvas valem só até fechar o app.";
-pub const LOCK_NOW: &str = "Bloquear cofre agora";
-pub const LOCK_NOW_HELP: &str = "Bloquear o cofre não encerra sessões abertas: ele só impede ler senhas e passphrases salvas em novas conexões até ser desbloqueado.";
+pub fn SETTINGS_TITLE() -> &'static str {
+    "Configurações"
+}
+pub fn S_THEME() -> &'static str {
+    "Tema"
+}
+pub fn THEME_SYSTEM() -> &'static str {
+    "Sistema"
+}
+pub fn THEME_LIGHT() -> &'static str {
+    "Claro"
+}
+pub fn THEME_DARK() -> &'static str {
+    "Escuro"
+}
+pub fn S_FONT() -> &'static str {
+    "Fonte do terminal"
+}
+pub fn FONT_SAMPLE() -> &'static str {
+    "user@host:~$ ls -la  áéíõç"
+}
+pub fn S_PASTE() -> &'static str {
+    "Colagem"
+}
+pub fn S_PASTE_HELP() -> &'static str {
+    "Confirmar colagem com várias linhas"
+}
+pub fn S_PROD() -> &'static str {
+    "Produção"
+}
+pub fn S_PROD_HELP() -> &'static str {
+    "Mostrar faixa e borda vermelhas em abas de produção"
+}
+pub fn S_VAULT_TIMEOUT() -> &'static str {
+    "Bloquear cofre após"
+}
+pub fn S_VAULT_TIMEOUT_HELP() -> &'static str {
+    "de inatividade (0 = nunca)"
+}
+pub fn S_VAULT() -> &'static str {
+    "Cofre de segredos"
+}
+pub fn S_VAULT_SESSION_ONLY() -> &'static str {
+    "Cofre em memória: senhas salvas valem só até fechar o app."
+}
+pub fn LOCK_NOW() -> &'static str {
+    "Bloquear cofre agora"
+}
+pub fn LOCK_NOW_HELP() -> &'static str {
+    "Bloquear o cofre não encerra sessões abertas: ele só impede ler senhas e passphrases salvas em novas conexões até ser desbloqueado."
+}
 
 // Aba de terminal: estados
-pub const ST_IDLE: &str = "Não conectado";
-pub const ST_PREPARING: &str = "Preparando";
-pub const ST_NEEDS_INPUT: &str = "Aguardando credenciais";
-pub const ST_CONNECTING: &str = "Conectando";
-pub const ST_AWAITING_TRUST: &str = "Aguardando confiança";
-pub const ST_AUTHENTICATING: &str = "Autenticando";
-pub const ST_CONNECTED: &str = "Conectado";
-pub const ST_DISCONNECTED: &str = "Desconectado";
-pub const ST_ERROR: &str = "Erro";
-pub const ST_BLOCKED: &str = "Bloqueado";
+pub fn ST_IDLE() -> &'static str {
+    "Não conectado"
+}
+pub fn ST_PREPARING() -> &'static str {
+    "Preparando"
+}
+pub fn ST_NEEDS_INPUT() -> &'static str {
+    "Aguardando credenciais"
+}
+pub fn ST_CONNECTING() -> &'static str {
+    "Conectando"
+}
+pub fn ST_AWAITING_TRUST() -> &'static str {
+    "Aguardando confiança"
+}
+pub fn ST_AUTHENTICATING() -> &'static str {
+    "Autenticando"
+}
+pub fn ST_CONNECTED() -> &'static str {
+    "Conectado"
+}
+pub fn ST_DISCONNECTED() -> &'static str {
+    "Desconectado"
+}
+pub fn ST_ERROR() -> &'static str {
+    "Erro"
+}
+pub fn ST_BLOCKED() -> &'static str {
+    "Bloqueado"
+}
 
 // Aba de terminal: ações
-pub const TAB_CONNECT: &str = "Conectar";
-pub const TAB_DISCONNECT: &str = "Desconectar";
-pub const TAB_RECONNECT: &str = "Reconectar";
-pub const TAB_RETRY: &str = "Tentar novamente";
-pub const TAB_PREPARING: &str = "Preparando a conexão…";
-pub const TAB_WAITING_INPUT: &str = "Aguardando você informar as credenciais…";
-pub const TAB_NOT_CONNECTED: &str = "Esta aba não está conectada.";
-pub const TAB_SESSION_ENDED: &str = "A sessão foi encerrada.";
-pub const TAB_CANCELLED: &str = "Conexão cancelada.";
-pub const JUMP_LABEL: &str = "Jump host";
+pub fn TAB_CONNECT() -> &'static str {
+    "Conectar"
+}
+pub fn TAB_DISCONNECT() -> &'static str {
+    "Desconectar"
+}
+pub fn TAB_RECONNECT() -> &'static str {
+    "Reconectar"
+}
+pub fn TAB_RETRY() -> &'static str {
+    "Tentar novamente"
+}
+pub fn TAB_PREPARING() -> &'static str {
+    "Preparando a conexão…"
+}
+pub fn TAB_WAITING_INPUT() -> &'static str {
+    "Aguardando você informar as credenciais…"
+}
+pub fn TAB_NOT_CONNECTED() -> &'static str {
+    "Esta aba não está conectada."
+}
+pub fn TAB_SESSION_ENDED() -> &'static str {
+    "A sessão foi encerrada."
+}
+pub fn TAB_CANCELLED() -> &'static str {
+    "Conexão cancelada."
+}
+pub fn JUMP_LABEL() -> &'static str {
+    "Jump host"
+}
 
 // Erros / avisos da aba
-pub const ERR_AUTH_PASSWORD: &str =
-    "Autenticação recusada: senha incorreta ou usuário sem acesso a este servidor.";
-pub const ERR_AUTH_KEY: &str = "Autenticação recusada: o servidor não aceitou esta chave.";
-pub const ERR_INTERNAL: &str = "Falha interna ao preparar a conexão.";
-pub const NOTE_CRED_MISSING: &str = "A credencial salva deste perfil não foi encontrada.";
-pub const NOTE_SECRET_MISSING: &str = "A senha salva não está mais no cofre.";
-pub const NOTE_VAULT_UNAVAILABLE: &str = "O cofre do sistema está indisponível.";
-pub const SAVED_TO_VAULT: &str = "Segredo salvo no cofre.";
+pub fn ERR_AUTH_PASSWORD() -> &'static str {
+    "Autenticação recusada: senha incorreta ou usuário sem acesso a este servidor."
+}
+pub fn ERR_AUTH_KEY() -> &'static str {
+    "Autenticação recusada: o servidor não aceitou esta chave."
+}
+pub fn ERR_INTERNAL() -> &'static str {
+    "Falha interna ao preparar a conexão."
+}
+pub fn NOTE_CRED_MISSING() -> &'static str {
+    "A credencial salva deste perfil não foi encontrada."
+}
+pub fn NOTE_SECRET_MISSING() -> &'static str {
+    "A senha salva não está mais no cofre."
+}
+pub fn NOTE_VAULT_UNAVAILABLE() -> &'static str {
+    "O cofre do sistema está indisponível."
+}
+pub fn SAVED_TO_VAULT() -> &'static str {
+    "Segredo salvo no cofre."
+}
 pub fn save_failed(why: &str) -> String {
     format!("Não foi possível salvar no cofre: {why}")
 }
@@ -243,71 +553,149 @@ pub fn ask_password_title(user: &str, host: &str) -> String {
 pub fn ask_passphrase_title(file: &str) -> String {
     format!("Passphrase da chave “{file}”")
 }
-pub const ASK_PASSWORD_HINT: &str = "Senha";
-pub const ASK_PASSPHRASE_HINT: &str = "Passphrase";
-pub const ASK_SAVE: &str = "Salvar no cofre do sistema";
-pub const ASK_SAVE_HELP: &str = "Não marque em computadores compartilhados.";
+pub fn ASK_PASSWORD_HINT() -> &'static str {
+    "Senha"
+}
+pub fn ASK_PASSPHRASE_HINT() -> &'static str {
+    "Passphrase"
+}
+pub fn ASK_SAVE() -> &'static str {
+    "Salvar no cofre do sistema"
+}
+pub fn ASK_SAVE_HELP() -> &'static str {
+    "Não marque em computadores compartilhados."
+}
 
 // Cofre bloqueado
-pub const VAULT_LOCKED_TITLE: &str = "Cofre bloqueado";
-pub const VAULT_LOCKED_BODY: &str = "A senha ou passphrase deste perfil está salva no cofre, que está bloqueado. Desbloqueie o cofre ou digite o segredo agora (sem salvar).";
-pub const VAULT_UNLOCKING: &str = "Desbloqueando…";
-pub const TYPE_NOW: &str = "Digitar agora";
+pub fn VAULT_LOCKED_TITLE() -> &'static str {
+    "Cofre bloqueado"
+}
+pub fn VAULT_LOCKED_BODY() -> &'static str {
+    "A senha ou passphrase deste perfil está salva no cofre, que está bloqueado. Desbloqueie o cofre ou digite o segredo agora (sem salvar)."
+}
+pub fn VAULT_UNLOCKING() -> &'static str {
+    "Desbloqueando…"
+}
+pub fn TYPE_NOW() -> &'static str {
+    "Digitar agora"
+}
 
 // Host key desconhecida
-pub const HK_TITLE: &str = "Servidor desconhecido";
-pub const HK_BODY: &str = "É a primeira vez que você se conecta a este servidor. Confirme a impressão digital abaixo por um canal confiável (com o administrador, no console do provedor ou em documentação oficial) antes de aceitar. Se não for possível confirmar, rejeite.";
-pub const HK_HOST: &str = "Servidor";
-pub const HK_ALGO: &str = "Algoritmo";
-pub const HK_FINGERPRINT: &str = "Impressão digital (SHA-256)";
-pub const HK_REJECT: &str = "Rejeitar";
-pub const HK_ACCEPT_ONCE: &str = "Aceitar uma vez";
-pub const HK_ACCEPT_SAVE: &str = "Aceitar e salvar";
+pub fn HK_TITLE() -> &'static str {
+    "Servidor desconhecido"
+}
+pub fn HK_BODY() -> &'static str {
+    "É a primeira vez que você se conecta a este servidor. Confirme a impressão digital abaixo por um canal confiável (com o administrador, no console do provedor ou em documentação oficial) antes de aceitar. Se não for possível confirmar, rejeite."
+}
+pub fn HK_HOST() -> &'static str {
+    "Servidor"
+}
+pub fn HK_ALGO() -> &'static str {
+    "Algoritmo"
+}
+pub fn HK_FINGERPRINT() -> &'static str {
+    "Impressão digital (SHA-256)"
+}
+pub fn HK_REJECT() -> &'static str {
+    "Rejeitar"
+}
+pub fn HK_ACCEPT_ONCE() -> &'static str {
+    "Aceitar uma vez"
+}
+pub fn HK_ACCEPT_SAVE() -> &'static str {
+    "Aceitar e salvar"
+}
 
 // Host key alterada
-pub const HKC_TITLE: &str = "ALERTA: a chave do servidor mudou";
-pub const HKC_BODY: &str = "A chave apresentada agora é diferente da que você confiou antes. Isso pode indicar um ataque de interceptação (MITM), em que alguém se passa pelo servidor para roubar senhas e dados. Por segurança a conexão foi bloqueada e nada foi enviado. Se o servidor foi reinstalado ou trocou de chave de forma legítima, confirme com o administrador por um canal confiável antes de esquecer a chave antiga.";
-pub const HKC_PRESENTED: &str = "Chave apresentada agora";
-pub const HKC_KNOWN: &str = "Chave(s) confiável(is) conhecida(s)";
-pub const HKC_REVOKED: &str = "Esta chave foi revogada anteriormente por você.";
-pub const HKC_OPEN_TRUSTED: &str = "Abrir hosts confiáveis";
-pub const HKC_HINT: &str = "Depois de esquecer a chave antiga em Configurações, uma nova conexão pedirá confirmação como servidor desconhecido.";
+pub fn HKC_TITLE() -> &'static str {
+    "ALERTA: a chave do servidor mudou"
+}
+pub fn HKC_BODY() -> &'static str {
+    "A chave apresentada agora é diferente da que você confiou antes. Isso pode indicar um ataque de interceptação (MITM), em que alguém se passa pelo servidor para roubar senhas e dados. Por segurança a conexão foi bloqueada e nada foi enviado. Se o servidor foi reinstalado ou trocou de chave de forma legítima, confirme com o administrador por um canal confiável antes de esquecer a chave antiga."
+}
+pub fn HKC_PRESENTED() -> &'static str {
+    "Chave apresentada agora"
+}
+pub fn HKC_KNOWN() -> &'static str {
+    "Chave(s) confiável(is) conhecida(s)"
+}
+pub fn HKC_REVOKED() -> &'static str {
+    "Esta chave foi revogada anteriormente por você."
+}
+pub fn HKC_OPEN_TRUSTED() -> &'static str {
+    "Abrir hosts confiáveis"
+}
+pub fn HKC_HINT() -> &'static str {
+    "Depois de esquecer a chave antiga em Configurações, uma nova conexão pedirá confirmação como servidor desconhecido."
+}
 
 // Colagem
-pub const PASTE_TITLE: &str = "Colar várias linhas?";
-pub const PASTE_BODY: &str =
-    "O texto abaixo tem várias linhas e cada uma pode ser executada como comando.";
-pub const PASTE_CONFIRM: &str = "Colar";
+pub fn PASTE_TITLE() -> &'static str {
+    "Colar várias linhas?"
+}
+pub fn PASTE_BODY() -> &'static str {
+    "O texto abaixo tem várias linhas e cada uma pode ser executada como comando."
+}
+pub fn PASTE_CONFIRM() -> &'static str {
+    "Colar"
+}
 pub fn paste_lines(n: usize) -> String {
     format!("{n} linhas")
 }
 
 // Hosts confiáveis (Configurações)
-pub const S_TRUSTED: &str = "Hosts confiáveis";
-pub const TRUSTED_EMPTY: &str = "Nenhum host confiável salvo.";
-pub const TRUSTED_FORGET: &str = "Esquecer";
-pub const TRUSTED_HELP: &str = "Chaves aceitas com “Aceitar e salvar”. Esquecer remove a chave: a próxima conexão pedirá confirmação de novo.";
-pub const FORGET_TITLE: &str = "Esquecer este host?";
+pub fn S_TRUSTED() -> &'static str {
+    "Hosts confiáveis"
+}
+pub fn TRUSTED_EMPTY() -> &'static str {
+    "Nenhum host confiável salvo."
+}
+pub fn TRUSTED_FORGET() -> &'static str {
+    "Esquecer"
+}
+pub fn TRUSTED_HELP() -> &'static str {
+    "Chaves aceitas com “Aceitar e salvar”. Esquecer remove a chave: a próxima conexão pedirá confirmação de novo."
+}
+pub fn FORGET_TITLE() -> &'static str {
+    "Esquecer este host?"
+}
 pub fn forget_body(host: &str, port: u16) -> String {
     format!(
         "A chave confiável de {host}:{port} será removida. Na próxima conexão você precisará confirmar a impressão digital novamente."
     )
 }
-pub const FORGET_CONFIRM: &str = "Esquecer";
-pub const TRUSTED_ERR: &str = "Não foi possível ler ou alterar os hosts confiáveis.";
+pub fn FORGET_CONFIRM() -> &'static str {
+    "Esquecer"
+}
+pub fn TRUSTED_ERR() -> &'static str {
+    "Não foi possível ler ou alterar os hosts confiáveis."
+}
 
 // M2-A: jump host, keyboard-interactive/MFA, reconexão
-pub const ERR_JUMP_LOOP: &str =
-    "A cadeia de jump hosts tem um ciclo: um perfil aparece duas vezes.";
-pub const ERR_JUMP_MISSING: &str =
-    "O jump host deste perfil não existe mais. Edite o perfil e escolha outro.";
-pub const KI_TITLE: &str = "Autenticação adicional";
-pub const KI_DEFAULT_INSTRUCTIONS: &str =
-    "O servidor pede informações adicionais para concluir o login.";
-pub const KI_SEND: &str = "Enviar";
-pub const KI_ECHO_HINT: &str = "Resposta";
-pub const RECONNECTED_SEPARATOR: &str = "— reconectado —";
-pub const HK_VIA: &str = "Caminho";
+pub fn ERR_JUMP_LOOP() -> &'static str {
+    "A cadeia de jump hosts tem um ciclo: um perfil aparece duas vezes."
+}
+pub fn ERR_JUMP_MISSING() -> &'static str {
+    "O jump host deste perfil não existe mais. Edite o perfil e escolha outro."
+}
+pub fn KI_TITLE() -> &'static str {
+    "Autenticação adicional"
+}
+pub fn KI_DEFAULT_INSTRUCTIONS() -> &'static str {
+    "O servidor pede informações adicionais para concluir o login."
+}
+pub fn KI_SEND() -> &'static str {
+    "Enviar"
+}
+pub fn KI_ECHO_HINT() -> &'static str {
+    "Resposta"
+}
+pub fn RECONNECTED_SEPARATOR() -> &'static str {
+    "— reconectado —"
+}
+pub fn HK_VIA() -> &'static str {
+    "Caminho"
+}
 pub fn hk_via_jump(n: usize, total: usize, name: &str) -> String {
     format!("Salto {n} de {total}: {name}")
 }

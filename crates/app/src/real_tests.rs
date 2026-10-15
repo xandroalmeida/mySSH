@@ -349,7 +349,7 @@ fn jump_host_recusado_indica_o_salto_no_erro() {
     let mut h = harness(app);
     // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro do salto", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     assert!(h.state().tabs[1].body.is_closed());
     // O erro vem do salto 1 (e não de uma conexão direta ao destino ignorando o salto).
@@ -376,7 +376,7 @@ fn keyboard_interactive_sem_servidor_vai_ate_a_rede() {
     let mut h = harness(app);
     // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro de rede", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     assert!(screen_or_error(h.state(), 1).contains("recusada"));
 }
@@ -410,11 +410,11 @@ fn cofre_bloqueado_pede_desbloqueio_e_depois_conecta() {
     wait(&mut h, "modal do cofre", 10, |a| {
         a.tabs[1].body.needs_modal()
     });
-    h.get_by_label(i18n::VAULT_LOCKED_TITLE);
-    click(&mut h, i18n::UNLOCK_VAULT);
+    h.get_by_label(i18n::VAULT_LOCKED_TITLE());
+    click(&mut h, i18n::UNLOCK_VAULT());
     // O estado "erro" chega antes do evento `Closed` com a mensagem: espera os dois.
     wait(&mut h, "erro de conexão", 10, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("Conexão recusada");
     assert!(!h.state().vault.is_locked());
@@ -461,21 +461,21 @@ fn real_senha_perguntar_host_desconhecido_comando_e_reconectar() {
         .value()
         .unwrap_or_default();
     assert_no_secrets("valor acessível do campo de senha", &node_value);
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
 
     // 2. host desconhecido: modal com fingerprint; "Aceitar e salvar"
     wait(&mut h, "host key desconhecida", 15, |a| {
-        status(a, 1) == i18n::ST_AWAITING_TRUST && a.tabs[1].body.needs_modal()
+        status(a, 1) == i18n::ST_AWAITING_TRUST() && a.tabs[1].body.needs_modal()
     });
-    h.get_by_label(i18n::HK_FINGERPRINT);
+    h.get_by_label(i18n::HK_FINGERPRINT());
     h.get_by_label_contains("SHA256:");
     // Rejeitar/aceitar existem; "Rejeitar" é o foco inicial
-    assert!(h.get_by_label(i18n::HK_REJECT).is_focused());
-    click(&mut h, i18n::HK_ACCEPT_SAVE);
+    assert!(h.get_by_label(i18n::HK_REJECT()).is_focused());
+    click(&mut h, i18n::HK_ACCEPT_SAVE());
 
     // 3. conectado, prompt no terminal, comando
     wait(&mut h, "conectado", 15, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     wait(&mut h, "prompt do shell", 15, |a| {
         !screen(a, 1).trim().is_empty()
@@ -485,27 +485,27 @@ fn real_senha_perguntar_host_desconhecido_comando_e_reconectar() {
     wait(&mut h, "saída ok-2", 15, |a| screen(a, 1).contains("ok-2"));
 
     // 4. desconectar e reconectar (mesmo terminal: scrollback mantido + separador, sem reenviar nada)
-    click(&mut h, i18n::TAB_DISCONNECT);
+    click(&mut h, i18n::TAB_DISCONNECT());
     wait(&mut h, "desconectado", 15, |a| {
-        status(a, 1) == i18n::ST_DISCONNECTED
+        status(a, 1) == i18n::ST_DISCONNECTED()
     });
     assert!(h.state().tabs[1].body.is_closed());
     ready();
-    click(&mut h, i18n::TAB_RECONNECT);
+    click(&mut h, i18n::TAB_RECONNECT());
     wait(&mut h, "novo pedido de senha", 10, |a| {
         a.tabs[1].body.needs_modal()
     });
     type_password(&mut h, "tester-pass");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(
         &mut h,
         "reconectado (host já confiável, sem modal)",
         15,
-        |a| status(a, 1) == i18n::ST_CONNECTED,
+        |a| status(a, 1) == i18n::ST_CONNECTED(),
     );
     wait(&mut h, "prompt", 15, |a| !screen(a, 1).trim().is_empty());
     assert!(
-        screen(h.state(), 1).contains(i18n::RECONNECTED_SEPARATOR),
+        screen(h.state(), 1).contains(i18n::RECONNECTED_SEPARATOR()),
         "separador de reconexão: {}",
         screen(h.state(), 1)
     );
@@ -558,13 +558,13 @@ fn real_host_key_alterada_bloqueia_e_esquecer_volta_ao_fluxo_desconhecido() {
     let mut h = harness(app);
 
     wait(&mut h, "bloqueio por chave alterada", 15, |a| {
-        status(a, 1) == i18n::ST_BLOCKED
+        status(a, 1) == i18n::ST_BLOCKED()
     });
     h.get_by_label_contains("ALERTA");
     h.get_by_label_contains("SHA256:CHAVE-FALSA-CONHECIDA");
-    h.get_by_label(i18n::HKC_OPEN_TRUSTED);
+    h.get_by_label(i18n::HKC_OPEN_TRUSTED());
     // nenhuma forma de aceitar no fluxo da aba
-    for l in [i18n::HK_ACCEPT_ONCE, i18n::HK_ACCEPT_SAVE] {
+    for l in [i18n::HK_ACCEPT_ONCE(), i18n::HK_ACCEPT_SAVE()] {
         assert!(h.query_by_label(l).is_none(), "{l} não pode existir aqui");
     }
     assert!(!h.state().tabs[1].body.needs_modal());
@@ -573,7 +573,7 @@ fn real_host_key_alterada_bloqueia_e_esquecer_volta_ao_fluxo_desconhecido() {
     assert_eq!(h.state().store.list().unwrap()[0].1, fake);
 
     // abre os hosts confiáveis e esquece (com confirmação)
-    click(&mut h, i18n::HKC_OPEN_TRUSTED);
+    click(&mut h, i18n::HKC_OPEN_TRUSTED());
     assert!(matches!(h.state().dialog, Dialog::Settings));
     assert!(
         h.query_all_by_label_contains("SHA256:CHAVE-FALSA-CONHECIDA")
@@ -582,27 +582,27 @@ fn real_host_key_alterada_bloqueia_e_esquecer_volta_ao_fluxo_desconhecido() {
     );
     // a rolagem até a seção é animada: deixa assentar antes de clicar
     h.run_steps(30);
-    click(&mut h, i18n::TRUSTED_FORGET);
+    click(&mut h, i18n::TRUSTED_FORGET());
     assert!(matches!(h.state().dialog, Dialog::ConfirmForget(_)));
     assert_eq!(
         h.state().store.list().unwrap().len(),
         1,
         "ainda não removido"
     );
-    click(&mut h, i18n::FORGET_CONFIRM);
+    click(&mut h, i18n::FORGET_CONFIRM());
     assert!(h.state().store.list().unwrap().is_empty());
-    click(&mut h, i18n::CLOSE);
+    click(&mut h, i18n::CLOSE());
     assert!(matches!(h.state().dialog, Dialog::None));
 
     // nova conexão cai no fluxo de host desconhecido; rejeitar não salva nada
     ready();
-    click(&mut h, i18n::TAB_RETRY);
+    click(&mut h, i18n::TAB_RETRY());
     wait(&mut h, "host desconhecido", 15, |a| {
-        status(a, 1) == i18n::ST_AWAITING_TRUST && a.tabs[1].body.needs_modal()
+        status(a, 1) == i18n::ST_AWAITING_TRUST() && a.tabs[1].body.needs_modal()
     });
-    click(&mut h, i18n::HK_REJECT);
+    click(&mut h, i18n::HK_REJECT());
     wait(&mut h, "rejeitado", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("host não confiável");
     assert!(h.state().store.list().unwrap().is_empty());
@@ -625,22 +625,22 @@ fn real_senha_errada_mostra_erro_e_tentar_novamente_pergunta_de_novo() {
         a.tabs[1].body.needs_modal()
     });
     type_password(&mut h, "senha-errada-xyz");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "erro de autenticação", 20, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("senha incorreta");
     assert!(h.state().tabs[1].body.is_closed());
     ready();
-    click(&mut h, i18n::TAB_RETRY);
+    click(&mut h, i18n::TAB_RETRY());
     wait(&mut h, "pergunta de novo", 10, |a| {
         a.tabs[1].body.needs_modal()
     });
     h.get_by_label_contains("Senha de tester@");
     type_password(&mut h, "tester-pass");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "conectado após corrigir", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     assert_clean(h.state());
     drop(h);
@@ -668,7 +668,7 @@ fn real_senha_salva_no_cofre_e_opcao_salvar() {
     app.open_profile(salva.id);
     let mut h = harness(app);
     wait(&mut h, "conectado com senha do cofre", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     assert!(!h.state().tabs[1].body.needs_modal());
 
@@ -678,12 +678,12 @@ fn real_senha_salva_no_cofre_e_opcao_salvar() {
         a.tabs[2].body.needs_modal()
     });
     // a opção de salvar existe e NÃO vem marcada
-    h.get_by_label(i18n::ASK_SAVE);
+    h.get_by_label(i18n::ASK_SAVE());
     type_password(&mut h, "tester-pass");
-    click(&mut h, i18n::ASK_SAVE);
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::ASK_SAVE());
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 2) == i18n::ST_CONNECTED
+        status(a, 2) == i18n::ST_CONNECTED()
     });
     wait(&mut h, "perfil atualizado com credencial", 10, |a| {
         a.profile(ask.id).is_some_and(|p| {
@@ -731,20 +731,20 @@ fn real_chave_com_passphrase_perguntar_e_errada() {
     });
     h.get_by_label_contains("Passphrase da chave");
     type_password(&mut h, "passphrase-errada");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "erro de passphrase", 20, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     h.get_by_label_contains("passphrase incorreta");
     ready();
-    click(&mut h, i18n::TAB_RETRY);
+    click(&mut h, i18n::TAB_RETRY());
     wait(&mut h, "pergunta de novo", 10, |a| {
         a.tabs[1].body.needs_modal()
     });
     type_password(&mut h, "test-passphrase");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     assert_clean(h.state());
     drop(h);
@@ -788,7 +788,7 @@ fn real_dez_abas_simultaneas_com_saida_continua() {
     }
     // abas: 0 = Início, 1..=10 = sessões
     wait(&mut h, "10 sessões conectadas", 60, |a| {
-        (1..=10).all(|i| status(a, i) == i18n::ST_CONNECTED)
+        (1..=10).all(|i| status(a, i) == i18n::ST_CONNECTED())
     });
     wait(&mut h, "prompts", 30, |a| {
         (1..=10).all(|i| !screen(a, i).trim().is_empty())
@@ -864,21 +864,21 @@ fn real_dez_abas_simultaneas_com_saida_continua() {
         rss_mb()
     );
     // as outras abas continuam vivas
-    assert!((1..=10).all(|i| status(h.state(), i) == i18n::ST_CONNECTED));
+    assert!((1..=10).all(|i| status(h.state(), i) == i18n::ST_CONNECTED()));
     assert!(h.try_run().is_ok(), "ocioso depois do flood");
 
     // desconectar uma aba não afeta as outras
     let sixth = h.state().tabs[6].id;
     h.state_mut().active = Some(sixth);
     h.run_steps(2);
-    click(&mut h, i18n::TAB_DISCONNECT);
+    click(&mut h, i18n::TAB_DISCONNECT());
     wait(&mut h, "aba 6 desconectada", 20, |a| {
-        status(a, 6) == i18n::ST_DISCONNECTED
+        status(a, 6) == i18n::ST_DISCONNECTED()
     });
     assert!(
         (1..=10)
             .filter(|i| *i != 6)
-            .all(|i| status(h.state(), i) == i18n::ST_CONNECTED)
+            .all(|i| status(h.state(), i) == i18n::ST_CONNECTED())
     );
 
     // fechar o app: todas as sessões encerram de forma previsível
@@ -941,12 +941,12 @@ fn real_capturas() {
     wait(&mut h, "senha", 10, |a| a.tabs[1].body.needs_modal());
     type_password(&mut h, "tester-pass");
     shot(&mut h, "20-senha");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "host key", 15, |a| a.tabs[1].body.needs_modal());
     shot(&mut h, "21-host-desconhecido");
-    click(&mut h, i18n::HK_ACCEPT_SAVE);
+    click(&mut h, i18n::HK_ACCEPT_SAVE());
     wait(&mut h, "conectado", 15, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     wait(&mut h, "prompt", 15, |a| !screen(a, 1).trim().is_empty());
     type_line(
@@ -963,7 +963,7 @@ fn real_capturas() {
         a.tabs[1].body.needs_modal()
     });
     shot(&mut h, "23-colar-multilinha");
-    click(&mut h, i18n::CANCEL);
+    click(&mut h, i18n::CANCEL());
 
     // chave alterada (outra aba)
     ready();
@@ -981,9 +981,9 @@ fn real_capturas() {
     )
     .unwrap();
     h.state_mut().open_profile(key.id);
-    wait(&mut h, "bloqueio", 15, |a| status(a, 2) == i18n::ST_BLOCKED);
+    wait(&mut h, "bloqueio", 15, |a| status(a, 2) == i18n::ST_BLOCKED());
     shot(&mut h, "24-chave-alterada");
-    click(&mut h, i18n::HKC_OPEN_TRUSTED);
+    click(&mut h, i18n::HKC_OPEN_TRUSTED());
     shot(&mut h, "25-hosts-confiaveis");
     h.state_mut().close_dialog();
     h.state_mut().close_all_tabs();
@@ -1009,7 +1009,7 @@ fn real_keyboard_interactive_modal_de_prompt() {
         15,
         |a| a.tabs[1].body.needs_modal(),
     );
-    h.get_by_label(i18n::KI_TITLE);
+    h.get_by_label(i18n::KI_TITLE());
     h.get_by_label_contains("Password");
     // O campo é mascarado (o servidor pediu sem eco).
     type_password(&mut h, "ki-pass");
@@ -1021,9 +1021,9 @@ fn real_keyboard_interactive_modal_de_prompt() {
         !value.contains("ki-pass"),
         "resposta exposta à acessibilidade"
     );
-    click(&mut h, i18n::KI_SEND);
+    click(&mut h, i18n::KI_SEND());
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     wait(&mut h, "prompt do shell", 15, |a| {
         !screen(a, 1).trim().is_empty()
@@ -1053,21 +1053,21 @@ fn real_mfa_chave_mais_keyboard_interactive_cancelar() {
     wait(&mut h, "segundo fator", 15, |a| {
         a.tabs[1].body.needs_modal()
     });
-    click(&mut h, i18n::CANCEL);
+    click(&mut h, i18n::CANCEL());
     wait(&mut h, "autenticação cancelada", 15, |a| {
-        status(a, 1) == i18n::ST_ERROR && a.tabs[1].body.is_closed()
+        status(a, 1) == i18n::ST_ERROR() && a.tabs[1].body.is_closed()
     });
     assert!(screen_or_error(h.state(), 1).contains("Autenticação cancelada"));
     // Tentar de novo e responder: conecta.
     ready();
-    click(&mut h, i18n::TAB_RECONNECT);
+    click(&mut h, i18n::TAB_RECONNECT());
     wait(&mut h, "segundo fator de novo", 15, |a| {
         a.tabs[1].body.needs_modal()
     });
     type_password(&mut h, "mfa-code-123456");
-    click(&mut h, i18n::KI_SEND);
+    click(&mut h, i18n::KI_SEND());
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     drop(h);
     cooldown();
@@ -1099,22 +1099,22 @@ fn real_jump_host_conecta_e_pergunta_host_key_de_cada_salto() {
 
     // 1. host key do bastion (salto 1 de 1), depois a do destino ("via bastion")
     wait(&mut h, "host key do bastion", 20, |a| {
-        status(a, 1) == i18n::ST_AWAITING_TRUST && a.tabs[1].body.needs_modal()
+        status(a, 1) == i18n::ST_AWAITING_TRUST() && a.tabs[1].body.needs_modal()
     });
     h.get_by_label_contains("Salto 1 de 1: bastion");
-    click(&mut h, i18n::HK_ACCEPT_SAVE);
+    click(&mut h, i18n::HK_ACCEPT_SAVE());
     wait(&mut h, "host key do destino", 20, |a| {
-        status(a, 1) == i18n::ST_AWAITING_TRUST
+        status(a, 1) == i18n::ST_AWAITING_TRUST()
             && a.tabs[1].body.needs_modal()
             && a.store.list().map(|l| l.len() == 1).unwrap_or(false)
     });
     h.get_by_label_contains("via bastion bastion");
     h.get_by_label_contains("SHA256:");
-    click(&mut h, i18n::HK_ACCEPT_SAVE);
+    click(&mut h, i18n::HK_ACCEPT_SAVE());
 
     // 2. conectado ao DESTINO (o hostname do container-destino)
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     wait(&mut h, "prompt", 15, |a| !screen(a, 1).trim().is_empty());
     assert_eq!(
@@ -1161,7 +1161,7 @@ fn real_jump_host_pergunta_credenciais_de_cada_perfil_da_cadeia() {
     });
     h.get_by_label_contains("(jump host bastion)");
     type_password(&mut h, "tester-pass");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "senha do destino", 10, |a| {
         a.tabs[1].body.needs_modal()
     });
@@ -1171,9 +1171,9 @@ fn real_jump_host_pergunta_credenciais_de_cada_perfil_da_cadeia() {
     );
     h.get_by_label_contains("Senha de tester@myssh-testsshd-target");
     type_password(&mut h, "tester-pass");
-    click(&mut h, i18n::CONNECT);
+    click(&mut h, i18n::CONNECT());
     wait(&mut h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     assert_clean(h.state());
     drop(h);
@@ -1210,11 +1210,11 @@ fn real_jump_host_key_do_bastion_alterada_bloqueia_e_aponta_o_salto() {
     app.open_profile(dest.id);
     let mut h = harness(app);
     wait(&mut h, "bloqueado", 20, |a| {
-        status(a, 1) == i18n::ST_BLOCKED
+        status(a, 1) == i18n::ST_BLOCKED()
     });
     h.get_by_label_contains("Salto 1 de 1: bastion");
     assert!(
-        h.query_by_label(i18n::HK_ACCEPT_SAVE).is_none(),
+        h.query_by_label(i18n::HK_ACCEPT_SAVE()).is_none(),
         "mudança de chave nunca oferece aceitar"
     );
     drop(h);

@@ -2848,6 +2848,7 @@ dependencies = [
  "egui",
  "egui_kittest",
  "myssh-core",
+ "myssh-i18n",
  "myssh-secrets",
  "myssh-ssh",
  "myssh-sshconfig",
@@ -2869,9 +2870,17 @@ dependencies = [
 name = "myssh-core"
 version = "0.1.1"
 dependencies = [
+ "myssh-i18n",
  "serde",
  "thiserror 2.0.21",
  "uuid",
+]
+
+[[package]]
+name = "myssh-i18n"
+version = "0.1.1"
+dependencies = [
+ "sys-locale",
 ]
 
 [[package]]
@@ -2887,6 +2896,7 @@ version = "0.1.1"
 dependencies = [
  "keyring",
  "myssh-core",
+ "myssh-i18n",
  "secrecy",
  "thiserror 2.0.21",
  "uuid",
@@ -2898,6 +2908,7 @@ name = "myssh-ssh"
 version = "0.1.1"
 dependencies = [
  "myssh-core",
+ "myssh-i18n",
  "myssh-store",
  "russh",
  "russh-sftp",
@@ -2911,6 +2922,7 @@ name = "myssh-sshconfig"
 version = "0.1.1"
 dependencies = [
  "myssh-core",
+ "myssh-i18n",
 ]
 
 [[package]]
@@ -2918,6 +2930,7 @@ name = "myssh-store"
 version = "0.1.1"
 dependencies = [
  "myssh-core",
+ "myssh-i18n",
  "rusqlite",
  "serde",
  "serde_json",
@@ -2931,6 +2944,7 @@ name = "myssh-sync"
 version = "0.1.1"
 dependencies = [
  "globset",
+ "myssh-i18n",
  "serde",
  "serde_json",
  "tempfile",
@@ -2945,6 +2959,7 @@ version = "0.1.1"
 dependencies = [
  "filetime",
  "myssh-core",
+ "myssh-i18n",
  "myssh-ssh",
  "myssh-store",
  "myssh-sync",
@@ -2983,6 +2998,7 @@ dependencies = [
  "filetime",
  "libc",
  "myssh-core",
+ "myssh-i18n",
  "myssh-ssh",
  "myssh-store",
  "myssh-sync",
@@ -5089,6 +5105,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 3.0.9",
+]
+
+[[package]]
+name = "sys-locale"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+dependencies = [
+ "libc",
 ]
 
 [[package]]

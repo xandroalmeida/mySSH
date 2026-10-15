@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Sessão SSH (russh) do mySSH: conexão, host trust, autenticação e PTY, sem dependência de UI"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 myssh-core = { path = "../core" }
 russh = "0.64"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }

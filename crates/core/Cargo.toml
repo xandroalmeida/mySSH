@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Tipos de domínio e contratos compartilhados do mySSH"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 serde = { version = "1", features = ["derive"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 thiserror = "2"

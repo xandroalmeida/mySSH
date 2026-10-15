@@ -14,7 +14,7 @@ const MAX_BYTES: u64 = 16 * 1024 * 1024;
 /// Grava a configuração em `path`. Devolve o aviso de sucesso.
 pub fn export_to(store: &Store, path: &Path) -> Result<String, String> {
     let json = store.export_config_json().map_err(|e| e.to_string())?;
-    write_private(path, json.as_bytes()).map_err(|_| i18n::CFG_ERR_WRITE.to_string())?;
+    write_private(path, json.as_bytes()).map_err(|_| i18n::CFG_ERR_WRITE().to_string())?;
     Ok(i18n::cfg_exported(&path.display().to_string()))
 }
 
@@ -53,9 +53,9 @@ pub fn import_from(store: &Store, path: &Path) -> Result<ImportReport, String> {
     let mut text = String::new();
     let n = std::fs::File::open(path)
         .and_then(|f| f.take(MAX_BYTES + 1).read_to_string(&mut text))
-        .map_err(|_| i18n::CFG_ERR_READ.to_string())?;
+        .map_err(|_| i18n::CFG_ERR_READ().to_string())?;
     if n as u64 > MAX_BYTES {
-        return Err(i18n::CFG_ERR_TOO_BIG.to_string());
+        return Err(i18n::CFG_ERR_TOO_BIG().to_string());
     }
     store.import_config_json(&text).map_err(|e| e.to_string())
 }
@@ -119,14 +119,14 @@ mod tests {
         let s = Store::open_in_memory().unwrap();
         assert_eq!(
             import_from(&s, &tmp.path().join("nada.json")).unwrap_err(),
-            i18n::CFG_ERR_READ
+            i18n::CFG_ERR_READ()
         );
         let bad = tmp.path().join("ruim.json");
         std::fs::write(&bad, "{ isto não é json").unwrap();
         assert!(import_from(&s, &bad).is_err());
         assert_eq!(
             export_to(&s, &tmp.path().join("sem/pasta/x.json")).unwrap_err(),
-            i18n::CFG_ERR_WRITE
+            i18n::CFG_ERR_WRITE()
         );
     }
 }

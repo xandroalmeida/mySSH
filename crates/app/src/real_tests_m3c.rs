@@ -179,7 +179,7 @@ pub(crate) fn setup() -> Ctx {
         _data: data,
     };
     wait(&mut c.h, "conectado", 20, |a| {
-        status(a, 1) == i18n::ST_CONNECTED
+        status(a, 1) == i18n::ST_CONNECTED()
     });
     wait(&mut c.h, "prompt", 10, |a| !screen(a, 1).trim().is_empty());
     type_line(

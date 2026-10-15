@@ -26,12 +26,12 @@ impl State {
 
     pub fn label(self) -> &'static str {
         match self {
-            Self::Queued => i18n::XFER_QUEUED,
-            Self::Scanning => i18n::XFER_SCANNING,
-            Self::Running => i18n::XFER_RUNNING,
-            Self::Done => i18n::XFER_DONE,
-            Self::Failed => i18n::XFER_FAILED,
-            Self::Cancelled => i18n::XFER_CANCELLED,
+            Self::Queued => i18n::XFER_QUEUED(),
+            Self::Scanning => i18n::XFER_SCANNING(),
+            Self::Running => i18n::XFER_RUNNING(),
+            Self::Done => i18n::XFER_DONE(),
+            Self::Failed => i18n::XFER_FAILED(),
+            Self::Cancelled => i18n::XFER_CANCELLED(),
         }
     }
 }
@@ -289,7 +289,7 @@ pub fn summary_line(it: &Item) -> String {
         parts.push(fmt_rate(it.rate_bps));
         parts.push(format!(
             "{} {}",
-            i18n::XFER_ETA,
+            i18n::XFER_ETA(),
             fmt_eta(it.bytes_done, it.bytes_total, it.rate_bps)
         ));
     }
@@ -307,7 +307,7 @@ pub fn queue_ui(ui: &mut egui::Ui, q: &mut Queue) -> Option<QueueAction> {
             if ui
                 .add_enabled(
                     q.active_count() > 0,
-                    egui::Button::new(i18n::XFER_CANCEL_ALL),
+                    egui::Button::new(i18n::XFER_CANCEL_ALL()),
                 )
                 .clicked()
             {
@@ -316,7 +316,7 @@ pub fn queue_ui(ui: &mut egui::Ui, q: &mut Queue) -> Option<QueueAction> {
             if ui
                 .add_enabled(
                     q.items.iter().any(|i| i.state.is_terminal()),
-                    egui::Button::new(i18n::XFER_CLEAR),
+                    egui::Button::new(i18n::XFER_CLEAR()),
                 )
                 .clicked()
             {
@@ -340,7 +340,7 @@ fn item_ui(ui: &mut egui::Ui, it: &mut Item, action: &mut Option<QueueAction>) {
     ui.horizontal(|ui| {
         ui.label(RichText::new(&it.label).strong());
         let badge = if it.cancel_requested && !it.state.is_terminal() {
-            i18n::XFER_CANCELLING
+            i18n::XFER_CANCELLING()
         } else {
             it.state.label()
         };
@@ -348,8 +348,8 @@ fn item_ui(ui: &mut egui::Ui, it: &mut Item, action: &mut Option<QueueAction>) {
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let can = !it.state.is_terminal() && !it.cancel_requested;
             if ui
-                .add_enabled(can, egui::Button::new(i18n::XFER_CANCEL))
-                .on_hover_text(i18n::XFER_CANCEL_HINT)
+                .add_enabled(can, egui::Button::new(i18n::XFER_CANCEL()))
+                .on_hover_text(i18n::XFER_CANCEL_HINT())
                 .clicked()
             {
                 it.cancel_requested = true;
@@ -361,8 +361,8 @@ fn item_ui(ui: &mut egui::Ui, it: &mut Item, action: &mut Option<QueueAction>) {
     let text = match it.state {
         State::Scanning => i18n::xfer_counting(it.files_total, it.bytes_total),
         // Com falhas/cancelada a barra não pode parecer "concluída".
-        State::Failed => i18n::XFER_FAILED_BAR.to_string(),
-        State::Cancelled => i18n::XFER_CANCELLED.to_string(),
+        State::Failed => i18n::XFER_FAILED_BAR().to_string(),
+        State::Cancelled => i18n::XFER_CANCELLED().to_string(),
         _ => format!("{:.0}%", frac * 100.0),
     };
     let mut bar = egui::ProgressBar::new(frac).text(text).desired_height(14.0);

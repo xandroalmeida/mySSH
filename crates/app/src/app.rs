@@ -322,7 +322,7 @@ impl App {
         let (tx, ctx) = (self.tx.clone(), ctx.clone());
         let start = crate::paths::ssh_dir();
         self.rt.spawn(async move {
-            let mut dlg = rfd::AsyncFileDialog::new().set_title(i18n::PICK_KEY_TITLE);
+            let mut dlg = rfd::AsyncFileDialog::new().set_title(i18n::PICK_KEY_TITLE());
             if let Some(d) = start {
                 dlg = dlg.set_directory(d);
             }
@@ -340,7 +340,7 @@ impl App {
         self.vault = v;
         self.vault_mode = VaultMode::SessionOnly;
         self.keyring = KeyringStatus::Available;
-        self.set_notice(i18n::SESSION_VAULT_ON);
+        self.set_notice(i18n::SESSION_VAULT_ON());
         ctx.request_repaint();
     }
 
@@ -351,12 +351,12 @@ impl App {
                     self.keyring = match a {
                         Availability::Available => KeyringStatus::Available,
                         Availability::Locked => {
-                            KeyringStatus::Unavailable(i18n::KEYRING_LOCKED.into())
+                            KeyringStatus::Unavailable(i18n::KEYRING_LOCKED().into())
                         }
                         Availability::Unavailable(r) => KeyringStatus::Unavailable(r),
                     }
                 }
-                Msg::Unlocked(Ok(())) => self.set_notice(i18n::VAULT_UNLOCKED),
+                Msg::Unlocked(Ok(())) => self.set_notice(i18n::VAULT_UNLOCKED()),
                 Msg::Unlocked(Err(e)) => self.set_notice(secret_error_text(&e)),
                 Msg::KeyPicked(path) => {
                     if let Dialog::Profile(d) = &mut self.dialog {
@@ -602,7 +602,7 @@ impl App {
     /// Divide o painel focado da aba ativa. `profile` = `None` repete o perfil do painel focado.
     pub fn split_active(&mut self, dir: Dir, profile: Option<ProfileId>) {
         let Some(base) = self.focused_kind() else {
-            return self.set_notice(i18n::SPLIT_ONLY_TERMINAL);
+            return self.set_notice(i18n::SPLIT_ONLY_TERMINAL());
         };
         let kind = match profile.and_then(|id| self.profile(id).cloned()) {
             Some(p) => TabKind::Terminal {
@@ -624,7 +624,7 @@ impl App {
             .as_split()
             .is_some_and(|sp| sp.split(dir, kind, body).is_some());
         if !ok {
-            self.set_notice(i18n::SPLIT_LIMIT);
+            self.set_notice(i18n::SPLIT_LIMIT());
         }
     }
 
@@ -642,7 +642,7 @@ impl App {
         if self.focused_kind().is_some() {
             self.dialog = Dialog::Split(SplitDialog { dir, choice: None });
         } else {
-            self.set_notice(i18n::SPLIT_ONLY_TERMINAL);
+            self.set_notice(i18n::SPLIT_ONLY_TERMINAL());
         }
     }
 
@@ -699,7 +699,7 @@ impl App {
 
     pub fn request_end_all(&mut self) {
         if self.active_sessions() == 0 {
-            self.set_notice(i18n::END_ALL_NONE);
+            self.set_notice(i18n::END_ALL_NONE());
         } else {
             self.dialog = Dialog::ConfirmEndAll;
         }
@@ -710,12 +710,12 @@ impl App {
         for t in &mut self.tabs {
             t.body.close();
         }
-        self.set_notice(i18n::END_ALL_DONE);
+        self.set_notice(i18n::END_ALL_DONE());
     }
 
     pub fn lock_vault(&mut self) {
         self.vault.lock();
-        self.set_notice(i18n::VAULT_LOCKED_NOTICE);
+        self.set_notice(i18n::VAULT_LOCKED_NOTICE());
     }
 
     // -------------------------------------------------- importação do ssh config
@@ -736,7 +736,7 @@ impl App {
         self.rt.spawn_blocking(move || {
             let r = path
                 .or_else(ssh_import::default_path)
-                .ok_or_else(|| i18n::IMPORT_ERR_NO_HOME.to_string())
+                .ok_or_else(|| i18n::IMPORT_ERR_NO_HOME().to_string())
                 .and_then(|p| ssh_import::load_with_env(&p))
                 .map(|raw| ssh_import::build_preview(raw, &existing));
             let _ = tx.send(Msg::SshConfigLoaded(r));
@@ -750,7 +750,7 @@ impl App {
         let start = crate::paths::ssh_dir();
         let existing = self.profiles.clone();
         self.rt.spawn(async move {
-            let mut dlg = rfd::AsyncFileDialog::new().set_title(i18n::IMPORT_PICK_TITLE);
+            let mut dlg = rfd::AsyncFileDialog::new().set_title(i18n::IMPORT_PICK_TITLE());
             if let Some(d) = start {
                 dlg = dlg.set_directory(d);
             }
@@ -763,7 +763,7 @@ impl App {
                     .map(|raw| ssh_import::build_preview(raw, &existing))
             })
             .await
-            .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()));
+            .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL().to_string()));
             let _ = tx.send(Msg::SshConfigLoaded(r));
             ctx.request_repaint();
         });
@@ -817,7 +817,7 @@ impl App {
             Err(e) => {
                 if let Dialog::ImportSsh(d) = &mut self.dialog {
                     d.stage = ImportStage::Preview;
-                    d.error = Some(format!("{}{e}", i18n::IMPORT_ERR_SAVE));
+                    d.error = Some(format!("{}{e}", i18n::IMPORT_ERR_SAVE()));
                 }
             }
         }
@@ -833,8 +833,8 @@ impl App {
         let (store, tx, ctx) = (self.store.clone(), self.tx.clone(), ctx.clone());
         self.rt.spawn(async move {
             let dlg = rfd::AsyncFileDialog::new()
-                .set_title(i18n::CFG_EXPORT_TITLE)
-                .set_file_name(i18n::CFG_EXPORT_NAME)
+                .set_title(i18n::CFG_EXPORT_TITLE())
+                .set_file_name(i18n::CFG_EXPORT_NAME())
                 .add_filter("JSON", &["json"]);
             let msg = match dlg.save_file().await {
                 None => Err(String::new()),
@@ -842,7 +842,7 @@ impl App {
                     let path = f.path().to_path_buf();
                     tokio::task::spawn_blocking(move || crate::config_io::export_to(&store, &path))
                         .await
-                        .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()))
+                        .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL().to_string()))
                 }
             };
             let _ = tx.send(Msg::ConfigExported(msg));
@@ -858,7 +858,7 @@ impl App {
         let (store, tx, ctx) = (self.store.clone(), self.tx.clone(), ctx.clone());
         self.rt.spawn(async move {
             let dlg = rfd::AsyncFileDialog::new()
-                .set_title(i18n::CFG_IMPORT_TITLE)
+                .set_title(i18n::CFG_IMPORT_TITLE())
                 .add_filter("JSON", &["json"]);
             let r = match dlg.pick_file().await {
                 None => Err(String::new()),
@@ -868,7 +868,7 @@ impl App {
                         crate::config_io::import_from(&store, &path)
                     })
                     .await
-                    .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL.to_string()))
+                    .unwrap_or_else(|_| Err(i18n::ERR_INTERNAL().to_string()))
                 }
             };
             let _ = tx.send(Msg::ConfigImported(r));
@@ -984,7 +984,7 @@ impl App {
     pub(crate) fn on_suspend(&mut self, suspended: bool) {
         if suspended && self.settings.vault_lock_on_suspend && !self.vault.is_locked() {
             self.vault.lock();
-            self.set_notice(i18n::VAULT_LOCKED_SUSPEND);
+            self.set_notice(i18n::VAULT_LOCKED_SUSPEND());
         }
     }
 
@@ -1139,7 +1139,7 @@ impl App {
                 self.trusted = l;
                 self.trusted_error = None;
             }
-            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR.into()),
+            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR().into()),
         }
     }
 
@@ -1147,7 +1147,7 @@ impl App {
     pub fn forget_host(&mut self, ep: &HostEndpoint) {
         match self.store.forget(ep) {
             Ok(()) => self.trusted_error = None,
-            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR.into()),
+            Err(_) => self.trusted_error = Some(i18n::TRUSTED_ERR().into()),
         }
         self.refresh_trusted();
     }
@@ -1161,10 +1161,10 @@ impl App {
 
 pub fn secret_error_text(e: &SecretError) -> String {
     match e {
-        SecretError::Unavailable(_) => i18n::ERR_VAULT_UNAVAILABLE.into(),
-        SecretError::Locked => i18n::ERR_VAULT_LOCKED.into(),
-        SecretError::NotFound => i18n::ERR_SECRET_NOT_FOUND.into(),
-        SecretError::TooLong { .. } => i18n::ERR_SECRET_TOO_LONG.into(),
-        SecretError::Backend(_) => i18n::ERR_VAULT_BACKEND.into(),
+        SecretError::Unavailable(_) => i18n::ERR_VAULT_UNAVAILABLE().into(),
+        SecretError::Locked => i18n::ERR_VAULT_LOCKED().into(),
+        SecretError::NotFound => i18n::ERR_SECRET_NOT_FOUND().into(),
+        SecretError::TooLong { .. } => i18n::ERR_SECRET_TOO_LONG().into(),
+        SecretError::Backend(_) => i18n::ERR_VAULT_BACKEND().into(),
     }
 }

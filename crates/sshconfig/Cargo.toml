@@ -6,4 +6,5 @@ license = "MIT OR Apache-2.0"
 description = "Importação limitada e segura de ~/.ssh/config para perfis do mySSH (pura, sem rede)"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 myssh-core = { path = "../core" }

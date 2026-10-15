@@ -251,10 +251,10 @@ pub fn validate_name(name: &str) -> Result<(), &'static str> {
     use crate::i18n;
     let n = name.trim();
     if n.is_empty() {
-        return Err(i18n::FILES_NAME_EMPTY);
+        return Err(i18n::FILES_NAME_EMPTY());
     }
     if n == "." || n == ".." || n.contains(['/', '\0']) || (cfg!(windows) && n.contains('\\')) {
-        return Err(i18n::FILES_NAME_INVALID);
+        return Err(i18n::FILES_NAME_INVALID());
     }
     Ok(())
 }

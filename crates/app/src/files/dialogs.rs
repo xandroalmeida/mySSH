@@ -101,7 +101,7 @@ fn button_row(ui: &mut egui::Ui, confirm: &str, enabled: bool) -> Option<bool> {
         {
             out = Some(true);
         }
-        if ui.button(i18n::CANCEL).clicked() {
+        if ui.button(i18n::CANCEL()).clicked() {
             out = Some(false);
         }
     });
@@ -115,9 +115,9 @@ fn name_input(
     error: &Option<String>,
     fresh: &mut bool,
 ) -> bool {
-    ui.label(i18n::FILES_NAME_LABEL);
+    ui.label(i18n::FILES_NAME_LABEL());
     let r = ui.add(egui::TextEdit::singleline(name).desired_width(f32::INFINITY));
-    r.widget_info(|| super::column::text_info(i18n::FILES_NAME_FIELD, name));
+    r.widget_info(|| super::column::text_info(i18n::FILES_NAME_FIELD(), name));
     if *fresh {
         r.request_focus();
         *fresh = false;
@@ -139,11 +139,11 @@ pub fn fs_dialog(ctx: &egui::Context, d: &mut FsDialog, existing: &[String]) -> 
             let mut decision = None;
             let resp = egui::Modal::new(egui::Id::new("files-newdir")).show(ctx, |ui| {
                 ui.set_max_width(380.0);
-                ui.heading(i18n::FILES_NEWDIR_TITLE);
+                ui.heading(i18n::FILES_NEWDIR_TITLE());
                 ui.add_space(6.0);
                 let enter = name_input(ui, name, error, fresh);
                 ui.add_space(8.0);
-                decision = button_row(ui, i18n::FILES_CREATE, true);
+                decision = button_row(ui, i18n::FILES_CREATE(), true);
                 if enter {
                     decision = Some(true);
                 }
@@ -169,11 +169,11 @@ pub fn fs_dialog(ctx: &egui::Context, d: &mut FsDialog, existing: &[String]) -> 
             let mut decision = None;
             let resp = egui::Modal::new(egui::Id::new("files-rename")).show(ctx, |ui| {
                 ui.set_max_width(380.0);
-                ui.heading(i18n::FILES_RENAME_TITLE);
+                ui.heading(i18n::FILES_RENAME_TITLE());
                 ui.add_space(6.0);
                 let enter = name_input(ui, name, error, fresh);
                 ui.add_space(8.0);
-                decision = button_row(ui, i18n::FILES_RENAME_CONFIRM, true);
+                decision = button_row(ui, i18n::FILES_RENAME_CONFIRM(), true);
                 if enter {
                     decision = Some(true);
                 }
@@ -214,14 +214,14 @@ pub fn fs_dialog(ctx: &egui::Context, d: &mut FsDialog, existing: &[String]) -> 
                     ui.weak(i18n::files_delete_more(items.len() - 8));
                 }
                 ui.add_space(6.0);
-                ui.label(i18n::FILES_DELETE_PERMANENT);
+                ui.label(i18n::FILES_DELETE_PERMANENT());
                 if needs_ack {
                     ui.add_space(4.0);
-                    ui.colored_label(err_color(ui), i18n::FILES_DELETE_RECURSIVE);
-                    ui.checkbox(ack, i18n::FILES_DELETE_ACK);
+                    ui.colored_label(err_color(ui), i18n::FILES_DELETE_RECURSIVE());
+                    ui.checkbox(ack, i18n::FILES_DELETE_ACK());
                 }
                 ui.add_space(8.0);
-                decision = button_row(ui, i18n::FILES_DELETE_CONFIRM, !needs_ack || *ack);
+                decision = button_row(ui, i18n::FILES_DELETE_CONFIRM(), !needs_ack || *ack);
             });
             match decision {
                 Some(true) if !needs_ack || *ack => {
@@ -245,7 +245,7 @@ pub fn conflict_dialog(
     let mut choice = None;
     egui::Modal::new(egui::Id::new("files-conflict")).show(ctx, |ui| {
         ui.set_max_width(460.0);
-        ui.heading(i18n::CONFLICT_TITLE);
+        ui.heading(i18n::CONFLICT_TITLE());
         ui.add_space(4.0);
         ui.label(RichText::new(&c.path).monospace());
         let p = i18n::conflict_pending(pending);
@@ -258,32 +258,32 @@ pub fn conflict_dialog(
             .spacing([14.0, 4.0])
             .show(ui, |ui| {
                 ui.label("");
-                ui.label(RichText::new(i18n::CONFLICT_EXISTING).strong());
-                ui.label(RichText::new(i18n::CONFLICT_INCOMING).strong());
+                ui.label(RichText::new(i18n::CONFLICT_EXISTING()).strong());
+                ui.label(RichText::new(i18n::CONFLICT_INCOMING()).strong());
                 ui.end_row();
-                ui.label(i18n::CONFLICT_SIZE);
+                ui.label(i18n::CONFLICT_SIZE());
                 ui.label(meta_size(Some(&c.existing)));
                 ui.label(meta_size(c.incoming.as_ref()));
                 ui.end_row();
-                ui.label(i18n::CONFLICT_DATE);
+                ui.label(i18n::CONFLICT_DATE());
                 ui.label(meta_date(Some(&c.existing)));
                 ui.label(meta_date(c.incoming.as_ref()));
                 ui.end_row();
             });
         ui.add_space(8.0);
-        ui.checkbox(all, i18n::CONFLICT_ALL);
+        ui.checkbox(all, i18n::CONFLICT_ALL());
         ui.add_space(8.0);
         ui.horizontal_wrapped(|ui| {
-            if ui.button(i18n::CONFLICT_OVERWRITE).clicked() {
+            if ui.button(i18n::CONFLICT_OVERWRITE()).clicked() {
                 choice = Some(ConflictChoice::Overwrite);
             }
-            if ui.button(i18n::CONFLICT_SKIP).clicked() {
+            if ui.button(i18n::CONFLICT_SKIP()).clicked() {
                 choice = Some(ConflictChoice::Skip);
             }
-            if ui.button(i18n::CONFLICT_RENAME).clicked() {
+            if ui.button(i18n::CONFLICT_RENAME()).clicked() {
                 choice = Some(ConflictChoice::Rename);
             }
-            if ui.button(i18n::CONFLICT_CANCEL).clicked() {
+            if ui.button(i18n::CONFLICT_CANCEL()).clicked() {
                 choice = Some(ConflictChoice::Cancel);
             }
         });
@@ -292,12 +292,12 @@ pub fn conflict_dialog(
 }
 
 fn meta_size(m: Option<&RemoteOrLocalMeta>) -> String {
-    m.map_or_else(|| i18n::CONFLICT_UNKNOWN.to_string(), |m| fmt_size(m.size))
+    m.map_or_else(|| i18n::CONFLICT_UNKNOWN().to_string(), |m| fmt_size(m.size))
 }
 
 fn meta_date(m: Option<&RemoteOrLocalMeta>) -> String {
     m.map_or_else(
-        || i18n::CONFLICT_UNKNOWN.to_string(),
+        || i18n::CONFLICT_UNKNOWN().to_string(),
         |m| fmt_mtime(m.mtime),
     )
 }

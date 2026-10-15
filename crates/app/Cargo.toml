@@ -18,6 +18,7 @@ demo = []
 
 [dependencies]
 myssh-core = { path = "../core" }
+myssh-i18n = { path = "../i18n" }
 myssh-store = { path = "../store" }
 myssh-secrets = { path = "../secrets" }
 myssh-ssh = { path = "../ssh" }

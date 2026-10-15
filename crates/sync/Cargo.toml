@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Núcleo de planejamento de sincronização unidirecional (sem rede) do mySSH"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 globset = "0.4"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

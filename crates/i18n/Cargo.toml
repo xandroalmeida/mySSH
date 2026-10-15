@@ -1,0 +1,9 @@
+[package]
+name = "myssh-i18n"
+version.workspace = true
+edition = "2024"
+license = "MIT OR Apache-2.0"
+description = "Idioma da interface do mySSH (en, pt-BR, es): seleção e detecção do sistema"
+
+[dependencies]
+sys-locale = "0.3"

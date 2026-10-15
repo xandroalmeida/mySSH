@@ -1,32 +1,71 @@
 //! Textos da sincronização (M4-B).
 
-pub const FILES_SYNC: &str = "Sincronizar…";
-pub const FILES_SYNC_HINT: &str =
-    "Sincronizar a pasta local aberta com a pasta remota aberta (com prévia)";
-pub const SYNC_UNAVAILABLE: &str = "Sincronização indisponível: o SFTP ainda não está aberto.";
-pub const SYNC_TITLE: &str = "Sincronizar pastas";
-pub const SYNC_RESUME: &str = "Retomar";
-pub const SYNC_DISCARD: &str = "Descartar";
-pub const SYNC_RESUME_HELP: &str = "A retomada usa as pastas atuais das colunas, mostra o que falta e revalida tudo antes de executar.";
+pub fn FILES_SYNC() -> &'static str {
+    "Sincronizar…"
+}
+pub fn FILES_SYNC_HINT() -> &'static str {
+    "Sincronizar a pasta local aberta com a pasta remota aberta (com prévia)"
+}
+pub fn SYNC_UNAVAILABLE() -> &'static str {
+    "Sincronização indisponível: o SFTP ainda não está aberto."
+}
+pub fn SYNC_TITLE() -> &'static str {
+    "Sincronizar pastas"
+}
+pub fn SYNC_RESUME() -> &'static str {
+    "Retomar"
+}
+pub fn SYNC_DISCARD() -> &'static str {
+    "Descartar"
+}
+pub fn SYNC_RESUME_HELP() -> &'static str {
+    "A retomada usa as pastas atuais das colunas, mostra o que falta e revalida tudo antes de executar."
+}
 pub fn sync_resume_found(n: usize) -> String {
     format!("Há uma sincronização interrompida com {n} item(ns) pendentes.")
 }
-pub const SYNC_DIRECTION: &str = "Direção";
-pub const SYNC_L2R: &str = "Local ➡ Remoto";
-pub const SYNC_R2L: &str = "Remoto ➡ Local";
+pub fn SYNC_DIRECTION() -> &'static str {
+    "Direção"
+}
+pub fn SYNC_L2R() -> &'static str {
+    "Local ➡ Remoto"
+}
+pub fn SYNC_R2L() -> &'static str {
+    "Remoto ➡ Local"
+}
 pub fn sync_dest_changes(dest: &str) -> String {
     format!("O destino ({dest}) será alterado: arquivos novos e diferentes serão gravados nele.")
 }
-pub const SYNC_COMPARE: &str = "Comparação";
-pub const SYNC_COMPARE_FAST: &str = "Tamanho e data (rápida; tolerância de 2 s)";
-pub const SYNC_COMPARE_CONTENT: &str = "Conteúdo (hash dos arquivos de mesmo tamanho)";
-pub const SYNC_CONTENT_COST: &str = "Custo de rede: cada arquivo de mesmo tamanho é lido por inteiro dos dois lados pelo SFTP. Pode ser lento e consumir banda.";
-pub const SYNC_EXCLUDES: &str = "Exclusões";
-pub const SYNC_EXCLUDES_HELP: &str = "Um padrão por linha (ex.: .git/, *.log, build/). Itens excluídos nunca são apagados no destino.";
-pub const SYNC_MIRROR: &str = "Modo espelho: apagar do destino o que não existe na origem";
-pub const SYNC_MIRROR_WARNING: &str = "ATENÇÃO: no modo espelho, itens que existem só no destino aparecem como exclusões na prévia e serão APAGADOS se você confirmar. Nada é apagado sem a sua confirmação explícita.";
-pub const SYNC_PREVIEW: &str = "Gerar prévia";
-pub const SYNC_PLANNING: &str = "Gerando a prévia (nada é alterado)…";
+pub fn SYNC_COMPARE() -> &'static str {
+    "Comparação"
+}
+pub fn SYNC_COMPARE_FAST() -> &'static str {
+    "Tamanho e data (rápida; tolerância de 2 s)"
+}
+pub fn SYNC_COMPARE_CONTENT() -> &'static str {
+    "Conteúdo (hash dos arquivos de mesmo tamanho)"
+}
+pub fn SYNC_CONTENT_COST() -> &'static str {
+    "Custo de rede: cada arquivo de mesmo tamanho é lido por inteiro dos dois lados pelo SFTP. Pode ser lento e consumir banda."
+}
+pub fn SYNC_EXCLUDES() -> &'static str {
+    "Exclusões"
+}
+pub fn SYNC_EXCLUDES_HELP() -> &'static str {
+    "Um padrão por linha (ex.: .git/, *.log, build/). Itens excluídos nunca são apagados no destino."
+}
+pub fn SYNC_MIRROR() -> &'static str {
+    "Modo espelho: apagar do destino o que não existe na origem"
+}
+pub fn SYNC_MIRROR_WARNING() -> &'static str {
+    "ATENÇÃO: no modo espelho, itens que existem só no destino aparecem como exclusões na prévia e serão APAGADOS se você confirmar. Nada é apagado sem a sua confirmação explícita."
+}
+pub fn SYNC_PREVIEW() -> &'static str {
+    "Gerar prévia"
+}
+pub fn SYNC_PLANNING() -> &'static str {
+    "Gerando a prévia (nada é alterado)…"
+}
 pub fn sync_hashing(done: usize, total: usize) -> String {
     format!("Comparando conteúdo: {done} de {total}")
 }
@@ -49,17 +88,33 @@ pub fn sync_direction_line(l2r: bool) -> &'static str {
         "Remoto ➡ Local: o local será alterado."
     }
 }
-pub const SYNC_SEARCH: &str = "Filtrar por caminho";
-pub const SYNC_SKIP: &str = "Pular";
-pub const SYNC_USE_SOURCE: &str = "Usar origem";
-pub const SYNC_NOT_RESOLVABLE: &str = "(não resolvido automaticamente)";
-pub const SYNC_NO_ITEMS: &str = "Nenhum item neste filtro.";
+pub fn SYNC_SEARCH() -> &'static str {
+    "Filtrar por caminho"
+}
+pub fn SYNC_SKIP() -> &'static str {
+    "Pular"
+}
+pub fn SYNC_USE_SOURCE() -> &'static str {
+    "Usar origem"
+}
+pub fn SYNC_NOT_RESOLVABLE() -> &'static str {
+    "(não resolvido automaticamente)"
+}
+pub fn SYNC_NO_ITEMS() -> &'static str {
+    "Nenhum item neste filtro."
+}
 pub fn sync_delete_section(n: usize) -> String {
     format!("Exclusões no destino: {n} itens existem só no destino e serão APAGADOS.")
 }
-pub const SYNC_NOTHING_TO_DO: &str = "Nada a executar com as escolhas atuais.";
-pub const SYNC_BACK: &str = "Voltar às opções";
-pub const SYNC_RUNNING: &str = "Sincronizando…";
+pub fn SYNC_NOTHING_TO_DO() -> &'static str {
+    "Nada a executar com as escolhas atuais."
+}
+pub fn SYNC_BACK() -> &'static str {
+    "Voltar às opções"
+}
+pub fn SYNC_RUNNING() -> &'static str {
+    "Sincronizando…"
+}
 pub fn sync_progress_line(
     items_done: usize,
     items_total: usize,
@@ -68,13 +123,27 @@ pub fn sync_progress_line(
 ) -> String {
     format!("itens {items_done}/{items_total} · {done} / {total}")
 }
-pub const SYNC_CANCEL: &str = "Cancelar sincronização";
-pub const SYNC_HIDE: &str = "Ocultar";
-pub const SYNC_SHOW: &str = "Mostrar";
-pub const SYNC_RUNNING_HIDDEN: &str = "Sincronização em andamento";
-pub const SYNC_CANCELLED: &str = "Sincronização cancelada";
-pub const SYNC_DONE_WITH_FAILURES: &str = "Sincronização concluída com falhas";
-pub const SYNC_DONE: &str = "Sincronização concluída";
+pub fn SYNC_CANCEL() -> &'static str {
+    "Cancelar sincronização"
+}
+pub fn SYNC_HIDE() -> &'static str {
+    "Ocultar"
+}
+pub fn SYNC_SHOW() -> &'static str {
+    "Mostrar"
+}
+pub fn SYNC_RUNNING_HIDDEN() -> &'static str {
+    "Sincronização em andamento"
+}
+pub fn SYNC_CANCELLED() -> &'static str {
+    "Sincronização cancelada"
+}
+pub fn SYNC_DONE_WITH_FAILURES() -> &'static str {
+    "Sincronização concluída com falhas"
+}
+pub fn SYNC_DONE() -> &'static str {
+    "Sincronização concluída"
+}
 pub fn sync_final_line(
     done: usize,
     failed: usize,
@@ -84,19 +153,32 @@ pub fn sync_final_line(
 ) -> String {
     format!("{done} ok · {failed} com falha · {skipped} pulados · {pending} pendentes · {bytes}")
 }
-pub const SYNC_PENDING_HELP: &str =
-    "Os itens pendentes ficam registrados: abra “Sincronizar…” de novo para retomar.";
-pub const SYNC_NEW: &str = "Nova sincronização";
-pub const SYNC_STALE_TITLE: &str = "A prévia ficou velha: nada foi executado";
+pub fn SYNC_PENDING_HELP() -> &'static str {
+    "Os itens pendentes ficam registrados: abra “Sincronizar…” de novo para retomar."
+}
+pub fn SYNC_NEW() -> &'static str {
+    "Nova sincronização"
+}
+pub fn SYNC_STALE_TITLE() -> &'static str {
+    "A prévia ficou velha: nada foi executado"
+}
 pub fn sync_stale_body(n: usize) -> String {
     format!(
         "A origem ou o destino mudou depois da prévia ({n} item(ns)). Por segurança o plano antigo nunca é executado: gere uma nova prévia e confira de novo."
     )
 }
-pub const SYNC_SIDE_SOURCE: &str = "mudou na origem";
-pub const SYNC_SIDE_DEST: &str = "mudou no destino";
-pub const SYNC_NEW_PREVIEW: &str = "Gerar nova prévia";
-pub const SYNC_FAILED_TITLE: &str = "A sincronização não pôde continuar";
+pub fn SYNC_SIDE_SOURCE() -> &'static str {
+    "mudou na origem"
+}
+pub fn SYNC_SIDE_DEST() -> &'static str {
+    "mudou no destino"
+}
+pub fn SYNC_NEW_PREVIEW() -> &'static str {
+    "Gerar nova prévia"
+}
+pub fn SYNC_FAILED_TITLE() -> &'static str {
+    "A sincronização não pôde continuar"
+}
 pub fn sync_active_warning(n: usize) -> String {
     if n == 1 {
         "Há uma sincronização em andamento. Se continuar, ela será cancelada; os itens pendentes ficam registrados para retomar depois.".into()

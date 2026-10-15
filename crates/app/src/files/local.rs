@@ -16,9 +16,9 @@ pub fn home_dir() -> PathBuf {
 fn io_text(e: &std::io::Error) -> String {
     use std::io::ErrorKind as K;
     match e.kind() {
-        K::NotFound => i18n::FILES_ERR_NOT_FOUND.into(),
-        K::PermissionDenied => i18n::FILES_ERR_PERMISSION.into(),
-        K::AlreadyExists => i18n::FILES_ERR_EXISTS.into(),
+        K::NotFound => i18n::FILES_ERR_NOT_FOUND().into(),
+        K::PermissionDenied => i18n::FILES_ERR_PERMISSION().into(),
+        K::AlreadyExists => i18n::FILES_ERR_EXISTS().into(),
         _ => i18n::files_err_io(&e.to_string()),
     }
 }
@@ -59,7 +59,7 @@ pub async fn mkdir(path: PathBuf) -> Result<(), String> {
 /// Renomeia sem sobrescrever: o rename do SO substituiria o destino em silêncio.
 pub async fn rename(from: PathBuf, to: PathBuf) -> Result<(), String> {
     if tokio::fs::symlink_metadata(&to).await.is_ok() {
-        return Err(i18n::FILES_ERR_EXISTS.into());
+        return Err(i18n::FILES_ERR_EXISTS().into());
     }
     tokio::fs::rename(&from, &to).await.map_err(|e| io_text(&e))
 }
@@ -124,7 +124,7 @@ mod tests {
         // não sobrescreve um existente
         assert_eq!(
             rename(d.join("a.txt"), d.join("sub")).await.unwrap_err(),
-            i18n::FILES_ERR_EXISTS
+            i18n::FILES_ERR_EXISTS()
         );
         std::fs::write(d.join("sub").join("x"), b"x").unwrap();
         remove(d.join("sub")).await.unwrap();

@@ -129,7 +129,7 @@ impl FilesPanel {
             dest: HashMap::new(),
             remote_rect: None,
             sources: HashMap::new(),
-            remote_status: Some(i18n::FILES_REMOTE_UNAVAILABLE.to_string()),
+            remote_status: Some(i18n::FILES_REMOTE_UNAVAILABLE().to_string()),
             refocus: None,
         };
         p.navigate(
@@ -169,7 +169,7 @@ impl FilesPanel {
             profile_id: pid,
             journal_path: jpath,
         }));
-        self.remote_status = Some(i18n::FILES_REMOTE_OPENING.to_string());
+        self.remote_status = Some(i18n::FILES_REMOTE_OPENING().to_string());
         let (tx, ctx, rt) = (self.tx.clone(), self.ctx.clone(), self.rt.clone());
         let notify: Notify = {
             let c = self.ctx.clone();
@@ -392,16 +392,16 @@ impl FilesPanel {
             Side::Remote => Direction::Download,
         };
         if self.backend.is_none() {
-            self.notice = Some(i18n::FILES_REMOTE_UNAVAILABLE.into());
+            self.notice = Some(i18n::FILES_REMOTE_UNAVAILABLE().into());
             return;
         }
         if self.remote_pane.path.is_empty() {
-            self.notice = Some(i18n::FILES_NO_REMOTE_DIR.into());
+            self.notice = Some(i18n::FILES_NO_REMOTE_DIR().into());
             return;
         }
         let selected: Vec<Entry> = self.pane(from).selected().into_iter().cloned().collect();
         if selected.is_empty() {
-            self.notice = Some(i18n::FILES_NOTHING_SELECTED.into());
+            self.notice = Some(i18n::FILES_NOTHING_SELECTED().into());
             return;
         }
         let refs: Vec<&Entry> = selected.iter().collect();
@@ -439,11 +439,11 @@ impl FilesPanel {
     fn upload_dropped(&mut self, paths: Vec<PathBuf>) {
         self.notice = None;
         if self.backend.is_none() {
-            self.notice = Some(i18n::FILES_REMOTE_UNAVAILABLE.into());
+            self.notice = Some(i18n::FILES_REMOTE_UNAVAILABLE().into());
             return;
         }
         if self.remote_pane.path.is_empty() {
-            self.notice = Some(i18n::FILES_NO_REMOTE_DIR.into());
+            self.notice = Some(i18n::FILES_NO_REMOTE_DIR().into());
             return;
         }
         let reqs = plan::requests_for_drop(&paths, &self.remote_pane.path, self.overwrite);
@@ -560,8 +560,8 @@ impl FilesPanel {
         let keys = !self.needs_modal();
 
         ui.horizontal(|ui| {
-            ui.label(RichText::new(i18n::FILES_TITLE).strong());
-            ui.label(i18n::FILES_POLICY_LABEL);
+            ui.label(RichText::new(i18n::FILES_TITLE()).strong());
+            ui.label(i18n::FILES_POLICY_LABEL());
             egui::ComboBox::from_id_salt((self.uid, "policy"))
                 .selected_text(plan::overwrite_label(self.overwrite))
                 .show_ui(ui, |ui| {
@@ -570,18 +570,18 @@ impl FilesPanel {
                     }
                 })
                 .response
-                .on_hover_text(i18n::FILES_POLICY_HINT);
+                .on_hover_text(i18n::FILES_POLICY_HINT());
             if let Some(n) = &self.notice {
                 ui.colored_label(crate::view::warn_color(ui), n);
             }
             if self.sync.running() && !self.sync.open {
-                ui.label(i18n::SYNC_RUNNING_HIDDEN);
-                if ui.button(i18n::SYNC_SHOW).clicked() {
+                ui.label(i18n::SYNC_RUNNING_HIDDEN());
+                if ui.button(i18n::SYNC_SHOW()).clicked() {
                     self.sync.open = true;
                 }
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(i18n::FILES_CLOSE).clicked() {
+                if ui.button(i18n::FILES_CLOSE()).clicked() {
                     close = true;
                 }
             });
@@ -629,7 +629,7 @@ impl FilesPanel {
         sub(ui, left, &mut |ui| {
             let cx = ColCtx {
                 uid,
-                label: i18n::FILES_LOCAL,
+                label: i18n::FILES_LOCAL(),
                 unavailable: None,
                 keys,
                 can_transfer: can_up,
@@ -641,24 +641,24 @@ impl FilesPanel {
             ui.add_space(70.0);
             ui.vertical_centered(|ui| {
                 if ui
-                    .add_enabled(can_up, egui::Button::new(i18n::FILES_UPLOAD))
-                    .on_hover_text(i18n::FILES_UPLOAD_HINT)
+                    .add_enabled(can_up, egui::Button::new(i18n::FILES_UPLOAD()))
+                    .on_hover_text(i18n::FILES_UPLOAD_HINT())
                     .clicked()
                 {
                     acts.push(Act::Transfer(Side::Local));
                 }
                 ui.add_space(6.0);
                 if ui
-                    .add_enabled(can_down, egui::Button::new(i18n::FILES_DOWNLOAD))
-                    .on_hover_text(i18n::FILES_DOWNLOAD_HINT)
+                    .add_enabled(can_down, egui::Button::new(i18n::FILES_DOWNLOAD()))
+                    .on_hover_text(i18n::FILES_DOWNLOAD_HINT())
                     .clicked()
                 {
                     acts.push(Act::Transfer(Side::Remote));
                 }
                 ui.add_space(16.0);
                 if ui
-                    .add_enabled(remote_ready, egui::Button::new(i18n::FILES_SYNC))
-                    .on_hover_text(i18n::FILES_SYNC_HINT)
+                    .add_enabled(remote_ready, egui::Button::new(i18n::FILES_SYNC()))
+                    .on_hover_text(i18n::FILES_SYNC_HINT())
                     .clicked()
                 {
                     acts.push(Act::Sync);
@@ -668,7 +668,7 @@ impl FilesPanel {
         sub(ui, right, &mut |ui| {
             let cx = ColCtx {
                 uid,
-                label: i18n::FILES_REMOTE,
+                label: i18n::FILES_REMOTE(),
                 unavailable: self.remote_status.as_deref(),
                 keys,
                 can_transfer: can_down,
@@ -776,7 +776,7 @@ impl FilesPanel {
             ui.painter().text(
                 remote_rect.center(),
                 Align2::CENTER_CENTER,
-                i18n::FILES_DROP_HINT,
+                i18n::FILES_DROP_HINT(),
                 egui::FontId::proportional(15.0),
                 ui.visuals().strong_text_color(),
             );
@@ -853,7 +853,7 @@ pub fn new_for_session(
     });
     match conn {
         Some(c) => p.attach_connection(c),
-        None => p.remote_status = Some(i18n::FILES_NO_CONNECTION.to_string()),
+        None => p.remote_status = Some(i18n::FILES_NO_CONNECTION().to_string()),
     }
     p
 }
@@ -869,7 +869,7 @@ pub(crate) fn name_problem(
     }
     let n = name.trim();
     if Some(n) != same_as && existing.iter().any(|e| e == n) {
-        return Some(i18n::FILES_ERR_EXISTS.to_string());
+        return Some(i18n::FILES_ERR_EXISTS().to_string());
     }
     None
 }

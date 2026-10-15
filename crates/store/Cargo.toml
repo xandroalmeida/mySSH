@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Persistência local (SQLite) de perfis, pastas, credenciais (metadados) e host keys do mySSH"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 myssh-core = { path = "../core" }
 rusqlite = { version = "0.37", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }

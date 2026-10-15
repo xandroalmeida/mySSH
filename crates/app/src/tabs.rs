@@ -192,15 +192,15 @@ pub struct WelcomeBody;
 
 impl TabBody for WelcomeBody {
     fn title(&self) -> String {
-        i18n::WELCOME_TITLE.into()
+        i18n::WELCOME_TITLE().into()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _env: &TabEnv) {
         ui.add_space(24.0);
         ui.vertical_centered(|ui| {
-            ui.heading(i18n::WELCOME_HEADING);
+            ui.heading(i18n::WELCOME_HEADING());
             ui.add_space(8.0);
-            ui.label(i18n::WELCOME_BODY);
+            ui.label(i18n::WELCOME_BODY());
             ui.add_space(8.0);
             for a in crate::shortcuts::ACTIONS {
                 ui.weak(format!(

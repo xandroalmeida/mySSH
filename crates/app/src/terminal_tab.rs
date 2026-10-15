@@ -298,13 +298,13 @@ impl TerminalTab {
     fn launch(&mut self, env: &TabEnv) {
         let mut mats = std::mem::take(&mut self.mats);
         let Some(Some(auth)) = mats.pop() else {
-            self.phase = Phase::Failed(i18n::ERR_INTERNAL.into());
+            self.phase = Phase::Failed(i18n::ERR_INTERNAL().into());
             return;
         };
         let mut jumps = Vec::with_capacity(self.hops.len());
         for (h, m) in self.hops.iter().zip(mats) {
             let Some(auth) = m else {
-                self.phase = Phase::Failed(i18n::ERR_INTERNAL.into());
+                self.phase = Phase::Failed(i18n::ERR_INTERNAL().into());
                 return;
             };
             jumps.push(Hop {
@@ -350,7 +350,7 @@ impl TerminalTab {
             Some(s) => {
                 // Só marca a reconexão se a sessão anterior mostrou alguma saída.
                 let sep = if s.bytes_received() > 0 {
-                    i18n::RECONNECTED_SEPARATOR
+                    i18n::RECONNECTED_SEPARATOR()
                 } else {
                     ""
                 };
@@ -376,7 +376,7 @@ impl TerminalTab {
                 passphrase: Some(secret),
             },
             _ => {
-                self.phase = Phase::Failed(i18n::ERR_INTERNAL.into());
+                self.phase = Phase::Failed(i18n::ERR_INTERNAL().into());
                 return;
             }
         };
@@ -415,7 +415,7 @@ impl TerminalTab {
             }
             Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. } => {
                 self.phase = Phase::Idle;
-                self.notice = Some(i18n::TAB_CANCELLED.into());
+                self.notice = Some(i18n::TAB_CANCELLED().into());
             }
             _ => {}
         }
@@ -444,25 +444,25 @@ impl TerminalTab {
     fn badge(&self) -> StatusBadge {
         let b = |icon, text, color| StatusBadge { icon, text, color };
         match &self.phase {
-            Phase::Idle => b("○", i18n::ST_IDLE, GRAY),
-            Phase::Resolving(_) => b("⏳", i18n::ST_PREPARING, AMBER),
-            Phase::VaultLocked { .. } | Phase::Prompt(_) => b("🔑", i18n::ST_NEEDS_INPUT, AMBER),
-            Phase::Failed(_) => b("✖", i18n::ST_ERROR, RED),
+            Phase::Idle => b("○", i18n::ST_IDLE(), GRAY),
+            Phase::Resolving(_) => b("⏳", i18n::ST_PREPARING(), AMBER),
+            Phase::VaultLocked { .. } | Phase::Prompt(_) => b("🔑", i18n::ST_NEEDS_INPUT(), AMBER),
+            Phase::Failed(_) => b("✖", i18n::ST_ERROR(), RED),
             Phase::Live => match &self.sess {
-                None => b("○", i18n::ST_IDLE, GRAY),
-                Some(s) if s.host_key_alert().is_some() => b("⛔", i18n::ST_BLOCKED, RED),
+                None => b("○", i18n::ST_IDLE(), GRAY),
+                Some(s) if s.host_key_alert().is_some() => b("⛔", i18n::ST_BLOCKED(), RED),
                 Some(s) => match s.closed() {
-                    Some(Some(_)) => b("✖", i18n::ST_ERROR, RED),
-                    Some(None) => b("○", i18n::ST_DISCONNECTED, GRAY),
+                    Some(Some(_)) => b("✖", i18n::ST_ERROR(), RED),
+                    Some(None) => b("○", i18n::ST_DISCONNECTED(), GRAY),
                     None => match s.state() {
                         SessionState::Connecting | SessionState::Reconnecting => {
-                            b("⏳", i18n::ST_CONNECTING, AMBER)
+                            b("⏳", i18n::ST_CONNECTING(), AMBER)
                         }
-                        SessionState::AwaitingHostTrust => b("🔒", i18n::ST_AWAITING_TRUST, AMBER),
-                        SessionState::AwaitingAuth => b("🔑", i18n::ST_AUTHENTICATING, AMBER),
-                        SessionState::Connected => b("✔", i18n::ST_CONNECTED, GREEN),
-                        SessionState::Disconnected => b("○", i18n::ST_DISCONNECTED, GRAY),
-                        SessionState::Error(_) => b("✖", i18n::ST_ERROR, RED),
+                        SessionState::AwaitingHostTrust => b("🔒", i18n::ST_AWAITING_TRUST(), AMBER),
+                        SessionState::AwaitingAuth => b("🔑", i18n::ST_AUTHENTICATING(), AMBER),
+                        SessionState::Connected => b("✔", i18n::ST_CONNECTED(), GREEN),
+                        SessionState::Disconnected => b("○", i18n::ST_DISCONNECTED(), GRAY),
+                        SessionState::Error(_) => b("✖", i18n::ST_ERROR(), RED),
                     },
                 },
             },
@@ -513,22 +513,22 @@ impl TerminalTab {
         );
         let can_reconnect = !live && !matches!(self.phase, Phase::Resolving(_));
         let label = if matches!(self.phase, Phase::Idle) && self.sess.is_none() {
-            i18n::TAB_CONNECT
+            i18n::TAB_CONNECT()
         } else if self.force.is_some() {
-            i18n::TAB_RETRY
+            i18n::TAB_RETRY()
         } else {
-            i18n::TAB_RECONNECT
+            i18n::TAB_RECONNECT()
         };
         let p = &self.profile;
         ui.horizontal(|ui| {
-            let mut tip = format!("{}: {}", i18n::AUTH_LABEL, auth_text(&p.auth));
+            let mut tip = format!("{}: {}", i18n::AUTH_LABEL(), auth_text(&p.auth));
             if !self.saved {
-                tip.push_str(&format!("\n{}", i18n::QUICK_NOT_SAVED));
+                tip.push_str(&format!("\n{}", i18n::QUICK_NOT_SAVED()));
             }
             ui.label(RichText::new(format!("{}@{}:{}", p.username, p.host, p.port)).monospace())
                 .on_hover_text(tip);
             if let Some(j) = &self.jump_name {
-                ui.weak(format!("{}: {j}", i18n::JUMP_LABEL));
+                ui.weak(format!("{}: {j}", i18n::JUMP_LABEL()));
             }
             ui.colored_label(badge.color, format!("{} {}", badge.icon, badge.text));
             if let Some(n) = &self.notice {
@@ -538,11 +538,11 @@ impl TerminalTab {
                 if ui
                     .add_enabled(
                         live || self.files_open,
-                        egui::Button::new(i18n::FILES_BUTTON).selected(self.files_open),
+                        egui::Button::new(i18n::FILES_BUTTON()).selected(self.files_open),
                     )
                     .on_hover_text(format!(
                         "{} ({})",
-                        i18n::FILES_BUTTON_HINT,
+                        i18n::FILES_BUTTON_HINT(),
                         crate::shortcuts::label(crate::shortcuts::Action::ToggleFiles)
                     ))
                     .clicked()
@@ -558,7 +558,7 @@ impl TerminalTab {
                 if ui
                     .add_enabled(
                         live || connecting_pre,
-                        egui::Button::new(i18n::TAB_DISCONNECT),
+                        egui::Button::new(i18n::TAB_DISCONNECT()),
                     )
                     .clicked()
                 {
@@ -633,7 +633,7 @@ impl TerminalTab {
                 });
             ui.add_space(2.0);
         } else if sess.closed().is_some() {
-            ui.weak(i18n::TAB_SESSION_ENDED);
+            ui.weak(i18n::TAB_SESSION_ENDED());
         }
         sess.set_input_enabled(!env.input_blocked);
         sess.set_confirm_multiline(env.confirm_paste);
@@ -695,8 +695,8 @@ impl TerminalTab {
                 ui.colored_label(warn_color(ui), n);
             }
             let hint = match p.kind {
-                SecretKind::Password => i18n::ASK_PASSWORD_HINT,
-                SecretKind::Passphrase => i18n::ASK_PASSPHRASE_HINT,
+                SecretKind::Password => i18n::ASK_PASSWORD_HINT(),
+                SecretKind::Passphrase => i18n::ASK_PASSPHRASE_HINT(),
             };
             let te = ui.add(
                 egui::TextEdit::singleline(&mut p.text)
@@ -710,18 +710,18 @@ impl TerminalTab {
             let enter = te.lost_focus() && ui.input(|i| i.key_pressed(Key::Enter));
             if p.can_save {
                 ui.add_space(4.0);
-                ui.checkbox(&mut p.save, i18n::ASK_SAVE);
-                ui.weak(i18n::ASK_SAVE_HELP);
+                ui.checkbox(&mut p.save, i18n::ASK_SAVE());
+                ui.weak(i18n::ASK_SAVE_HELP());
             }
             ui.add_space(6.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let ok = ui
-                    .add_enabled(!p.text.is_empty(), egui::Button::new(i18n::CONNECT))
+                    .add_enabled(!p.text.is_empty(), egui::Button::new(i18n::CONNECT()))
                     .clicked();
                 if ok || (enter && !p.text.is_empty()) {
                     submit = true;
                 }
-                if ui.button(i18n::CANCEL).clicked() {
+                if ui.button(i18n::CANCEL()).clicked() {
                     cancel = true;
                 }
             });
@@ -731,7 +731,7 @@ impl TerminalTab {
         }
         if cancel {
             self.phase = Phase::Idle; // descarta (e zeroiza) o buffer
-            self.notice = Some(i18n::TAB_CANCELLED.into());
+            self.notice = Some(i18n::TAB_CANCELLED().into());
         } else if submit {
             self.submit_prompt(env);
         }
@@ -752,29 +752,29 @@ impl TerminalTab {
         let mut cancel = false;
         let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
             ui.set_width(440.0);
-            ui.heading(i18n::VAULT_LOCKED_TITLE);
+            ui.heading(i18n::VAULT_LOCKED_TITLE());
             ui.add_space(6.0);
-            ui.label(i18n::VAULT_LOCKED_BODY);
+            ui.label(i18n::VAULT_LOCKED_BODY());
             if let Some(e) = &err {
                 ui.colored_label(error_text(ui), e);
             }
             ui.add_space(8.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let label = if busy {
-                    i18n::VAULT_UNLOCKING
+                    i18n::VAULT_UNLOCKING()
                 } else {
-                    i18n::UNLOCK_VAULT
+                    i18n::UNLOCK_VAULT()
                 };
                 if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
                     unlock = true;
                 }
                 if ui
-                    .add_enabled(!busy, egui::Button::new(i18n::TYPE_NOW))
+                    .add_enabled(!busy, egui::Button::new(i18n::TYPE_NOW()))
                     .clicked()
                 {
                     type_now = true;
                 }
-                if ui.button(i18n::CANCEL).clicked() {
+                if ui.button(i18n::CANCEL()).clicked() {
                     cancel = true;
                 }
             });
@@ -813,32 +813,32 @@ impl TerminalTab {
         let mut decision = None;
         let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
             ui.set_width(540.0);
-            ui.heading(i18n::HK_TITLE);
+            ui.heading(i18n::HK_TITLE());
             ui.add_space(6.0);
-            ui.label(i18n::HK_BODY);
+            ui.label(i18n::HK_BODY());
             ui.add_space(8.0);
             egui::Grid::new(("hk-grid", self.uid))
                 .num_columns(2)
                 .spacing([10.0, 6.0])
                 .show(ui, |ui| {
-                    ui.label(i18n::HK_HOST);
+                    ui.label(i18n::HK_HOST());
                     ui.add(
                         egui::Label::new(RichText::new(fmt_endpoint(&p.endpoint)).monospace())
                             .selectable(true),
                     );
                     ui.end_row();
                     if let Some(v) = &via {
-                        ui.label(i18n::HK_VIA);
+                        ui.label(i18n::HK_VIA());
                         ui.label(v);
                         ui.end_row();
                     }
-                    ui.label(i18n::HK_ALGO);
+                    ui.label(i18n::HK_ALGO());
                     ui.add(
                         egui::Label::new(RichText::new(&p.key.algorithm).monospace())
                             .selectable(true),
                     );
                     ui.end_row();
-                    ui.label(i18n::HK_FINGERPRINT);
+                    ui.label(i18n::HK_FINGERPRINT());
                     ui.add(
                         egui::Label::new(
                             RichText::new(&p.key.fingerprint_sha256)
@@ -852,7 +852,7 @@ impl TerminalTab {
             ui.add_space(10.0);
             ui.horizontal(|ui| {
                 // Rejeitar é o padrão (foco inicial e Enter).
-                let reject = ui.button(i18n::HK_REJECT);
+                let reject = ui.button(i18n::HK_REJECT());
                 if fresh {
                     reject.request_focus();
                 }
@@ -860,10 +860,10 @@ impl TerminalTab {
                     decision = Some(HostKeyDecision::Reject);
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if ui.button(i18n::HK_ACCEPT_SAVE).clicked() {
+                    if ui.button(i18n::HK_ACCEPT_SAVE()).clicked() {
                         decision = Some(HostKeyDecision::AcceptAndSave);
                     }
-                    if ui.button(i18n::HK_ACCEPT_ONCE).clicked() {
+                    if ui.button(i18n::HK_ACCEPT_ONCE()).clicked() {
                         decision = Some(HostKeyDecision::AcceptOnce);
                     }
                 });
@@ -894,10 +894,10 @@ impl TerminalTab {
         let title = match info.hop {
             Some(i) => i18n::ki_title_jump(self.hops.get(i).map_or("", |h| h.name.as_str())),
             None if !info.name.trim().is_empty() => info.name.clone(),
-            None => i18n::KI_TITLE.to_string(),
+            None => i18n::KI_TITLE().to_string(),
         };
         let instructions = if info.instructions.trim().is_empty() {
-            i18n::KI_DEFAULT_INSTRUCTIONS.to_string()
+            i18n::KI_DEFAULT_INSTRUCTIONS().to_string()
         } else {
             info.instructions.clone()
         };
@@ -919,7 +919,7 @@ impl TerminalTab {
                 let te = ui.add(
                     egui::TextEdit::singleline(&mut form.fields[i])
                         .password(!*echo)
-                        .hint_text(i18n::KI_ECHO_HINT)
+                        .hint_text(i18n::KI_ECHO_HINT())
                         .desired_width(f32::INFINITY),
                 );
                 if fresh && i == 0 {
@@ -932,10 +932,10 @@ impl TerminalTab {
             }
             ui.add_space(4.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(i18n::KI_SEND).clicked() || enter {
+                if ui.button(i18n::KI_SEND()).clicked() || enter {
                     submit = true;
                 }
-                if ui.button(i18n::CANCEL).clicked() {
+                if ui.button(i18n::CANCEL()).clicked() {
                     cancel = true;
                 }
             });
@@ -969,9 +969,9 @@ impl TerminalTab {
         let mut cancel = false;
         let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
             ui.set_width(520.0);
-            ui.heading(i18n::PASTE_TITLE);
+            ui.heading(i18n::PASTE_TITLE());
             ui.add_space(6.0);
-            ui.label(i18n::PASTE_BODY);
+            ui.label(i18n::PASTE_BODY());
             ui.strong(i18n::paste_lines(lines));
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 ui.set_width(ui.available_width());
@@ -979,11 +979,11 @@ impl TerminalTab {
             });
             ui.add_space(8.0);
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button(i18n::PASTE_CONFIRM).clicked() {
+                if ui.button(i18n::PASTE_CONFIRM()).clicked() {
                     confirm = true;
                 }
                 // Cancelar é o padrão (foco inicial e Enter).
-                let c = ui.button(i18n::CANCEL);
+                let c = ui.button(i18n::CANCEL());
                 if fresh {
                     c.request_focus();
                 }
@@ -1029,7 +1029,7 @@ impl TabBody for TerminalTab {
                 Err(TryRecvError::Disconnected) => Some(ResolveOut {
                     hops: Vec::new(),
                     mats: Vec::new(),
-                    stop: Stop::Failed(i18n::ERR_INTERNAL.into()),
+                    stop: Stop::Failed(i18n::ERR_INTERNAL().into()),
                 }),
             },
             _ => None,
@@ -1080,7 +1080,7 @@ impl TabBody for TerminalTab {
                         Some(h) => h.auth = auth,
                         None => self.profile.auth = auth,
                     }
-                    self.notice = Some(i18n::SAVED_TO_VAULT.into());
+                    self.notice = Some(i18n::SAVED_TO_VAULT().into());
                     self.events.push(TabEvent::ProfileChanged);
                     self.save_rx = None;
                 }
@@ -1125,15 +1125,15 @@ impl TabBody for TerminalTab {
         match &self.phase {
             Phase::Idle => {
                 let msg = if self.sess.is_some() {
-                    i18n::TAB_SESSION_ENDED
+                    i18n::TAB_SESSION_ENDED()
                 } else {
-                    i18n::TAB_NOT_CONNECTED
+                    i18n::TAB_NOT_CONNECTED()
                 };
                 self.message_panel(ui, msg, false);
             }
-            Phase::Resolving(_) => self.message_panel(ui, i18n::TAB_PREPARING, false),
+            Phase::Resolving(_) => self.message_panel(ui, i18n::TAB_PREPARING(), false),
             Phase::VaultLocked { .. } | Phase::Prompt(_) => {
-                self.message_panel(ui, i18n::TAB_WAITING_INPUT, false)
+                self.message_panel(ui, i18n::TAB_WAITING_INPUT(), false)
             }
             Phase::Failed(m) => {
                 let m = self.friendly_error(m);
@@ -1308,19 +1308,19 @@ fn auth_text(a: &AuthMethod) -> &'static str {
     match a {
         AuthMethod::Password {
             credential: Some(_),
-        } => i18n::AUTH_SUMMARY_PASSWORD_SAVED,
-        AuthMethod::Password { credential: None } => i18n::AUTH_SUMMARY_PASSWORD_ASK,
-        AuthMethod::KeyFile { .. } => i18n::AUTH_SUMMARY_KEY,
-        AuthMethod::Agent => i18n::AUTH_SUMMARY_AGENT,
-        AuthMethod::KeyboardInteractive => i18n::AUTH_SUMMARY_KI,
+        } => i18n::AUTH_SUMMARY_PASSWORD_SAVED(),
+        AuthMethod::Password { credential: None } => i18n::AUTH_SUMMARY_PASSWORD_ASK(),
+        AuthMethod::KeyFile { .. } => i18n::AUTH_SUMMARY_KEY(),
+        AuthMethod::Agent => i18n::AUTH_SUMMARY_AGENT(),
+        AuthMethod::KeyboardInteractive => i18n::AUTH_SUMMARY_KI(),
     }
 }
 
 fn friendly_error(auth: &AuthMethod, msg: &str) -> String {
     if msg == AUTH_REJECTED {
         match auth {
-            AuthMethod::Password { .. } => return i18n::ERR_AUTH_PASSWORD.into(),
-            AuthMethod::KeyFile { .. } => return i18n::ERR_AUTH_KEY.into(),
+            AuthMethod::Password { .. } => return i18n::ERR_AUTH_PASSWORD().into(),
+            AuthMethod::KeyFile { .. } => return i18n::ERR_AUTH_KEY().into(),
             _ => {}
         }
     }
@@ -1360,13 +1360,13 @@ enum Fetch {
 fn fetch(store: &Store, vault: &Vault, cid: CredentialId) -> Fetch {
     let cred = match store.get_credential(cid) {
         Ok(Some(c)) => c,
-        _ => return Fetch::Missing(i18n::NOTE_CRED_MISSING.into()),
+        _ => return Fetch::Missing(i18n::NOTE_CRED_MISSING().into()),
     };
     match vault.get(&cred.secret) {
         Ok(s) => Fetch::Secret(s),
         Err(SecretError::Locked) => Fetch::Locked,
-        Err(SecretError::NotFound) => Fetch::Missing(i18n::NOTE_SECRET_MISSING.into()),
-        Err(SecretError::Unavailable(_)) => Fetch::Missing(i18n::NOTE_VAULT_UNAVAILABLE.into()),
+        Err(SecretError::NotFound) => Fetch::Missing(i18n::NOTE_SECRET_MISSING().into()),
+        Err(SecretError::Unavailable(_)) => Fetch::Missing(i18n::NOTE_VAULT_UNAVAILABLE().into()),
         Err(e) => Fetch::Missing(secret_error_text(&e)),
     }
 }
@@ -1422,7 +1422,7 @@ fn resolve_chain(
         let mut cur = target.jump;
         while let Some(id) = cur {
             if seen.contains(&id) {
-                return fail(hops, mats, i18n::ERR_JUMP_LOOP);
+                return fail(hops, mats, i18n::ERR_JUMP_LOOP());
             }
             seen.push(id);
             match store.get_profile(id) {
@@ -1430,7 +1430,7 @@ fn resolve_chain(
                     cur = p.jump;
                     chain.push(p);
                 }
-                _ => return fail(hops, mats, i18n::ERR_JUMP_MISSING),
+                _ => return fail(hops, mats, i18n::ERR_JUMP_MISSING()),
             }
         }
         chain.reverse(); // do cliente para o destino
@@ -1551,7 +1551,7 @@ fn save_secret(
         Ok(Some(p)) => p,
         _ => {
             undo(store, Some(cred.id));
-            return Err(i18n::ERR_INTERNAL.into());
+            return Err(i18n::ERR_INTERNAL().into());
         }
     };
     match (&mut p.auth, kind) {
@@ -1561,7 +1561,7 @@ fn save_secret(
         }
         _ => {
             undo(store, Some(cred.id));
-            return Err(i18n::ERR_INTERNAL.into());
+            return Err(i18n::ERR_INTERNAL().into());
         }
     }
     if let Err(e) = store.update_profile(&p) {
@@ -1585,26 +1585,26 @@ fn alert_panel(ui: &mut egui::Ui, alert: &HostKeyAlert, via: Option<&str>, act: 
                     ui.set_width(ui.available_width());
                     ui.visuals_mut().override_text_color = Some(Color32::WHITE);
                     ui.label(
-                        RichText::new(format!("⛔ {}", i18n::HKC_TITLE))
+                        RichText::new(format!("⛔ {}", i18n::HKC_TITLE()))
                             .heading()
                             .strong(),
                     );
                     ui.add_space(6.0);
-                    ui.label(i18n::HKC_BODY);
+                    ui.label(i18n::HKC_BODY());
                     ui.add_space(8.0);
                     ui.label(
                         RichText::new(format!(
                             "{}: {}",
-                            i18n::HK_HOST,
+                            i18n::HK_HOST(),
                             fmt_endpoint(&alert.endpoint)
                         ))
                         .monospace(),
                     );
                     if let Some(v) = via {
-                        ui.label(format!("{}: {v}", i18n::HK_VIA));
+                        ui.label(format!("{}: {v}", i18n::HK_VIA()));
                     }
                     ui.add_space(6.0);
-                    ui.strong(i18n::HKC_PRESENTED);
+                    ui.strong(i18n::HKC_PRESENTED());
                     key_line(
                         ui,
                         &alert.presented.algorithm,
@@ -1612,21 +1612,21 @@ fn alert_panel(ui: &mut egui::Ui, alert: &HostKeyAlert, via: Option<&str>, act: 
                     );
                     ui.add_space(6.0);
                     if alert.known.is_empty() {
-                        ui.label(i18n::HKC_REVOKED);
+                        ui.label(i18n::HKC_REVOKED());
                     } else {
-                        ui.strong(i18n::HKC_KNOWN);
+                        ui.strong(i18n::HKC_KNOWN());
                         for k in &alert.known {
                             key_line(ui, &k.algorithm, &k.fingerprint_sha256);
                         }
                     }
                     ui.add_space(8.0);
-                    ui.label(i18n::HKC_HINT);
+                    ui.label(i18n::HKC_HINT());
                     ui.add_space(8.0);
                     ui.horizontal(|ui| {
-                        if ui.button(i18n::HKC_OPEN_TRUSTED).clicked() {
+                        if ui.button(i18n::HKC_OPEN_TRUSTED()).clicked() {
                             *act = Some(Act::OpenTrusted);
                         }
-                        if ui.button(i18n::TAB_RETRY).clicked() {
+                        if ui.button(i18n::TAB_RETRY()).clicked() {
                             *act = Some(Act::Connect);
                         }
                     });
@@ -1706,7 +1706,7 @@ mod tests {
     #[test]
     fn erro_de_autenticacao_vira_mensagem_clara() {
         let pw = AuthMethod::Password { credential: None };
-        assert_eq!(friendly_error(&pw, AUTH_REJECTED), i18n::ERR_AUTH_PASSWORD);
+        assert_eq!(friendly_error(&pw, AUTH_REJECTED), i18n::ERR_AUTH_PASSWORD());
         assert_eq!(friendly_error(&pw, "outro"), "outro");
     }
 }

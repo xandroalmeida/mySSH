@@ -26,10 +26,10 @@ pub enum QuickError {
 impl std::fmt::Display for QuickError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::Empty => i18n::QUICK_ERR_EMPTY,
-            Self::MissingUser => i18n::QUICK_ERR_USER,
-            Self::MissingHost => i18n::QUICK_ERR_HOST,
-            Self::InvalidPort => i18n::ERR_PORT,
+            Self::Empty => i18n::QUICK_ERR_EMPTY(),
+            Self::MissingUser => i18n::QUICK_ERR_USER(),
+            Self::MissingHost => i18n::QUICK_ERR_HOST(),
+            Self::InvalidPort => i18n::ERR_PORT(),
         })
     }
 }
@@ -182,7 +182,7 @@ pub fn group_by_folder(profiles: &[&Profile], folders: &[Folder]) -> Vec<Group> 
             None => groups.push(Group {
                 folder: key,
                 label: key.map_or_else(
-                    || i18n::NO_FOLDER.to_string(),
+                    || i18n::NO_FOLDER().to_string(),
                     |id| folder_path(folders, id),
                 ),
                 items: vec![i],
@@ -225,7 +225,7 @@ pub fn parse_tags(s: &str) -> Vec<String> {
 pub fn duplicate_profile(p: &Profile) -> Profile {
     let mut d = p.clone();
     d.id = myssh_core::ProfileId::new();
-    d.name = format!("{} {}", p.name, i18n::COPY_SUFFIX);
+    d.name = format!("{} {}", p.name, i18n::COPY_SUFFIX());
     d
 }
 
@@ -390,7 +390,7 @@ mod tests {
         let ps = [&a, &b, &fav, &c, &loose, &orphan];
         let g = group_by_folder(&ps, &folders);
         let labels: Vec<_> = g.iter().map(|g| g.label.as_str()).collect();
-        assert_eq!(labels, ["Raiz", "Raiz / Filha", i18n::NO_FOLDER]);
+        assert_eq!(labels, ["Raiz", "Raiz / Filha", i18n::NO_FOLDER()]);
         // favorito primeiro, depois por nome
         assert_eq!(g[0].items, vec![2, 1, 0]);
         // pasta inexistente cai em "sem pasta"
@@ -408,7 +408,7 @@ mod tests {
         let p = prof("X", "h", "u", &["t"]);
         let d = duplicate_profile(&p);
         assert_ne!(d.id, p.id);
-        assert_eq!(d.name, format!("X {}", i18n::COPY_SUFFIX));
+        assert_eq!(d.name, format!("X {}", i18n::COPY_SUFFIX()));
         assert_eq!(d.tags, p.tags);
     }
 

@@ -179,11 +179,11 @@ impl FilesPanel {
     pub fn open_sync(&mut self) {
         self.notice = None;
         if self.sync_engine.is_none() {
-            self.notice = Some(i18n::SYNC_UNAVAILABLE.into());
+            self.notice = Some(i18n::SYNC_UNAVAILABLE().into());
             return;
         }
         if self.remote_pane.path.is_empty() {
-            self.notice = Some(i18n::FILES_NO_REMOTE_DIR.into());
+            self.notice = Some(i18n::FILES_NO_REMOTE_DIR().into());
             return;
         }
         self.sync.open = true;
@@ -483,7 +483,7 @@ impl FilesPanel {
         )))
         .show(ctx, |ui| {
             ui.set_width(800.0);
-            ui.heading(i18n::SYNC_TITLE);
+            ui.heading(i18n::SYNC_TITLE());
             ui.add_space(4.0);
             // rodapé fixo (botões) + corpo rolável acima dele
             let footer_h = 34.0;
@@ -521,10 +521,10 @@ impl FilesPanel {
     fn options_ui(&mut self, ui: &mut egui::Ui, ask: &mut Option<Ask>) {
         let red = err_color(ui);
         egui::Grid::new("sync-roots").num_columns(2).show(ui, |ui| {
-            ui.label(i18n::FILES_LOCAL);
+            ui.label(i18n::FILES_LOCAL());
             ui.label(RichText::new(self.sync.local_root.display().to_string()).monospace());
             ui.end_row();
-            ui.label(i18n::FILES_REMOTE);
+            ui.label(i18n::FILES_REMOTE());
             ui.label(RichText::new(&self.sync.remote_root).monospace());
             ui.end_row();
         });
@@ -535,10 +535,10 @@ impl FilesPanel {
             let mut discard = false;
             egui::Frame::group(ui.style()).show(ui, |ui| {
                 ui.label(RichText::new(msg).strong());
-                ui.weak(i18n::SYNC_RESUME_HELP);
+                ui.weak(i18n::SYNC_RESUME_HELP());
                 ui.horizontal(|ui| {
-                    resume = ui.button(i18n::SYNC_RESUME).clicked();
-                    discard = ui.button(i18n::SYNC_DISCARD).clicked();
+                    resume = ui.button(i18n::SYNC_RESUME()).clicked();
+                    discard = ui.button(i18n::SYNC_DISCARD()).clicked();
                 });
             });
             if resume {
@@ -548,51 +548,51 @@ impl FilesPanel {
             }
             ui.add_space(8.0);
         }
-        ui.label(RichText::new(i18n::SYNC_DIRECTION).strong());
+        ui.label(RichText::new(i18n::SYNC_DIRECTION()).strong());
         ui.radio_value(
             &mut self.sync.direction,
             Direction::LocalToRemote,
-            i18n::SYNC_L2R,
+            i18n::SYNC_L2R(),
         );
         ui.radio_value(
             &mut self.sync.direction,
             Direction::RemoteToLocal,
-            i18n::SYNC_R2L,
+            i18n::SYNC_R2L(),
         );
         let dest = match self.sync.direction {
-            Direction::LocalToRemote => i18n::FILES_REMOTE,
-            Direction::RemoteToLocal => i18n::FILES_LOCAL,
+            Direction::LocalToRemote => i18n::FILES_REMOTE(),
+            Direction::RemoteToLocal => i18n::FILES_LOCAL(),
         };
         ui.colored_label(warn(ui), i18n::sync_dest_changes(dest));
         ui.add_space(8.0);
-        ui.label(RichText::new(i18n::SYNC_COMPARE).strong());
-        ui.radio_value(&mut self.sync.content, false, i18n::SYNC_COMPARE_FAST);
-        ui.radio_value(&mut self.sync.content, true, i18n::SYNC_COMPARE_CONTENT);
+        ui.label(RichText::new(i18n::SYNC_COMPARE()).strong());
+        ui.radio_value(&mut self.sync.content, false, i18n::SYNC_COMPARE_FAST());
+        ui.radio_value(&mut self.sync.content, true, i18n::SYNC_COMPARE_CONTENT());
         if self.sync.content {
-            ui.colored_label(warn(ui), i18n::SYNC_CONTENT_COST);
+            ui.colored_label(warn(ui), i18n::SYNC_CONTENT_COST());
         }
         ui.add_space(8.0);
-        ui.label(RichText::new(i18n::SYNC_EXCLUDES).strong());
-        ui.weak(i18n::SYNC_EXCLUDES_HELP);
+        ui.label(RichText::new(i18n::SYNC_EXCLUDES()).strong());
+        ui.weak(i18n::SYNC_EXCLUDES_HELP());
         ui.add(
             egui::TextEdit::multiline(&mut self.sync.excl_text)
                 .desired_rows(3)
                 .desired_width(f32::INFINITY)
                 .font(egui::TextStyle::Monospace),
         )
-        .widget_info(|| super::column::text_info(i18n::SYNC_EXCLUDES, &self.sync.excl_text));
+        .widget_info(|| super::column::text_info(i18n::SYNC_EXCLUDES(), &self.sync.excl_text));
         let bad = txt::parse_exclusions(&self.sync.excl_text).err();
         if let Some(m) = &bad {
             ui.colored_label(red, m);
         }
         ui.add_space(8.0);
-        ui.checkbox(&mut self.sync.mirror, i18n::SYNC_MIRROR);
+        ui.checkbox(&mut self.sync.mirror, i18n::SYNC_MIRROR());
         if self.sync.mirror {
             egui::Frame::new()
                 .stroke(egui::Stroke::new(1.5, red))
                 .inner_margin(6.0)
                 .show(ui, |ui| {
-                    ui.colored_label(red, i18n::SYNC_MIRROR_WARNING);
+                    ui.colored_label(red, i18n::SYNC_MIRROR_WARNING());
                 });
         }
         if let Some(e) = &self.sync.error {
@@ -612,7 +612,7 @@ impl FilesPanel {
         };
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label(i18n::SYNC_PLANNING);
+            ui.label(i18n::SYNC_PLANNING());
         });
         if *total > 0 {
             let frac = percent(*done as u64, *total as u64) / 100.0;
@@ -664,7 +664,7 @@ impl FilesPanel {
             }
             ui.add(
                 egui::TextEdit::singleline(&mut self.sync.query)
-                    .hint_text(i18n::SYNC_SEARCH)
+                    .hint_text(i18n::SYNC_SEARCH())
                     .desired_width(180.0),
             );
         });
@@ -709,17 +709,17 @@ impl FilesPanel {
                                 .copied()
                                 .unwrap_or(ConflictChoice::Skip);
                             let mut c = cur;
-                            ui.selectable_value(&mut c, ConflictChoice::Skip, i18n::SYNC_SKIP);
+                            ui.selectable_value(&mut c, ConflictChoice::Skip, i18n::SYNC_SKIP());
                             ui.selectable_value(
                                 &mut c,
                                 ConflictChoice::UseSource,
-                                i18n::SYNC_USE_SOURCE,
+                                i18n::SYNC_USE_SOURCE(),
                             );
                             if c != cur {
                                 self.sync.choices.insert(it.path.clone(), c);
                             }
                         } else if matches!(it.action, Action::Conflict { .. }) {
-                            ui.weak(i18n::SYNC_NOT_RESOLVABLE);
+                            ui.weak(i18n::SYNC_NOT_RESOLVABLE());
                         }
                         let reason = txt::reason_text(&it.action);
                         ui.add(egui::Label::new(RichText::new(&reason).weak()).truncate())
@@ -728,7 +728,7 @@ impl FilesPanel {
                 }
             });
         if idx.is_empty() {
-            ui.weak(i18n::SYNC_NO_ITEMS);
+            ui.weak(i18n::SYNC_NO_ITEMS());
         }
         ui.add_space(6.0);
         if n_del > 0 {
@@ -751,17 +751,17 @@ impl FilesPanel {
         let can = txt::can_execute(&plan, self.sync.confirm_deletes, &decisions);
         let mut label = txt::execute_label(&plan, self.sync.confirm_deletes);
         if resuming {
-            label = format!("{} ({})", i18n::SYNC_RESUME, label);
+            label = format!("{} ({})", i18n::SYNC_RESUME(), label);
         }
         if !can && n_del == 0 && txt::executable_count(&plan, &decisions) == 0 {
-            ui.weak(i18n::SYNC_NOTHING_TO_DO);
+            ui.weak(i18n::SYNC_NOTHING_TO_DO());
         }
         let _ = (ask, can, label);
     }
 
     fn running_ui(&mut self, ui: &mut egui::Ui, ask: &mut Option<Ask>) {
         let p = self.sync.progress.clone();
-        ui.label(RichText::new(i18n::SYNC_RUNNING).strong());
+        ui.label(RichText::new(i18n::SYNC_RUNNING()).strong());
         let frac = if p.bytes_total > 0 {
             percent(p.bytes_done, p.bytes_total) / 100.0
         } else {
@@ -815,11 +815,11 @@ impl FilesPanel {
         ui.colored_label(
             color,
             RichText::new(if s.cancelled {
-                i18n::SYNC_CANCELLED
+                i18n::SYNC_CANCELLED()
             } else if s.failed > 0 {
-                i18n::SYNC_DONE_WITH_FAILURES
+                i18n::SYNC_DONE_WITH_FAILURES()
             } else {
-                i18n::SYNC_DONE
+                i18n::SYNC_DONE()
             })
             .strong(),
         );
@@ -831,7 +831,7 @@ impl FilesPanel {
             &fmt_size(s.bytes),
         ));
         if s.pending > 0 {
-            ui.weak(i18n::SYNC_PENDING_HELP);
+            ui.weak(i18n::SYNC_PENDING_HELP());
         }
         for w in &self.sync.warnings {
             ui.weak(w);
@@ -845,12 +845,12 @@ impl FilesPanel {
             return;
         };
         let red = err_color(ui);
-        ui.colored_label(red, RichText::new(i18n::SYNC_STALE_TITLE).strong());
+        ui.colored_label(red, RichText::new(i18n::SYNC_STALE_TITLE()).strong());
         ui.label(i18n::sync_stale_body(ch.len()));
         for c in ch.iter().take(8) {
             let lado = match c.side {
-                PSide::Source => i18n::SYNC_SIDE_SOURCE,
-                PSide::Dest => i18n::SYNC_SIDE_DEST,
+                PSide::Source => i18n::SYNC_SIDE_SOURCE(),
+                PSide::Dest => i18n::SYNC_SIDE_DEST(),
             };
             ui.label(RichText::new(format!("{}  ({lado})", c.path)).monospace());
         }
@@ -866,7 +866,7 @@ impl FilesPanel {
         };
         ui.colored_label(
             err_color(ui),
-            RichText::new(i18n::SYNC_FAILED_TITLE).strong(),
+            RichText::new(i18n::SYNC_FAILED_TITLE()).strong(),
         );
         ui.label(m);
         let _ = ask;
@@ -880,17 +880,17 @@ impl FilesPanel {
                 Phase::Options => {
                     let bad = txt::parse_exclusions(&self.sync.excl_text).is_err();
                     if ui
-                        .add_enabled(!bad, egui::Button::new(i18n::SYNC_PREVIEW))
+                        .add_enabled(!bad, egui::Button::new(i18n::SYNC_PREVIEW()))
                         .clicked()
                     {
                         *ask = Some(Ask::Plan);
                     }
-                    if ui.button(i18n::CANCEL).clicked() {
+                    if ui.button(i18n::CANCEL()).clicked() {
                         *ask = Some(Ask::Close);
                     }
                 }
                 Phase::Planning { .. } => {
-                    if ui.button(i18n::CLOSE).clicked() {
+                    if ui.button(i18n::CLOSE()).clicked() {
                         *ask = Some(Ask::Close);
                     }
                 }
@@ -900,47 +900,47 @@ impl FilesPanel {
                     let can = txt::can_execute(plan, self.sync.confirm_deletes, &d);
                     let mut label = txt::execute_label(plan, self.sync.confirm_deletes);
                     if self.sync.resume_journal.is_some() {
-                        label = format!("{} ({})", i18n::SYNC_RESUME, label);
+                        label = format!("{} ({})", i18n::SYNC_RESUME(), label);
                     }
                     if ui.add_enabled(can, egui::Button::new(label)).clicked() {
                         *ask = Some(Ask::Execute);
                     }
-                    if ui.button(i18n::SYNC_BACK).clicked() {
+                    if ui.button(i18n::SYNC_BACK()).clicked() {
                         *ask = Some(Ask::BackToOptions);
                     }
-                    if ui.button(i18n::CLOSE).clicked() {
+                    if ui.button(i18n::CLOSE()).clicked() {
                         *ask = Some(Ask::Close);
                     }
                 }
                 Phase::Running => {
-                    if ui.button(i18n::SYNC_HIDE).clicked() {
+                    if ui.button(i18n::SYNC_HIDE()).clicked() {
                         *ask = Some(Ask::Hide);
                     }
-                    if ui.button(i18n::SYNC_CANCEL).clicked() {
+                    if ui.button(i18n::SYNC_CANCEL()).clicked() {
                         *ask = Some(Ask::Cancel);
                     }
                 }
                 Phase::Finished(_) => {
-                    if ui.button(i18n::CLOSE).clicked() {
+                    if ui.button(i18n::CLOSE()).clicked() {
                         *ask = Some(Ask::Close);
                     }
-                    if ui.button(i18n::SYNC_NEW).clicked() {
+                    if ui.button(i18n::SYNC_NEW()).clicked() {
                         *ask = Some(Ask::BackToOptions);
                     }
                 }
                 Phase::Stale(_) => {
-                    if ui.button(i18n::CLOSE).clicked() {
+                    if ui.button(i18n::CLOSE()).clicked() {
                         *ask = Some(Ask::Close);
                     }
-                    if ui.button(i18n::SYNC_NEW_PREVIEW).clicked() {
+                    if ui.button(i18n::SYNC_NEW_PREVIEW()).clicked() {
                         *ask = Some(Ask::Plan);
                     }
                 }
                 Phase::Failed(_) => {
-                    if ui.button(i18n::CLOSE).clicked() {
+                    if ui.button(i18n::CLOSE()).clicked() {
                         *ask = Some(Ask::Close);
                     }
-                    if ui.button(i18n::SYNC_BACK).clicked() {
+                    if ui.button(i18n::SYNC_BACK()).clicked() {
                         *ask = Some(Ask::BackToOptions);
                     }
                 }

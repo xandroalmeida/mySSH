@@ -75,7 +75,7 @@ fn main() -> eframe::Result {
     {
         Ok(s) => s,
         Err(()) => {
-            store_warning = Some(i18n::STORE_FALLBACK.to_string());
+            store_warning = Some(i18n::STORE_FALLBACK().to_string());
             Store::open_in_memory().expect("sqlite em memória")
         }
     };
@@ -90,7 +90,7 @@ fn main() -> eframe::Result {
     let vault = Arc::new(Vault::new(backend));
 
     let mut viewport = egui::ViewportBuilder::default()
-        .with_title(i18n::TITLE)
+        .with_title(i18n::TITLE())
         .with_inner_size([1200.0, 800.0])
         .with_min_inner_size([720.0, 480.0])
         .with_icon(Arc::new(icon::app_icon()));

@@ -6,6 +6,7 @@ license = "MIT OR Apache-2.0"
 description = "Transferência SFTP do mySSH: navegador remoto, fila de upload/download, retomada e FileTree remoto (sem UI)"
 
 [dependencies]
+myssh-i18n = { path = "../i18n" }
 myssh-ssh = { path = "../ssh" }
 myssh-sync = { path = "../sync" }
 russh-sftp = "3"
