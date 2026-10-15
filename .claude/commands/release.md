@@ -21,7 +21,7 @@ Há dois modos. Cada máquina gera só o pacote da própria plataforma, então u
 2. Última tag: `T=$(git describe --tags --abbrev=0 --match 'v*')`.
 3. Arquivos alterados desde a tag, **ignorando os da página** (o passo 8 sempre faz um commit da página depois da tag):
    ```
-   git diff --name-only "$T" HEAD -- . ':(exclude)docs/index.html' ':(exclude)docs/pt-br/index.html' ':(exclude)docs/es/index.html' ':(exclude)tools/site/release.json'
+   git diff --name-only "$T" HEAD -- . ':(exclude)docs/index.html' ':(exclude)docs/pt-br/index.html' ':(exclude)docs/es/index.html' ':(exclude)docs/sitemap.xml' ':(exclude)docs/llms.txt' ':(exclude)tools/site/release.json'
    ```
 4. Decida:
    - **Saída vazia e sem argumento** → **modo binários**: siga só a seção "Modo binários" no fim deste arquivo.
@@ -90,9 +90,9 @@ Omita as seções vazias. Grave em `docs/releases/vX.Y.Z.md` e acrescente o mesm
 
 ## 8. Atualizar a página do projeto
 A página (https://xandroalmeida.github.io/mySSH/, em inglês, pt-BR e espanhol) é servida pelo GitHub Pages a partir de `docs/` na `main`. Ela mostra a versão, a data e os links de download dos binários da release, então só pode ser gerada **depois** do `gh release create` e dos uploads.
-- `python3 tools/site/build.py vX.Y.Z`: lê a release no GitHub com `gh` e regenera `docs/index.html`, `docs/pt-br/index.html` e `docs/es/index.html`, além de `tools/site/release.json`. Não edite essas páginas à mão: layout em `tools/site/template.html`, textos em `tools/site/strings.json`.
+- `python3 tools/site/build.py vX.Y.Z`: lê a release no GitHub com `gh` e regenera `docs/index.html`, `docs/pt-br/index.html` `docs/es/index.html`, `docs/sitemap.xml` e `docs/llms.txt`, além de `tools/site/release.json`. Não edite essas páginas à mão: layout em `tools/site/template.html`, textos em `tools/site/strings.json`.
 - Confira que as três páginas citam `vX.Y.Z` e que cada binário anexado aparece em Download (`grep -c 'releases/download/vX.Y.Z' docs/index.html`).
-- `git add docs/index.html docs/pt-br/index.html docs/es/index.html tools/site/release.json`
+- `git add docs/index.html docs/pt-br/index.html docs/es/index.html docs/sitemap.xml docs/llms.txt tools/site/release.json`
 - Commit `docs(site): página atualizada para vX.Y.Z`, com a linha de coautoria exigida pelo ambiente, se houver. Depois `git push origin main`. O Pages publica sozinho em cerca de um minuto.
 - Se a release ganhar um tipo novo de binário (por exemplo, Windows), confira em `classify()` de `tools/site/build.py` se ele é reconhecido.
 

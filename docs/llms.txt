@@ -1,0 +1,57 @@
+# mySSH
+
+> mySSH is a free, open-source desktop SSH client and session manager for macOS, Linux and Windows, written in Rust. It combines saved connection profiles, a tabbed terminal with split panes, an SFTP file panel and one-way folder sync in a single native app.
+
+Latest version: v0.2.0 (2026-10-15, pre-release). License: MIT or Apache-2.0. Author: Alexandro Almeida. Languages: English, Portuguese (Brazil), Spanish.
+
+## Features
+
+- **Organized profiles**: Folders, tags, favorites and DEV / STAGING / PRODUCTION environments with a warning stripe. Quick connect without saving anything.
+- **Every way to log in**: Password, private key with or without passphrase, SSH agent and keyboard-interactive / MFA, through jump hosts.
+- **Secrets in the system vault**: Keychain, Credential Manager or Secret Service. Nothing in plain text on disk, in logs or in process arguments.
+- **Strict host keys**: Accept once or accept and save. A changed key blocks the connection before anything is sent.
+- **Tabs and split panes**: A native terminal (alacritty_terminal) with per-profile themes, six palettes and confirmation for multi-line paste.
+- **SFTP file panel**: Local and remote side by side, transfer queue, conflict handling, cancellation and resume of large files.
+- **Folder sync with preview**: One-way sync that shows every change before it runs. Deletions are off by default and mirror mode is protected.
+- **Private by design**: No telemetry and no update checks: the only network traffic is the connections you start. Interface in English, Portuguese and Spanish.
+
+## FAQ
+
+### What is mySSH?
+
+mySSH is a free, open-source desktop SSH client and session manager for macOS, Linux and Windows, written in Rust. It combines saved connection profiles, a tabbed terminal with split panes, an SFTP file panel and one-way folder sync in a single native app.
+
+### Is mySSH free?
+
+Yes. mySSH is free software, dual-licensed under MIT or Apache-2.0. There is no paid edition, no account and no subscription.
+
+### Where does mySSH store passwords and passphrases?
+
+In the operating system's credential vault: Keychain on macOS, Credential Manager on Windows and Secret Service on Linux. Secrets are never written in plain text to disk, logs or process arguments.
+
+### Does mySSH support jump hosts, SSH agents and MFA?
+
+Yes. It logs in with a password, a private key (with or without passphrase), the SSH agent or keyboard-interactive authentication, including one-time MFA codes, also through jump hosts (bastions).
+
+### Does mySSH collect any data?
+
+No. There is no telemetry, no account and no automatic update check. The only network connections are the SSH and SFTP sessions you open.
+
+### Is mySSH an alternative to PuTTY or Termius?
+
+Yes. mySSH covers the same everyday work, terminal sessions, saved hosts and file transfer, as a native open-source app that keeps all data on your computer, with no cloud service involved.
+
+## Download
+
+- [mySSH_0.2.0_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/mySSH_0.2.0_aarch64.dmg)
+- [myssh_0.2.0_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_amd64.deb)
+- [myssh_0.2.0_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_x86_64.AppImage)
+- [All releases](https://github.com/xandroalmeida/mySSH/releases)
+
+## Links
+
+- [Website (English)](https://xandroalmeida.github.io/mySSH/), [Português](https://xandroalmeida.github.io/mySSH/pt-br/), [Español](https://xandroalmeida.github.io/mySSH/es/)
+- [Source code on GitHub](https://github.com/xandroalmeida/mySSH)
+- [Changelog](https://github.com/xandroalmeida/mySSH/blob/main/CHANGELOG.md)
+- [User guide (Portuguese)](https://github.com/xandroalmeida/mySSH/blob/main/docs/USO.md)
+- [Issues](https://github.com/xandroalmeida/mySSH/issues)

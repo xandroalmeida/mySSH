@@ -4,13 +4,29 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>mySSH — gerenciador de sessões SSH para desktop</title>
-<meta name="description" content="Gerenciador de sessões SSH para desktop, livre e de código aberto, escrito em Rust: perfis, abas, painéis divididos, SFTP e sincronização de pastas, com segredos no cofre do sistema. macOS, Linux e Windows.">
-<meta property="og:title" content="mySSH — gerenciador de sessões SSH para desktop">
-<meta property="og:description" content="Gerenciador de sessões SSH para desktop, livre e de código aberto, escrito em Rust: perfis, abas, painéis divididos, SFTP e sincronização de pastas, com segredos no cofre do sistema. macOS, Linux e Windows.">
+<title>mySSH — cliente SSH de código aberto para macOS, Linux e Windows</title>
+<meta name="description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="author" content="Alexandro Almeida">
+<meta name="theme-color" content="#0b0614" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbf9fe" media="(prefers-color-scheme: light)">
+<meta property="og:site_name" content="mySSH">
+<meta property="og:title" content="mySSH — cliente SSH de código aberto para macOS, Linux e Windows">
+<meta property="og:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://xandroalmeida.github.io/mySSH/pt-br/">
+<meta property="og:locale" content="pt_BR">
+<meta property="og:locale:alternate" content="en_US">
+<meta property="og:locale:alternate" content="es_ES">
 <meta property="og:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
+<meta property="og:image:width" content="1800">
+<meta property="og:image:height" content="1200">
+<meta property="og:image:alt" content="mySSH — Painéis divididos com tema por perfil">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="mySSH — cliente SSH de código aberto para macOS, Linux e Windows">
+<meta name="twitter:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
+<meta name="twitter:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
+<meta name="twitter:image:alt" content="mySSH — Painéis divididos com tema por perfil">
 <link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
 <link rel="apple-touch-icon" href="../assets/icon-256.png">
 <link rel="canonical" href="https://xandroalmeida.github.io/mySSH/pt-br/">
@@ -18,7 +34,156 @@
 <link rel="alternate" hreflang="pt-BR" href="https://xandroalmeida.github.io/mySSH/pt-br/">
 <link rel="alternate" hreflang="es" href="https://xandroalmeida.github.io/mySSH/es/">
 <link rel="alternate" hreflang="x-default" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="alternate" type="text/markdown" title="llms.txt" href="https://xandroalmeida.github.io/mySSH/llms.txt">
 <link rel="stylesheet" href="../assets/site.css">
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "SoftwareApplication",
+      "@id": "https://xandroalmeida.github.io/mySSH/#app",
+      "name": "mySSH",
+      "alternateName": "mySSH SSH client",
+      "description": "O mySSH é um cliente SSH e gerenciador de sessões para desktop, gratuito e de código aberto, para macOS, Linux e Windows, escrito em Rust. Ele reúne perfis de conexão salvos, terminal com abas e painéis divididos, painel de arquivos SFTP e sincronização unidirecional de pastas em um único app nativo.",
+      "url": "https://xandroalmeida.github.io/mySSH/pt-br/",
+      "applicationCategory": "DeveloperApplication",
+      "applicationSubCategory": "SSH client",
+      "operatingSystem": "macOS, Linux, Windows",
+      "softwareVersion": "0.2.0",
+      "datePublished": "2026-10-15",
+      "releaseNotes": "https://github.com/xandroalmeida/mySSH/releases/tag/v0.2.0",
+      "downloadUrl": [
+        "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/mySSH_0.2.0_aarch64.dmg",
+        "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_amd64.deb",
+        "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_x86_64.AppImage"
+      ],
+      "installUrl": "https://xandroalmeida.github.io/mySSH/pt-br/#download",
+      "screenshot": [
+        "https://xandroalmeida.github.io/mySSH/img/dez-abas.png",
+        "https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png",
+        "https://xandroalmeida.github.io/mySSH/img/arquivos-conflito.png",
+        "https://xandroalmeida.github.io/mySSH/img/sync-previa.png"
+      ],
+      "image": "https://xandroalmeida.github.io/mySSH/assets/icon-256.png",
+      "featureList": [
+        "Perfis organizados: Pastas, tags, favoritos e ambientes DEV / HOMOLOGAÇÃO / PRODUÇÃO com faixa de aviso. Conexão rápida sem salvar nada.",
+        "Todas as formas de login: Senha, chave privada com ou sem passphrase, agente SSH e keyboard-interactive / MFA, inclusive por jump hosts.",
+        "Segredos no cofre do sistema: Keychain, Credential Manager ou Secret Service. Nada em texto puro no disco, em logs ou em argumentos de processo.",
+        "Host keys com rigor: Aceitar uma vez ou aceitar e salvar. Chave alterada bloqueia a conexão antes de qualquer envio.",
+        "Abas e painéis divididos: Terminal nativo (alacritty_terminal) com tema por perfil, seis paletas e confirmação de colagem com várias linhas.",
+        "Painel de arquivos SFTP: Local e remoto lado a lado, fila de transferências, tratamento de conflitos, cancelamento e retomada de arquivos grandes.",
+        "Sincronização com prévia: Sincronização unidirecional que mostra cada mudança antes de executar. Exclusões desligadas por padrão e modo espelho protegido.",
+        "Privado por padrão: Sem telemetria e sem verificação de atualização: a única rede usada é a das conexões que você inicia. Interface em inglês, português e espanhol."
+      ],
+      "inLanguage": [
+        "en",
+        "pt-BR",
+        "es"
+      ],
+      "isAccessibleForFree": true,
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "license": [
+        "https://opensource.org/license/mit",
+        "https://www.apache.org/licenses/LICENSE-2.0"
+      ],
+      "author": {
+        "@type": "Person",
+        "name": "Alexandro Almeida",
+        "url": "https://github.com/xandroalmeida"
+      },
+      "sameAs": [
+        "https://github.com/xandroalmeida/mySSH"
+      ]
+    },
+    {
+      "@type": "WebPage",
+      "@id": "https://xandroalmeida.github.io/mySSH/pt-br/#page",
+      "url": "https://xandroalmeida.github.io/mySSH/pt-br/",
+      "name": "mySSH — cliente SSH de código aberto para macOS, Linux e Windows",
+      "description": "Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.",
+      "inLanguage": "pt-BR",
+      "dateModified": "2026-10-15",
+      "about": {
+        "@id": "https://xandroalmeida.github.io/mySSH/#app"
+      },
+      "primaryImageOfPage": "https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png"
+    },
+    {
+      "@type": "FAQPage",
+      "@id": "https://xandroalmeida.github.io/mySSH/pt-br/#faq",
+      "inLanguage": "pt-BR",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "O que é o mySSH?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "O mySSH é um cliente SSH e gerenciador de sessões para desktop, gratuito e de código aberto, para macOS, Linux e Windows, escrito em Rust. Ele reúne perfis de conexão salvos, terminal com abas e painéis divididos, painel de arquivos SFTP e sincronização unidirecional de pastas em um único app nativo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O mySSH é gratuito?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O mySSH é software livre, com licença dupla MIT ou Apache-2.0. Não há edição paga, conta nem assinatura."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Onde o mySSH guarda senhas e passphrases?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No cofre de credenciais do sistema operacional: Keychain no macOS, Credential Manager no Windows e Secret Service no Linux. Segredos nunca são gravados em texto puro no disco, em logs ou em argumentos de processo."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O mySSH suporta jump hosts, agente SSH e MFA?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. Ele autentica por senha, chave privada (com ou sem passphrase), agente SSH ou keyboard-interactive, inclusive códigos MFA de uso único, também através de jump hosts (bastions)."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O mySSH coleta algum dado?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Não. Não há telemetria, conta nem verificação automática de atualização. As únicas conexões de rede são as sessões SSH e SFTP que você abre."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "O mySSH é uma alternativa ao PuTTY ou ao Termius?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O mySSH cobre o mesmo trabalho do dia a dia, sessões de terminal, hosts salvos e transferência de arquivos, como um app nativo de código aberto que mantém todos os dados no seu computador, sem serviço em nuvem."
+          }
+        }
+      ]
+    },
+    {
+      "@type": "SoftwareSourceCode",
+      "name": "mySSH",
+      "codeRepository": "https://github.com/xandroalmeida/mySSH",
+      "programmingLanguage": "Rust",
+      "license": [
+        "https://opensource.org/license/mit",
+        "https://www.apache.org/licenses/LICENSE-2.0"
+      ],
+      "targetProduct": {
+        "@id": "https://xandroalmeida.github.io/mySSH/#app"
+      }
+    }
+  ]
+}
+</script>
 <script>
   // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
   (function () {
@@ -45,6 +210,7 @@
       <a href="#screens">Capturas</a>
       <a href="#download">Download</a>
       <a href="#source">Código-fonte</a>
+      <a href="#faq">Dúvidas</a>
       <a href="https://github.com/xandroalmeida/mySSH">GitHub</a>
     </nav>
     <div class="langs" role="group" aria-label="Idioma"><a href="../" hreflang="en" data-lang="en">English</a><a href="../pt-br/" hreflang="pt-BR" data-lang="pt-br" aria-current="page">Português</a><a href="../es/" hreflang="es" data-lang="es">Español</a></div>
@@ -65,7 +231,7 @@
       <p class="platforms">macOS · Linux · Windows</p>
     </div>
     <figure class="hero-shot">
-      <img src="../img/paineis-divididos.png" alt="Painéis divididos com tema por perfil" width="1800" height="1200">
+      <img src="../img/paineis-divididos.png" alt="mySSH — Painéis divididos com tema por perfil" width="1800" height="1200" fetchpriority="high">
     </figure>
   </div>
 </section>
@@ -90,10 +256,10 @@
   <div class="wrap">
     <h2>Capturas de tela</h2>
     <div class="grid shots">
-      <figure><a href="../img/dez-abas.png"><img src="../img/dez-abas.png" alt="Dez abas ao mesmo tempo" loading="lazy" width="2400" height="1600"></a><figcaption>Dez abas ao mesmo tempo</figcaption></figure>
-      <figure><a href="../img/paineis-divididos.png"><img src="../img/paineis-divididos.png" alt="Painéis divididos com tema por perfil" loading="lazy" width="1800" height="1200"></a><figcaption>Painéis divididos com tema por perfil</figcaption></figure>
-      <figure><a href="../img/arquivos-conflito.png"><img src="../img/arquivos-conflito.png" alt="Conflito de transferência" loading="lazy" width="1500" height="1000"></a><figcaption>Conflito de transferência</figcaption></figure>
-      <figure><a href="../img/sync-previa.png"><img src="../img/sync-previa.png" alt="Prévia da sincronização" loading="lazy" width="1650" height="1350"></a><figcaption>Prévia da sincronização</figcaption></figure>
+      <figure><a href="../img/dez-abas.png"><img src="../img/dez-abas.png" alt="mySSH — Dez abas ao mesmo tempo" loading="lazy" decoding="async" width="2400" height="1600"></a><figcaption>Dez abas ao mesmo tempo</figcaption></figure>
+      <figure><a href="../img/paineis-divididos.png"><img src="../img/paineis-divididos.png" alt="mySSH — Painéis divididos com tema por perfil" loading="lazy" decoding="async" width="1800" height="1200"></a><figcaption>Painéis divididos com tema por perfil</figcaption></figure>
+      <figure><a href="../img/arquivos-conflito.png"><img src="../img/arquivos-conflito.png" alt="mySSH — Conflito de transferência" loading="lazy" decoding="async" width="1500" height="1000"></a><figcaption>Conflito de transferência</figcaption></figure>
+      <figure><a href="../img/sync-previa.png"><img src="../img/sync-previa.png" alt="mySSH — Prévia da sincronização" loading="lazy" decoding="async" width="1650" height="1350"></a><figcaption>Prévia da sincronização</figcaption></figure>
     </div>
     <p class="note">As capturas usam dados fictícios de um servidor de teste local.</p>
   </div>
@@ -145,11 +311,24 @@ cd mySSH
 cargo run -p myssh-app --release</code></pre>
   </div>
 </section>
+<section id="faq" class="section">
+  <div class="wrap">
+    <h2>Perguntas frequentes</h2>
+    <div class="faq">
+      <details><summary>O que é o mySSH?</summary><p>O mySSH é um cliente SSH e gerenciador de sessões para desktop, gratuito e de código aberto, para macOS, Linux e Windows, escrito em Rust. Ele reúne perfis de conexão salvos, terminal com abas e painéis divididos, painel de arquivos SFTP e sincronização unidirecional de pastas em um único app nativo.</p></details>
+      <details><summary>O mySSH é gratuito?</summary><p>Sim. O mySSH é software livre, com licença dupla MIT ou Apache-2.0. Não há edição paga, conta nem assinatura.</p></details>
+      <details><summary>Onde o mySSH guarda senhas e passphrases?</summary><p>No cofre de credenciais do sistema operacional: Keychain no macOS, Credential Manager no Windows e Secret Service no Linux. Segredos nunca são gravados em texto puro no disco, em logs ou em argumentos de processo.</p></details>
+      <details><summary>O mySSH suporta jump hosts, agente SSH e MFA?</summary><p>Sim. Ele autentica por senha, chave privada (com ou sem passphrase), agente SSH ou keyboard-interactive, inclusive códigos MFA de uso único, também através de jump hosts (bastions).</p></details>
+      <details><summary>O mySSH coleta algum dado?</summary><p>Não. Não há telemetria, conta nem verificação automática de atualização. As únicas conexões de rede são as sessões SSH e SFTP que você abre.</p></details>
+      <details><summary>O mySSH é uma alternativa ao PuTTY ou ao Termius?</summary><p>Sim. O mySSH cobre o mesmo trabalho do dia a dia, sessões de terminal, hosts salvos e transferência de arquivos, como um app nativo de código aberto que mantém todos os dados no seu computador, sem serviço em nuvem.</p></details>
+    </div>
+  </div>
+</section>
 </main>
 
 <footer class="foot">
   <div class="wrap foot-in">
-    <p>mySSH v0.2.0 · Licença MIT ou Apache-2.0.</p>
+    <p>mySSH v0.2.0 · Licença MIT ou Apache-2.0. · Criado por <a href="https://github.com/xandroalmeida" rel="author">Alexandro Almeida</a></p>
     <p><a href="https://github.com/xandroalmeida/mySSH">GitHub</a> · <a href="https://github.com/xandroalmeida/mySSH/issues">Relatar um problema</a> · <a href="https://github.com/xandroalmeida/mySSH/blob/main/docs/USO.md">Guia de uso</a></p>
   </div>
 </footer>

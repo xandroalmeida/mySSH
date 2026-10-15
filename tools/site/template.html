@@ -6,16 +6,35 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{title}}</title>
 <meta name="description" content="{{description}}">
+<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
+<meta name="author" content="{{author}}">
+<meta name="theme-color" content="#0b0614" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#fbf9fe" media="(prefers-color-scheme: light)">
+<meta property="og:site_name" content="mySSH">
 <meta property="og:title" content="{{title}}">
 <meta property="og:description" content="{{description}}">
 <meta property="og:type" content="website">
 <meta property="og:url" content="{{site_url}}{{path}}">
+<meta property="og:locale" content="{{og_locale}}">
+{{og_locale_alternates}}
 <meta property="og:image" content="{{site_url}}img/paineis-divididos.png">
+<meta property="og:image:width" content="1800">
+<meta property="og:image:height" content="1200">
+<meta property="og:image:alt" content="mySSH — {{s2}}">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{title}}">
+<meta name="twitter:description" content="{{description}}">
+<meta name="twitter:image" content="{{site_url}}img/paineis-divididos.png">
+<meta name="twitter:image:alt" content="mySSH — {{s2}}">
 <link rel="icon" type="image/svg+xml" href="{{root}}assets/icon.svg">
 <link rel="apple-touch-icon" href="{{root}}assets/icon-256.png">
 <link rel="canonical" href="{{site_url}}{{path}}">
 {{hreflang}}
+<link rel="alternate" type="text/markdown" title="llms.txt" href="{{site_url}}llms.txt">
 <link rel="stylesheet" href="{{root}}assets/site.css">
+<script type="application/ld+json">
+{{jsonld}}
+</script>
 <script>
   // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
   (function () {
@@ -42,6 +61,7 @@
       <a href="#screens">{{nav_screens}}</a>
       <a href="#download">{{nav_download}}</a>
       <a href="#source">{{nav_source}}</a>
+      <a href="#faq">{{nav_faq}}</a>
       <a href="{{repo}}">GitHub</a>
     </nav>
     <div class="langs" role="group" aria-label="{{lang_label}}">{{lang_links}}</div>
@@ -62,7 +82,7 @@
       <p class="platforms">macOS · Linux · Windows</p>
     </div>
     <figure class="hero-shot">
-      <img src="{{root}}img/paineis-divididos.png" alt="{{s2}}" width="1800" height="1200">
+      <img src="{{root}}img/paineis-divididos.png" alt="mySSH — {{s2}}" width="1800" height="1200" fetchpriority="high">
     </figure>
   </div>
 </section>
@@ -87,10 +107,10 @@
   <div class="wrap">
     <h2>{{screens_title}}</h2>
     <div class="grid shots">
-      <figure><a href="{{root}}img/dez-abas.png"><img src="{{root}}img/dez-abas.png" alt="{{s1}}" loading="lazy" width="2400" height="1600"></a><figcaption>{{s1}}</figcaption></figure>
-      <figure><a href="{{root}}img/paineis-divididos.png"><img src="{{root}}img/paineis-divididos.png" alt="{{s2}}" loading="lazy" width="1800" height="1200"></a><figcaption>{{s2}}</figcaption></figure>
-      <figure><a href="{{root}}img/arquivos-conflito.png"><img src="{{root}}img/arquivos-conflito.png" alt="{{s3}}" loading="lazy" width="1500" height="1000"></a><figcaption>{{s3}}</figcaption></figure>
-      <figure><a href="{{root}}img/sync-previa.png"><img src="{{root}}img/sync-previa.png" alt="{{s4}}" loading="lazy" width="1650" height="1350"></a><figcaption>{{s4}}</figcaption></figure>
+      <figure><a href="{{root}}img/dez-abas.png"><img src="{{root}}img/dez-abas.png" alt="mySSH — {{s1}}" loading="lazy" decoding="async" width="2400" height="1600"></a><figcaption>{{s1}}</figcaption></figure>
+      <figure><a href="{{root}}img/paineis-divididos.png"><img src="{{root}}img/paineis-divididos.png" alt="mySSH — {{s2}}" loading="lazy" decoding="async" width="1800" height="1200"></a><figcaption>{{s2}}</figcaption></figure>
+      <figure><a href="{{root}}img/arquivos-conflito.png"><img src="{{root}}img/arquivos-conflito.png" alt="mySSH — {{s3}}" loading="lazy" decoding="async" width="1500" height="1000"></a><figcaption>{{s3}}</figcaption></figure>
+      <figure><a href="{{root}}img/sync-previa.png"><img src="{{root}}img/sync-previa.png" alt="mySSH — {{s4}}" loading="lazy" decoding="async" width="1650" height="1350"></a><figcaption>{{s4}}</figcaption></figure>
     </div>
     <p class="note">{{screens_note}}</p>
   </div>
@@ -123,11 +143,19 @@ cd mySSH
 cargo run -p myssh-app --release</code></pre>
   </div>
 </section>
+<section id="faq" class="section">
+  <div class="wrap">
+    <h2>{{faq_title}}</h2>
+    <div class="faq">
+{{faq}}
+    </div>
+  </div>
+</section>
 </main>
 
 <footer class="foot">
   <div class="wrap foot-in">
-    <p>mySSH v{{version}} · {{footer_license}}</p>
+    <p>mySSH v{{version}} · {{footer_license}} · {{footer_by}} <a href="{{author_url}}" rel="author">{{author}}</a></p>
     <p><a href="{{repo}}">GitHub</a> · <a href="{{repo}}/issues">{{footer_issues}}</a> · <a href="{{repo}}/blob/main/docs/USO.md">{{footer_docs}}</a></p>
   </div>
 </footer>

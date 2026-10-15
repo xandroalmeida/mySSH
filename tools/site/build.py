@@ -7,7 +7,8 @@ Uso:
 
 Entradas: template.html (layout único), strings.json (textos por idioma) e release.json
 (versão, data e binários da release, escrito pelo modo com argumento).
-Saídas: docs/index.html (en), docs/pt-br/index.html e docs/es/index.html.
+Saídas: docs/index.html (en), docs/pt-br/index.html, docs/es/index.html, docs/sitemap.xml
+e docs/llms.txt (resumo em Markdown para buscadores de IA).
 """
 
 import html
@@ -23,6 +24,10 @@ DOCS = ROOT / "docs"
 REPO = "https://github.com/xandroalmeida/mySSH"
 SITE_URL = "https://xandroalmeida.github.io/mySSH/"
 RELEASE_JSON = HERE / "release.json"
+AUTHOR = "Alexandro Almeida"
+AUTHOR_URL = "https://github.com/xandroalmeida"
+SCREENSHOTS = ["dez-abas.png", "paineis-divididos.png", "arquivos-conflito.png", "sync-previa.png"]
+FAQ_KEYS = [(f"q{i}", f"a{i}") for i in range(1, 7)]
 
 
 def fetch_release(tag: str) -> dict:
@@ -95,6 +100,135 @@ def downloads_html(rel: dict, t: dict) -> str:
     return "\n".join(cards)
 
 
+def faq_html(t: dict) -> str:
+    e = html.escape
+    return "\n".join(
+        f"      <details><summary>{e(t[q])}</summary><p>{e(t[a])}</p></details>"
+        for q, a in FAQ_KEYS
+    )
+
+
+def jsonld(lang: str, strings: dict, rel: dict) -> str:
+    """Dados estruturados schema.org (SoftwareApplication, WebPage e FAQPage) da página."""
+    t = strings[lang]
+    url = SITE_URL + t["path"]
+    author = {"@type": "Person", "name": AUTHOR, "url": AUTHOR_URL}
+    oses = {"mac": "macOS", "linux": "Linux", "windows": "Windows"}
+    downloads = [a["url"] for a in rel["assets"] if classify(a["name"])]
+    app = {
+        "@type": "SoftwareApplication",
+        "@id": SITE_URL + "#app",
+        "name": "mySSH",
+        "alternateName": "mySSH SSH client",
+        "description": t["a1"],
+        "url": url,
+        "applicationCategory": "DeveloperApplication",
+        "applicationSubCategory": "SSH client",
+        "operatingSystem": ", ".join(oses.values()),
+        "softwareVersion": rel["version"],
+        "datePublished": rel["date"],
+        "releaseNotes": f"{REPO}/releases/tag/{rel['tag']}",
+        "downloadUrl": downloads or f"{REPO}/releases",
+        "installUrl": url + "#download",
+        "screenshot": [SITE_URL + "img/" + s for s in SCREENSHOTS],
+        "image": SITE_URL + "assets/icon-256.png",
+        "featureList": [t[f"f{i}_t"] + ": " + t[f"f{i}_d"] for i in range(1, 9)],
+        "inLanguage": [s["html_lang"] for s in strings.values()],
+        "isAccessibleForFree": True,
+        "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
+        "license": ["https://opensource.org/license/mit", "https://www.apache.org/licenses/LICENSE-2.0"],
+        "author": author,
+        "sameAs": [REPO],
+    }
+    page = {
+        "@type": "WebPage",
+        "@id": url + "#page",
+        "url": url,
+        "name": t["title"],
+        "description": t["description"],
+        "inLanguage": t["html_lang"],
+        "dateModified": rel["date"],
+        "about": {"@id": SITE_URL + "#app"},
+        "primaryImageOfPage": SITE_URL + "img/paineis-divididos.png",
+    }
+    faq = {
+        "@type": "FAQPage",
+        "@id": url + "#faq",
+        "inLanguage": t["html_lang"],
+        "mainEntity": [
+            {"@type": "Question", "name": t[q], "acceptedAnswer": {"@type": "Answer", "text": t[a]}}
+            for q, a in FAQ_KEYS
+        ],
+    }
+    code = {
+        "@type": "SoftwareSourceCode",
+        "name": "mySSH",
+        "codeRepository": REPO,
+        "programmingLanguage": "Rust",
+        "license": app["license"],
+        "targetProduct": {"@id": SITE_URL + "#app"},
+    }
+    data = {"@context": "https://schema.org", "@graph": [app, page, faq, code]}
+    # "</" não pode aparecer dentro de <script>.
+    return json.dumps(data, ensure_ascii=False, indent=2).replace("</", "<\\/")
+
+
+def sitemap_xml(strings: dict, rel: dict) -> str:
+    alts = "".join(
+        f'\n    <xhtml:link rel="alternate" hreflang="{s["html_lang"]}" href="{SITE_URL}{s["path"]}"/>'
+        for s in strings.values()
+    ) + f'\n    <xhtml:link rel="alternate" hreflang="x-default" href="{SITE_URL}"/>'
+    urls = "".join(
+        f"\n  <url>\n    <loc>{SITE_URL}{s['path']}</loc>\n    <lastmod>{rel['date']}</lastmod>{alts}\n  </url>"
+        for s in strings.values()
+    )
+    return (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
+        ' xmlns:xhtml="http://www.w3.org/1999/xhtml">'
+        f"{urls}\n</urlset>\n"
+    )
+
+
+def llms_txt(strings: dict, rel: dict) -> str:
+    """Resumo em Markdown (convenção llms.txt) para buscadores e assistentes de IA."""
+    t = strings["en"]
+    lines = [
+        "# mySSH",
+        "",
+        f"> {t['a1']}",
+        "",
+        f"Latest version: v{rel['version']} ({rel['date']}"
+        + (", pre-release" if rel["prerelease"] else "") + "). "
+        "License: MIT or Apache-2.0. "
+        f"Author: {AUTHOR}. Languages: English, Portuguese (Brazil), Spanish.",
+        "",
+        "## Features",
+        "",
+    ]
+    lines += [f"- **{t[f'f{i}_t']}**: {t[f'f{i}_d']}" for i in range(1, 9)]
+    lines += ["", "## FAQ", ""]
+    for q, a in FAQ_KEYS:
+        lines += [f"### {t[q]}", "", t[a], ""]
+    lines += ["## Download", ""]
+    for a in rel["assets"]:
+        if classify(a["name"]):
+            lines.append(f"- [{a['name']}]({a['url']})")
+    lines += [
+        f"- [All releases]({REPO}/releases)",
+        "",
+        "## Links",
+        "",
+        f"- [Website (English)]({SITE_URL}), [Português]({SITE_URL}pt-br/), [Español]({SITE_URL}es/)",
+        f"- [Source code on GitHub]({REPO})",
+        f"- [Changelog]({REPO}/blob/main/CHANGELOG.md)",
+        f"- [User guide (Portuguese)]({REPO}/blob/main/docs/USO.md)",
+        f"- [Issues]({REPO}/issues)",
+        "",
+    ]
+    return "\n".join(lines)
+
+
 def render(template: str, lang: str, strings: dict, rel: dict) -> str:
     t = strings[lang]
     depth = t["path"].count("/")
@@ -111,6 +245,10 @@ def render(template: str, lang: str, strings: dict, rel: dict) -> str:
          for s in strings.values()]
         + [f'<link rel="alternate" hreflang="x-default" href="{SITE_URL}">']
     )
+    og_alternates = "\n".join(
+        f'<meta property="og:locale:alternate" content="{s["og_locale"]}">'
+        for code, s in strings.items() if code != lang
+    )
     values = {k: e(v) for k, v in t.items()}
     values.update({
         "lang": lang,
@@ -125,6 +263,11 @@ def render(template: str, lang: str, strings: dict, rel: dict) -> str:
         "lang_links": lang_links,
         "hreflang": hreflang,
         "downloads": downloads_html(rel, t),
+        "faq": faq_html(t),
+        "jsonld": jsonld(lang, strings, rel),
+        "og_locale_alternates": og_alternates,
+        "author": e(AUTHOR),
+        "author_url": AUTHOR_URL,
     })
 
     def sub(m):
@@ -155,6 +298,9 @@ def main() -> None:
         out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(render(template, code, strings, rel))
         print(f"gerado {out.relative_to(ROOT)} (v{rel['version']})")
+    for name, content in (("sitemap.xml", sitemap_xml(strings, rel)), ("llms.txt", llms_txt(strings, rel))):
+        (DOCS / name).write_text(content)
+        print(f"gerado docs/{name}")
 
 
 if __name__ == "__main__":

@@ -163,3 +163,13 @@ pre {
   .section { padding: 52px 0; }
   .features, .shots { grid-template-columns: 1fr; }
 }
+
+/* Perguntas frequentes */
+.faq { display: grid; gap: 12px; max-width: 860px; }
+.faq details {
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px 22px;
+}
+.faq summary { cursor: pointer; font-weight: 600; }
+.faq details[open] summary { margin-bottom: 8px; }
+.faq details p { color: var(--muted); margin: 0; }
