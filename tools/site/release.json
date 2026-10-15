@@ -1,18 +1,18 @@
 {
-  "tag": "v0.1.1",
-  "version": "0.1.1",
-  "date": "2026-10-14",
+  "tag": "v0.2.0",
+  "version": "0.2.0",
+  "date": "2026-10-15",
   "prerelease": true,
   "assets": [
     {
-      "name": "myssh_0.1.1_amd64.deb",
-      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_amd64.deb",
-      "size": 15526284
+      "name": "myssh_0.2.0_amd64.deb",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_amd64.deb",
+      "size": 15589038
     },
     {
-      "name": "myssh_0.1.1_x86_64.AppImage",
-      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_x86_64.AppImage",
-      "size": 15055352
+      "name": "myssh_0.2.0_x86_64.AppImage",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_x86_64.AppImage",
+      "size": 15124984
     }
   ]
 }
