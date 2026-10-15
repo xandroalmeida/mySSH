@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="38%" r="75%">
+      <stop offset="0" stop-color="#2a0f4a"/>
+      <stop offset="0.6" stop-color="#120626"/>
+      <stop offset="1" stop-color="#05020d"/>
+    </radialGradient>
+    <linearGradient id="horizon" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ff2bd6" stop-opacity="0"/>
+      <stop offset="1" stop-color="#ff2bd6" stop-opacity="0.55"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00f0ff"/>
+      <stop offset="0.5" stop-color="#7a3cff"/>
+      <stop offset="1" stop-color="#ff2bd6"/>
+    </linearGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="22" result="b1"/>
+      <feGaussianBlur stdDeviation="8" in="SourceGraphic" result="b2"/>
+      <feMerge><feMergeNode in="b1"/><feMergeNode in="b2"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowsoft" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="6" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <clipPath id="sq"><rect x="100" y="100" width="824" height="824" rx="190"/></clipPath>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="190" fill="url(#bg)"/>
+
+  <g clip-path="url(#sq)">
+    <!-- perspective grid -->
+    <rect x="100" y="640" width="824" height="284" fill="url(#horizon)" opacity="0.35"/>
+    <g stroke="#ff2bd6" stroke-opacity="0.55" stroke-width="3" fill="none">
+      <line x1="100" y1="660" x2="924" y2="660"/>
+      <line x1="100" y1="690" x2="924" y2="690"/>
+      <line x1="100" y1="730" x2="924" y2="730"/>
+      <line x1="100" y1="785" x2="924" y2="785"/>
+      <line x1="100" y1="860" x2="924" y2="860"/>
+      <line x1="512" y1="640" x2="512" y2="924"/>
+      <line x1="440" y1="640" x2="250" y2="924"/>
+      <line x1="370" y1="640" x2="-20" y2="924"/>
+      <line x1="300" y1="640" x2="-300" y2="924"/>
+      <line x1="584" y1="640" x2="774" y2="924"/>
+      <line x1="654" y1="640" x2="1044" y2="924"/>
+      <line x1="724" y1="640" x2="1324" y2="924"/>
+    </g>
+    <!-- scanlines -->
+    <g stroke="#000" stroke-opacity="0.22" stroke-width="3">
+      <path d="M100 120H924M100 144H924M100 168H924M100 192H924M100 216H924M100 240H924M100 264H924M100 288H924M100 312H924M100 336H924M100 360H924M100 384H924M100 408H924M100 432H924M100 456H924M100 480H924M100 504H924M100 528H924M100 552H924M100 576H924M100 600H924M100 624H924"/>
+    </g>
+    <!-- glitch bars -->
+    <rect x="100" y="300" width="150" height="10" fill="#00f0ff" opacity="0.7"/>
+    <rect x="780" y="590" width="144" height="10" fill="#ff2bd6" opacity="0.7"/>
+  </g>
+
+  <!-- prompt: chromatic aberration layers -->
+  <g fill="none" stroke-linecap="square" stroke-linejoin="miter" stroke-width="64">
+    <g transform="translate(-14 0)" stroke="#00f0ff" opacity="0.85" filter="url(#glow)">
+      <polyline points="290,360 495,520 290,680"/>
+      <line x1="560" y1="690" x2="760" y2="690"/>
+    </g>
+    <g transform="translate(14 0)" stroke="#ff2bd6" opacity="0.85" filter="url(#glow)">
+      <polyline points="290,360 495,520 290,680"/>
+      <line x1="560" y1="690" x2="760" y2="690"/>
+    </g>
+    <g stroke="#f4fdff" filter="url(#glowsoft)">
+      <polyline points="290,360 495,520 290,680"/>
+      <line x1="560" y1="690" x2="760" y2="690"/>
+    </g>
+  </g>
+
+  <!-- neon rim -->
+  <rect x="106" y="106" width="812" height="812" rx="184" fill="none" stroke="url(#rim)" stroke-width="10" filter="url(#glowsoft)"/>
+</svg>

@@ -1,0 +1,162 @@
+<!doctype html>
+<!-- Gerado por tools/site/build.py a partir de tools/site/template.html e strings.json. Não edite em docs/. -->
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mySSH — gerenciador de sessões SSH para desktop</title>
+<meta name="description" content="Gerenciador de sessões SSH para desktop, livre e de código aberto, escrito em Rust: perfis, abas, painéis divididos, SFTP e sincronização de pastas, com segredos no cofre do sistema. macOS, Linux e Windows.">
+<meta property="og:title" content="mySSH — gerenciador de sessões SSH para desktop">
+<meta property="og:description" content="Gerenciador de sessões SSH para desktop, livre e de código aberto, escrito em Rust: perfis, abas, painéis divididos, SFTP e sincronização de pastas, com segredos no cofre do sistema. macOS, Linux e Windows.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xandroalmeida.github.io/mySSH/pt-br/">
+<meta property="og:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
+<link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
+<link rel="apple-touch-icon" href="../assets/icon-256.png">
+<link rel="canonical" href="https://xandroalmeida.github.io/mySSH/pt-br/">
+<link rel="alternate" hreflang="en" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="alternate" hreflang="pt-BR" href="https://xandroalmeida.github.io/mySSH/pt-br/">
+<link rel="alternate" hreflang="es" href="https://xandroalmeida.github.io/mySSH/es/">
+<link rel="alternate" hreflang="x-default" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="stylesheet" href="../assets/site.css">
+<script>
+  // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
+  (function () {
+    var key = "myssh-lang", here = "pt-br";
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    if (here !== "en" || saved) return;
+    var langs = navigator.languages || [navigator.language || ""];
+    for (var i = 0; i < langs.length; i++) {
+      var p = String(langs[i]).toLowerCase().split(/[-_]/)[0];
+      if (p === "en") return;
+      if (p === "pt") { location.replace("../pt-br/" + location.hash); return; }
+      if (p === "es") { location.replace("../es/" + location.hash); return; }
+    }
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="../pt-br/"><img src="../assets/icon.svg" alt="" width="32" height="32"><span>mySSH</span></a>
+    <nav class="nav" aria-label="mySSH">
+      <a href="#features">Recursos</a>
+      <a href="#screens">Capturas</a>
+      <a href="#download">Download</a>
+      <a href="#source">Código-fonte</a>
+      <a href="https://github.com/xandroalmeida/mySSH">GitHub</a>
+    </nav>
+    <div class="langs" role="group" aria-label="Idioma"><a href="../" hreflang="en" data-lang="en">English</a><a href="../pt-br/" hreflang="pt-BR" data-lang="pt-br" aria-current="page">Português</a><a href="../es/" hreflang="es" data-lang="es">Español</a></div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <h1>O gerenciador de sessões SSH que guarda seus segredos no lugar certo.</h1>
+      <p class="lead">Perfis, abas, painéis divididos, SFTP e sincronização de pastas em um app nativo e rápido, escrito em Rust. Senhas vão para o cofre do sistema, host keys são verificadas com rigor e não há telemetria.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">Baixar v0.1.1</a>
+        <a class="btn" href="https://github.com/xandroalmeida/mySSH">Ver no GitHub</a>
+      </div>
+      <p class="meta">Versão mais recente: <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1"><strong>v0.1.1</strong></a> <span class="badge">pré-lançamento</span> · lançada em <time datetime="2026-10-14">2026-10-14</time> · <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1">Notas da versão</a></p>
+      <p class="platforms">macOS · Linux · Windows</p>
+    </div>
+    <figure class="hero-shot">
+      <img src="../img/paineis-divididos.png" alt="Painéis divididos com tema por perfil" width="1800" height="1200">
+    </figure>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="wrap">
+    <h2>Recursos</h2>
+    <div class="grid features">
+      <article><h3>Perfis organizados</h3><p>Pastas, tags, favoritos e ambientes DEV / HOMOLOGAÇÃO / PRODUÇÃO com faixa de aviso. Conexão rápida sem salvar nada.</p></article>
+      <article><h3>Todas as formas de login</h3><p>Senha, chave privada com ou sem passphrase, agente SSH e keyboard-interactive / MFA, inclusive por jump hosts.</p></article>
+      <article><h3>Segredos no cofre do sistema</h3><p>Keychain, Credential Manager ou Secret Service. Nada em texto puro no disco, em logs ou em argumentos de processo.</p></article>
+      <article><h3>Host keys com rigor</h3><p>Aceitar uma vez ou aceitar e salvar. Chave alterada bloqueia a conexão antes de qualquer envio.</p></article>
+      <article><h3>Abas e painéis divididos</h3><p>Terminal nativo (alacritty_terminal) com tema por perfil, seis paletas e confirmação de colagem com várias linhas.</p></article>
+      <article><h3>Painel de arquivos SFTP</h3><p>Local e remoto lado a lado, fila de transferências, tratamento de conflitos, cancelamento e retomada de arquivos grandes.</p></article>
+      <article><h3>Sincronização com prévia</h3><p>Sincronização unidirecional que mostra cada mudança antes de executar. Exclusões desligadas por padrão e modo espelho protegido.</p></article>
+      <article><h3>Privado por padrão</h3><p>Sem telemetria e sem verificação de atualização: a única rede usada é a das conexões que você inicia. Interface em inglês, português e espanhol.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="section alt">
+  <div class="wrap">
+    <h2>Capturas de tela</h2>
+    <div class="grid shots">
+      <figure><a href="../img/dez-abas.png"><img src="../img/dez-abas.png" alt="Dez abas ao mesmo tempo" loading="lazy" width="2400" height="1600"></a><figcaption>Dez abas ao mesmo tempo</figcaption></figure>
+      <figure><a href="../img/paineis-divididos.png"><img src="../img/paineis-divididos.png" alt="Painéis divididos com tema por perfil" loading="lazy" width="1800" height="1200"></a><figcaption>Painéis divididos com tema por perfil</figcaption></figure>
+      <figure><a href="../img/arquivos-conflito.png"><img src="../img/arquivos-conflito.png" alt="Conflito de transferência" loading="lazy" width="1500" height="1000"></a><figcaption>Conflito de transferência</figcaption></figure>
+      <figure><a href="../img/sync-previa.png"><img src="../img/sync-previa.png" alt="Prévia da sincronização" loading="lazy" width="1650" height="1350"></a><figcaption>Prévia da sincronização</figcaption></figure>
+    </div>
+    <p class="note">As capturas usam dados fictícios de um servidor de teste local.</p>
+  </div>
+</section>
+
+<section id="download" class="section">
+  <div class="wrap">
+    <h2>Download <span class="ver">v0.1.1</span></h2>
+    <p class="lead small">Pacotes prontos da versão mais recente. Eles ainda não são assinados, então o sistema vai avisar na primeira vez.</p>
+    <div class="grid downloads">
+      <article class="dl" id="dl-mac">
+        <h3>macOS</h3>
+        <p class="none">Ainda não há pacote nesta versão. Compile a partir do código-fonte (abaixo).</p>
+        <p class="hint">App sem assinatura: na primeira abertura, clique com o botão direito e escolha Abrir.</p>
+      </article>
+      <article class="dl" id="dl-linux">
+        <h3>Linux</h3>
+        <ul>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_amd64.deb" download>Debian / Ubuntu (.deb) · x86_64 <small>14.8 MB</small></a></li>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_x86_64.AppImage" download>AppImage (qualquer distribuição) · x86_64 <small>14.4 MB</small></a></li>
+        </ul>
+        <p class="hint">Testado no Ubuntu 24.04 (Wayland).</p>
+      </article>
+      <article class="dl" id="dl-windows">
+        <h3>Windows</h3>
+        <p class="none">Ainda não há pacote nesta versão. Compile a partir do código-fonte (abaixo).</p>
+        <p class="hint">Ainda não validado no Windows.</p>
+      </article>
+    </div>
+    <p class="more"><a href="https://github.com/xandroalmeida/mySSH/releases">Todas as versões →</a></p>
+  </div>
+</section>
+
+<section id="source" class="section alt">
+  <div class="wrap">
+    <h2>Código-fonte</h2>
+    <p class="lead small">O mySSH é software livre, com licença dupla MIT ou Apache-2.0. Baixe o código desta versão ou clone o repositório.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.tar.gz">Código-fonte (.tar.gz)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.zip">Código-fonte (.zip)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH">Ver no GitHub</a>
+    </div>
+    <h3>Compilar a partir do código</h3>
+    <p>Requer Rust estável (edição 2024). No Debian/Ubuntu, instale antes as bibliotecas de janela e GPU com make deps-linux.</p>
+    <pre><code>git clone https://github.com/xandroalmeida/mySSH.git
+cd mySSH
+cargo run -p myssh-app --release</code></pre>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p>mySSH v0.1.1 · Licença MIT ou Apache-2.0.</p>
+    <p><a href="https://github.com/xandroalmeida/mySSH">GitHub</a> · <a href="https://github.com/xandroalmeida/mySSH/issues">Relatar um problema</a> · <a href="https://github.com/xandroalmeida/mySSH/blob/main/docs/USO.md">Guia de uso</a></p>
+  </div>
+</footer>
+<script>
+  document.querySelectorAll("[data-lang]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      try { localStorage.setItem("myssh-lang", a.getAttribute("data-lang")); } catch (e) {}
+    });
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!doctype html>
+<!-- Gerado por tools/site/build.py a partir de tools/site/template.html e strings.json. Não edite em docs/. -->
+<html lang="{{html_lang}}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+<meta property="og:title" content="{{title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:type" content="website">
+<meta property="og:url" content="{{site_url}}{{path}}">
+<meta property="og:image" content="{{site_url}}img/paineis-divididos.png">
+<link rel="icon" type="image/svg+xml" href="{{root}}assets/icon.svg">
+<link rel="apple-touch-icon" href="{{root}}assets/icon-256.png">
+<link rel="canonical" href="{{site_url}}{{path}}">
+{{hreflang}}
+<link rel="stylesheet" href="{{root}}assets/site.css">
+<script>
+  // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
+  (function () {
+    var key = "myssh-lang", here = "{{lang}}";
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    if (here !== "en" || saved) return;
+    var langs = navigator.languages || [navigator.language || ""];
+    for (var i = 0; i < langs.length; i++) {
+      var p = String(langs[i]).toLowerCase().split(/[-_]/)[0];
+      if (p === "en") return;
+      if (p === "pt") { location.replace("{{root}}pt-br/" + location.hash); return; }
+      if (p === "es") { location.replace("{{root}}es/" + location.hash); return; }
+    }
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="{{root}}{{path}}"><img src="{{root}}assets/icon.svg" alt="" width="32" height="32"><span>mySSH</span></a>
+    <nav class="nav" aria-label="mySSH">
+      <a href="#features">{{nav_features}}</a>
+      <a href="#screens">{{nav_screens}}</a>
+      <a href="#download">{{nav_download}}</a>
+      <a href="#source">{{nav_source}}</a>
+      <a href="{{repo}}">GitHub</a>
+    </nav>
+    <div class="langs" role="group" aria-label="{{lang_label}}">{{lang_links}}</div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <h1>{{tagline}}</h1>
+      <p class="lead">{{lead}}</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">{{cta_download}} v{{version}}</a>
+        <a class="btn" href="{{repo}}">{{cta_github}}</a>
+      </div>
+      <p class="meta">{{latest}}: <a href="{{release_url}}"><strong>v{{version}}</strong></a>{{prerelease_badge}} · {{released}} <time datetime="{{date}}">{{date}}</time> · <a href="{{release_url}}">{{release_notes}}</a></p>
+      <p class="platforms">macOS · Linux · Windows</p>
+    </div>
+    <figure class="hero-shot">
+      <img src="{{root}}img/paineis-divididos.png" alt="{{s2}}" width="1800" height="1200">
+    </figure>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="wrap">
+    <h2>{{features_title}}</h2>
+    <div class="grid features">
+      <article><h3>{{f1_t}}</h3><p>{{f1_d}}</p></article>
+      <article><h3>{{f2_t}}</h3><p>{{f2_d}}</p></article>
+      <article><h3>{{f3_t}}</h3><p>{{f3_d}}</p></article>
+      <article><h3>{{f4_t}}</h3><p>{{f4_d}}</p></article>
+      <article><h3>{{f5_t}}</h3><p>{{f5_d}}</p></article>
+      <article><h3>{{f6_t}}</h3><p>{{f6_d}}</p></article>
+      <article><h3>{{f7_t}}</h3><p>{{f7_d}}</p></article>
+      <article><h3>{{f8_t}}</h3><p>{{f8_d}}</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="section alt">
+  <div class="wrap">
+    <h2>{{screens_title}}</h2>
+    <div class="grid shots">
+      <figure><a href="{{root}}img/dez-abas.png"><img src="{{root}}img/dez-abas.png" alt="{{s1}}" loading="lazy" width="2400" height="1600"></a><figcaption>{{s1}}</figcaption></figure>
+      <figure><a href="{{root}}img/paineis-divididos.png"><img src="{{root}}img/paineis-divididos.png" alt="{{s2}}" loading="lazy" width="1800" height="1200"></a><figcaption>{{s2}}</figcaption></figure>
+      <figure><a href="{{root}}img/arquivos-conflito.png"><img src="{{root}}img/arquivos-conflito.png" alt="{{s3}}" loading="lazy" width="1500" height="1000"></a><figcaption>{{s3}}</figcaption></figure>
+      <figure><a href="{{root}}img/sync-previa.png"><img src="{{root}}img/sync-previa.png" alt="{{s4}}" loading="lazy" width="1650" height="1350"></a><figcaption>{{s4}}</figcaption></figure>
+    </div>
+    <p class="note">{{screens_note}}</p>
+  </div>
+</section>
+
+<section id="download" class="section">
+  <div class="wrap">
+    <h2>{{download_title}} <span class="ver">v{{version}}</span></h2>
+    <p class="lead small">{{download_lead}}</p>
+    <div class="grid downloads">
+{{downloads}}
+    </div>
+    <p class="more"><a href="{{repo}}/releases">{{all_releases}} →</a></p>
+  </div>
+</section>
+
+<section id="source" class="section alt">
+  <div class="wrap">
+    <h2>{{source_title}}</h2>
+    <p class="lead small">{{source_lead}}</p>
+    <div class="cta">
+      <a class="btn" href="{{repo}}/archive/refs/tags/{{tag}}.tar.gz">{{source_targz}}</a>
+      <a class="btn" href="{{repo}}/archive/refs/tags/{{tag}}.zip">{{source_zip}}</a>
+      <a class="btn" href="{{repo}}">{{cta_github}}</a>
+    </div>
+    <h3>{{build_title}}</h3>
+    <p>{{build_lead}}</p>
+    <pre><code>git clone {{repo}}.git
+cd mySSH
+cargo run -p myssh-app --release</code></pre>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p>mySSH v{{version}} · {{footer_license}}</p>
+    <p><a href="{{repo}}">GitHub</a> · <a href="{{repo}}/issues">{{footer_issues}}</a> · <a href="{{repo}}/blob/main/docs/USO.md">{{footer_docs}}</a></p>
+  </div>
+</footer>
+<script>
+  document.querySelectorAll("[data-lang]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      try { localStorage.setItem("myssh-lang", a.getAttribute("data-lang")); } catch (e) {}
+    });
+  });
+</script>
+</body>
+</html>

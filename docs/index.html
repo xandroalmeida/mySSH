@@ -1,0 +1,162 @@
+<!doctype html>
+<!-- Gerado por tools/site/build.py a partir de tools/site/template.html e strings.json. Não edite em docs/. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mySSH — SSH session manager for the desktop</title>
+<meta name="description" content="Free, open-source desktop SSH session manager written in Rust: profiles, tabs, split panes, SFTP and folder sync, with secrets kept in the system vault. macOS, Linux and Windows.">
+<meta property="og:title" content="mySSH — SSH session manager for the desktop">
+<meta property="og:description" content="Free, open-source desktop SSH session manager written in Rust: profiles, tabs, split panes, SFTP and folder sync, with secrets kept in the system vault. macOS, Linux and Windows.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xandroalmeida.github.io/mySSH/">
+<meta property="og:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
+<link rel="icon" type="image/svg+xml" href="assets/icon.svg">
+<link rel="apple-touch-icon" href="assets/icon-256.png">
+<link rel="canonical" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="alternate" hreflang="en" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="alternate" hreflang="pt-BR" href="https://xandroalmeida.github.io/mySSH/pt-br/">
+<link rel="alternate" hreflang="es" href="https://xandroalmeida.github.io/mySSH/es/">
+<link rel="alternate" hreflang="x-default" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="stylesheet" href="assets/site.css">
+<script>
+  // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
+  (function () {
+    var key = "myssh-lang", here = "en";
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    if (here !== "en" || saved) return;
+    var langs = navigator.languages || [navigator.language || ""];
+    for (var i = 0; i < langs.length; i++) {
+      var p = String(langs[i]).toLowerCase().split(/[-_]/)[0];
+      if (p === "en") return;
+      if (p === "pt") { location.replace("pt-br/" + location.hash); return; }
+      if (p === "es") { location.replace("es/" + location.hash); return; }
+    }
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href=""><img src="assets/icon.svg" alt="" width="32" height="32"><span>mySSH</span></a>
+    <nav class="nav" aria-label="mySSH">
+      <a href="#features">Features</a>
+      <a href="#screens">Screenshots</a>
+      <a href="#download">Download</a>
+      <a href="#source">Source</a>
+      <a href="https://github.com/xandroalmeida/mySSH">GitHub</a>
+    </nav>
+    <div class="langs" role="group" aria-label="Language"><a href="" hreflang="en" data-lang="en" aria-current="page">English</a><a href="pt-br/" hreflang="pt-BR" data-lang="pt-br">Português</a><a href="es/" hreflang="es" data-lang="es">Español</a></div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <h1>The SSH session manager that keeps your secrets where they belong.</h1>
+      <p class="lead">Profiles, tabs, split panes, SFTP and folder sync in one fast native app written in Rust. Passwords go to the system vault, host keys are checked strictly, and there is no telemetry.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">Download v0.1.1</a>
+        <a class="btn" href="https://github.com/xandroalmeida/mySSH">View on GitHub</a>
+      </div>
+      <p class="meta">Latest version: <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1"><strong>v0.1.1</strong></a> <span class="badge">pre-release</span> · released on <time datetime="2026-10-14">2026-10-14</time> · <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1">Release notes</a></p>
+      <p class="platforms">macOS · Linux · Windows</p>
+    </div>
+    <figure class="hero-shot">
+      <img src="img/paineis-divididos.png" alt="Split panes with per-profile themes" width="1800" height="1200">
+    </figure>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="wrap">
+    <h2>Features</h2>
+    <div class="grid features">
+      <article><h3>Organized profiles</h3><p>Folders, tags, favorites and DEV / STAGING / PRODUCTION environments with a warning stripe. Quick connect without saving anything.</p></article>
+      <article><h3>Every way to log in</h3><p>Password, private key with or without passphrase, SSH agent and keyboard-interactive / MFA, through jump hosts.</p></article>
+      <article><h3>Secrets in the system vault</h3><p>Keychain, Credential Manager or Secret Service. Nothing in plain text on disk, in logs or in process arguments.</p></article>
+      <article><h3>Strict host keys</h3><p>Accept once or accept and save. A changed key blocks the connection before anything is sent.</p></article>
+      <article><h3>Tabs and split panes</h3><p>A native terminal (alacritty_terminal) with per-profile themes, six palettes and confirmation for multi-line paste.</p></article>
+      <article><h3>SFTP file panel</h3><p>Local and remote side by side, transfer queue, conflict handling, cancellation and resume of large files.</p></article>
+      <article><h3>Folder sync with preview</h3><p>One-way sync that shows every change before it runs. Deletions are off by default and mirror mode is protected.</p></article>
+      <article><h3>Private by design</h3><p>No telemetry and no update checks: the only network traffic is the connections you start. Interface in English, Portuguese and Spanish.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="section alt">
+  <div class="wrap">
+    <h2>Screenshots</h2>
+    <div class="grid shots">
+      <figure><a href="img/dez-abas.png"><img src="img/dez-abas.png" alt="Ten tabs at once" loading="lazy" width="2400" height="1600"></a><figcaption>Ten tabs at once</figcaption></figure>
+      <figure><a href="img/paineis-divididos.png"><img src="img/paineis-divididos.png" alt="Split panes with per-profile themes" loading="lazy" width="1800" height="1200"></a><figcaption>Split panes with per-profile themes</figcaption></figure>
+      <figure><a href="img/arquivos-conflito.png"><img src="img/arquivos-conflito.png" alt="Transfer conflict" loading="lazy" width="1500" height="1000"></a><figcaption>Transfer conflict</figcaption></figure>
+      <figure><a href="img/sync-previa.png"><img src="img/sync-previa.png" alt="Sync preview" loading="lazy" width="1650" height="1350"></a><figcaption>Sync preview</figcaption></figure>
+    </div>
+    <p class="note">Screenshots use fictitious data from a local test server.</p>
+  </div>
+</section>
+
+<section id="download" class="section">
+  <div class="wrap">
+    <h2>Download <span class="ver">v0.1.1</span></h2>
+    <p class="lead small">Pre-built packages for the latest version. They are not signed yet, so your system will warn you the first time.</p>
+    <div class="grid downloads">
+      <article class="dl" id="dl-mac">
+        <h3>macOS</h3>
+        <p class="none">No package for this version yet. Build it from source (below).</p>
+        <p class="hint">Unsigned app: on first launch, right-click it and choose Open.</p>
+      </article>
+      <article class="dl" id="dl-linux">
+        <h3>Linux</h3>
+        <ul>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_amd64.deb" download>Debian / Ubuntu (.deb) · x86_64 <small>14.8 MB</small></a></li>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_x86_64.AppImage" download>AppImage (any distribution) · x86_64 <small>14.4 MB</small></a></li>
+        </ul>
+        <p class="hint">Tested on Ubuntu 24.04 (Wayland).</p>
+      </article>
+      <article class="dl" id="dl-windows">
+        <h3>Windows</h3>
+        <p class="none">No package for this version yet. Build it from source (below).</p>
+        <p class="hint">Not validated on Windows yet.</p>
+      </article>
+    </div>
+    <p class="more"><a href="https://github.com/xandroalmeida/mySSH/releases">All releases →</a></p>
+  </div>
+</section>
+
+<section id="source" class="section alt">
+  <div class="wrap">
+    <h2>Source code</h2>
+    <p class="lead small">mySSH is free software, dual-licensed under MIT or Apache-2.0. Download the source of this version or clone the repository.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.tar.gz">Source (.tar.gz)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.zip">Source (.zip)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH">View on GitHub</a>
+    </div>
+    <h3>Build from source</h3>
+    <p>Requires stable Rust (2024 edition). On Debian/Ubuntu, install the window and GPU libraries first with make deps-linux.</p>
+    <pre><code>git clone https://github.com/xandroalmeida/mySSH.git
+cd mySSH
+cargo run -p myssh-app --release</code></pre>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p>mySSH v0.1.1 · Licensed under MIT or Apache-2.0.</p>
+    <p><a href="https://github.com/xandroalmeida/mySSH">GitHub</a> · <a href="https://github.com/xandroalmeida/mySSH/issues">Report an issue</a> · <a href="https://github.com/xandroalmeida/mySSH/blob/main/docs/USO.md">User guide (Portuguese)</a></p>
+  </div>
+</footer>
+<script>
+  document.querySelectorAll("[data-lang]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      try { localStorage.setItem("myssh-lang", a.getAttribute("data-lang")); } catch (e) {}
+    });
+  });
+</script>
+</body>
+</html>

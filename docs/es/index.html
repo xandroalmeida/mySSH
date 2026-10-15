@@ -1,0 +1,162 @@
+<!doctype html>
+<!-- Gerado por tools/site/build.py a partir de tools/site/template.html e strings.json. Não edite em docs/. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mySSH — gestor de sesiones SSH para escritorio</title>
+<meta name="description" content="Gestor de sesiones SSH para escritorio, libre y de código abierto, escrito en Rust: perfiles, pestañas, paneles divididos, SFTP y sincronización de carpetas, con los secretos en la bóveda del sistema. macOS, Linux y Windows.">
+<meta property="og:title" content="mySSH — gestor de sesiones SSH para escritorio">
+<meta property="og:description" content="Gestor de sesiones SSH para escritorio, libre y de código abierto, escrito en Rust: perfiles, pestañas, paneles divididos, SFTP y sincronización de carpetas, con los secretos en la bóveda del sistema. macOS, Linux y Windows.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://xandroalmeida.github.io/mySSH/es/">
+<meta property="og:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
+<link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
+<link rel="apple-touch-icon" href="../assets/icon-256.png">
+<link rel="canonical" href="https://xandroalmeida.github.io/mySSH/es/">
+<link rel="alternate" hreflang="en" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="alternate" hreflang="pt-BR" href="https://xandroalmeida.github.io/mySSH/pt-br/">
+<link rel="alternate" hreflang="es" href="https://xandroalmeida.github.io/mySSH/es/">
+<link rel="alternate" hreflang="x-default" href="https://xandroalmeida.github.io/mySSH/">
+<link rel="stylesheet" href="../assets/site.css">
+<script>
+  // Primeira visita à página em inglês: usa o idioma do navegador, se for suportado.
+  (function () {
+    var key = "myssh-lang", here = "es";
+    var saved = null;
+    try { saved = localStorage.getItem(key); } catch (e) {}
+    if (here !== "en" || saved) return;
+    var langs = navigator.languages || [navigator.language || ""];
+    for (var i = 0; i < langs.length; i++) {
+      var p = String(langs[i]).toLowerCase().split(/[-_]/)[0];
+      if (p === "en") return;
+      if (p === "pt") { location.replace("../pt-br/" + location.hash); return; }
+      if (p === "es") { location.replace("../es/" + location.hash); return; }
+    }
+  })();
+</script>
+</head>
+<body>
+<header class="top">
+  <div class="wrap top-in">
+    <a class="brand" href="../es/"><img src="../assets/icon.svg" alt="" width="32" height="32"><span>mySSH</span></a>
+    <nav class="nav" aria-label="mySSH">
+      <a href="#features">Funciones</a>
+      <a href="#screens">Capturas</a>
+      <a href="#download">Descargar</a>
+      <a href="#source">Código fuente</a>
+      <a href="https://github.com/xandroalmeida/mySSH">GitHub</a>
+    </nav>
+    <div class="langs" role="group" aria-label="Idioma"><a href="../" hreflang="en" data-lang="en">English</a><a href="../pt-br/" hreflang="pt-BR" data-lang="pt-br">Português</a><a href="../es/" hreflang="es" data-lang="es" aria-current="page">Español</a></div>
+  </div>
+</header>
+
+<main>
+<section class="hero">
+  <div class="wrap hero-in">
+    <div class="hero-text">
+      <h1>El gestor de sesiones SSH que guarda tus secretos donde deben estar.</h1>
+      <p class="lead">Perfiles, pestañas, paneles divididos, SFTP y sincronización de carpetas en una app nativa y rápida, escrita en Rust. Las contraseñas van a la bóveda del sistema, las claves de host se verifican con rigor y no hay telemetría.</p>
+      <div class="cta">
+        <a class="btn primary" href="#download">Descargar v0.1.1</a>
+        <a class="btn" href="https://github.com/xandroalmeida/mySSH">Ver en GitHub</a>
+      </div>
+      <p class="meta">Última versión: <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1"><strong>v0.1.1</strong></a> <span class="badge">versión preliminar</span> · publicada el <time datetime="2026-10-14">2026-10-14</time> · <a href="https://github.com/xandroalmeida/mySSH/releases/tag/v0.1.1">Notas de la versión</a></p>
+      <p class="platforms">macOS · Linux · Windows</p>
+    </div>
+    <figure class="hero-shot">
+      <img src="../img/paineis-divididos.png" alt="Paneles divididos con tema por perfil" width="1800" height="1200">
+    </figure>
+  </div>
+</section>
+
+<section id="features" class="section">
+  <div class="wrap">
+    <h2>Funciones</h2>
+    <div class="grid features">
+      <article><h3>Perfiles organizados</h3><p>Carpetas, etiquetas, favoritos y entornos DEV / PREPRODUCCIÓN / PRODUCCIÓN con franja de aviso. Conexión rápida sin guardar nada.</p></article>
+      <article><h3>Todas las formas de iniciar sesión</h3><p>Contraseña, clave privada con o sin passphrase, agente SSH y keyboard-interactive / MFA, también a través de jump hosts.</p></article>
+      <article><h3>Secretos en la bóveda del sistema</h3><p>Keychain, Credential Manager o Secret Service. Nada en texto plano en el disco, en los logs ni en los argumentos de procesos.</p></article>
+      <article><h3>Claves de host con rigor</h3><p>Aceptar una vez o aceptar y guardar. Una clave cambiada bloquea la conexión antes de enviar nada.</p></article>
+      <article><h3>Pestañas y paneles divididos</h3><p>Terminal nativo (alacritty_terminal) con tema por perfil, seis paletas y confirmación al pegar varias líneas.</p></article>
+      <article><h3>Panel de archivos SFTP</h3><p>Local y remoto lado a lado, cola de transferencias, gestión de conflictos, cancelación y reanudación de archivos grandes.</p></article>
+      <article><h3>Sincronización con vista previa</h3><p>Sincronización unidireccional que muestra cada cambio antes de ejecutarlo. Eliminaciones desactivadas por defecto y modo espejo protegido.</p></article>
+      <article><h3>Privado por diseño</h3><p>Sin telemetría ni comprobación de actualizaciones: el único tráfico de red son las conexiones que inicias. Interfaz en inglés, portugués y español.</p></article>
+    </div>
+  </div>
+</section>
+
+<section id="screens" class="section alt">
+  <div class="wrap">
+    <h2>Capturas de pantalla</h2>
+    <div class="grid shots">
+      <figure><a href="../img/dez-abas.png"><img src="../img/dez-abas.png" alt="Diez pestañas a la vez" loading="lazy" width="2400" height="1600"></a><figcaption>Diez pestañas a la vez</figcaption></figure>
+      <figure><a href="../img/paineis-divididos.png"><img src="../img/paineis-divididos.png" alt="Paneles divididos con tema por perfil" loading="lazy" width="1800" height="1200"></a><figcaption>Paneles divididos con tema por perfil</figcaption></figure>
+      <figure><a href="../img/arquivos-conflito.png"><img src="../img/arquivos-conflito.png" alt="Conflicto de transferencia" loading="lazy" width="1500" height="1000"></a><figcaption>Conflicto de transferencia</figcaption></figure>
+      <figure><a href="../img/sync-previa.png"><img src="../img/sync-previa.png" alt="Vista previa de la sincronización" loading="lazy" width="1650" height="1350"></a><figcaption>Vista previa de la sincronización</figcaption></figure>
+    </div>
+    <p class="note">Las capturas usan datos ficticios de un servidor de pruebas local.</p>
+  </div>
+</section>
+
+<section id="download" class="section">
+  <div class="wrap">
+    <h2>Descargar <span class="ver">v0.1.1</span></h2>
+    <p class="lead small">Paquetes listos de la última versión. Todavía no están firmados, así que el sistema avisará la primera vez.</p>
+    <div class="grid downloads">
+      <article class="dl" id="dl-mac">
+        <h3>macOS</h3>
+        <p class="none">Todavía no hay paquete para esta versión. Compílalo desde el código fuente (abajo).</p>
+        <p class="hint">App sin firmar: la primera vez, haz clic derecho sobre ella y elige Abrir.</p>
+      </article>
+      <article class="dl" id="dl-linux">
+        <h3>Linux</h3>
+        <ul>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_amd64.deb" download>Debian / Ubuntu (.deb) · x86_64 <small>14.8 MB</small></a></li>
+          <li><a href="https://github.com/xandroalmeida/mySSH/releases/download/v0.1.1/myssh_0.1.1_x86_64.AppImage" download>AppImage (cualquier distribución) · x86_64 <small>14.4 MB</small></a></li>
+        </ul>
+        <p class="hint">Probado en Ubuntu 24.04 (Wayland).</p>
+      </article>
+      <article class="dl" id="dl-windows">
+        <h3>Windows</h3>
+        <p class="none">Todavía no hay paquete para esta versión. Compílalo desde el código fuente (abajo).</p>
+        <p class="hint">Todavía no validado en Windows.</p>
+      </article>
+    </div>
+    <p class="more"><a href="https://github.com/xandroalmeida/mySSH/releases">Todas las versiones →</a></p>
+  </div>
+</section>
+
+<section id="source" class="section alt">
+  <div class="wrap">
+    <h2>Código fuente</h2>
+    <p class="lead small">mySSH es software libre, con licencia doble MIT o Apache-2.0. Descarga el código de esta versión o clona el repositorio.</p>
+    <div class="cta">
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.tar.gz">Código fuente (.tar.gz)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH/archive/refs/tags/v0.1.1.zip">Código fuente (.zip)</a>
+      <a class="btn" href="https://github.com/xandroalmeida/mySSH">Ver en GitHub</a>
+    </div>
+    <h3>Compilar desde el código</h3>
+    <p>Requiere Rust estable (edición 2024). En Debian/Ubuntu, instala antes las bibliotecas de ventana y GPU con make deps-linux.</p>
+    <pre><code>git clone https://github.com/xandroalmeida/mySSH.git
+cd mySSH
+cargo run -p myssh-app --release</code></pre>
+  </div>
+</section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <p>mySSH v0.1.1 · Licencia MIT o Apache-2.0.</p>
+    <p><a href="https://github.com/xandroalmeida/mySSH">GitHub</a> · <a href="https://github.com/xandroalmeida/mySSH/issues">Informar un problema</a> · <a href="https://github.com/xandroalmeida/mySSH/blob/main/docs/USO.md">Guía de uso (portugués)</a></p>
+  </div>
+</footer>
+<script>
+  document.querySelectorAll("[data-lang]").forEach(function (a) {
+    a.addEventListener("click", function () {
+      try { localStorage.setItem("myssh-lang", a.getAttribute("data-lang")); } catch (e) {}
+    });
+  });
+</script>
+</body>
+</html>

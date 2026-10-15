@@ -1,6 +1,6 @@
 ---
 name: release
-description: Versiona o mySSH (SemVer), gera release notes, cria a tag anotada vX.Y.Z, publica no GitHub e anexa o .dmg do macOS.
+description: Versiona o mySSH (SemVer), gera release notes, cria a tag anotada vX.Y.Z, publica no GitHub, anexa o .dmg do macOS e atualiza a página do projeto (GitHub Pages).
 argument-hint: "[patch|minor|major|X.Y.Z] (padrão: inferido dos commits)"
 ---
 
@@ -72,5 +72,13 @@ Omita as seções vazias. Grave em `docs/releases/vX.Y.Z.md` e acrescente o mesm
 - `gh release create vX.Y.Z --title "mySSH vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md`, anexando `target/release/mySSH_X.Y.Z_<arch>.dmg` se ele foi gerado. Use `--prerelease` enquanto a versão for `0.x`.
 - Não habilite workflows de CI ou Release no GitHub: eles foram desabilitados de propósito.
 
-## 8. Relatório final (curto)
-Informe a versão anterior e a nova, a tag, o link da release, se o .dmg foi anexado, o resultado de `make check` e de `make test-real` (ou que foi pulado) e as release notes em poucas linhas.
+## 8. Atualizar a página do projeto
+A página (https://xandroalmeida.github.io/mySSH/, em inglês, pt-BR e espanhol) é servida pelo GitHub Pages a partir de `docs/` na `main`. Ela mostra a versão, a data e os links de download dos binários da release, então só pode ser gerada **depois** do `gh release create` e dos uploads.
+- `python3 tools/site/build.py vX.Y.Z`: lê a release no GitHub com `gh` e regenera `docs/index.html`, `docs/pt-br/index.html` e `docs/es/index.html`, além de `tools/site/release.json`. Não edite essas páginas à mão: layout em `tools/site/template.html`, textos em `tools/site/strings.json`.
+- Confira que as três páginas citam `vX.Y.Z` e que cada binário anexado aparece em Download (`grep -c 'releases/download/vX.Y.Z' docs/index.html`).
+- `git add docs/index.html docs/pt-br/index.html docs/es/index.html tools/site/release.json`
+- Commit `docs(site): página atualizada para vX.Y.Z`, com a linha de coautoria exigida pelo ambiente, se houver. Depois `git push origin main`. O Pages publica sozinho em cerca de um minuto.
+- Se a release ganhar um tipo novo de binário (por exemplo, Windows), confira em `classify()` de `tools/site/build.py` se ele é reconhecido.
+
+## 9. Relatório final (curto)
+Informe a versão anterior e a nova, a tag, o link da release, o link da página atualizada, se o .dmg foi anexado, o resultado de `make check` e de `make test-real` (ou que foi pulado) e as release notes em poucas linhas.

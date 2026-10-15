@@ -1,5 +1,7 @@
 # mySSH
 
+Página do projeto e downloads: https://xandroalmeida.github.io/mySSH/ (English · Português · Español)
+
 Gerenciador desktop de sessões SSH escrito em Rust (macOS, Windows e Linux), com interface em inglês, português (Brasil) e espanhol (segue o idioma do sistema, com inglês como padrão; dá para escolher em Configurações → Idioma). Sem telemetria e sem verificação automática de atualização: a única rede usada é a das conexões que você iniciar.
 
 > Estado: versão 0.1.0, validada em **macOS arm64** e **Linux x86_64** (Ubuntu 24.04, Wayland). Windows tem CI e empacotamento preparados, mas nunca foi executado (ver `docs/VALIDACAO.md`). Os pacotes são **sem assinatura**.
@@ -68,4 +70,4 @@ O workflow `.github/workflows/release.yml` faz isso nos três SOs. **Os artefato
 - Rename remoto no SFTP não é atômico quando o destino existe; symlinks não são transferidos.
 
 ## Licença
-MIT OR Apache-2.0.
+MIT OR Apache-2.0, à sua escolha: [`LICENSE-MIT`](LICENSE-MIT) e [`LICENSE-APACHE`](LICENSE-APACHE).
