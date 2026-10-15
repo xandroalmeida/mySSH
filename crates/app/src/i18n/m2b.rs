@@ -245,15 +245,11 @@ pub fn IMPORT_SELECT_NEW() -> &'static str {
         "Marcar solo los nuevos"
     )
 }
-/// Nome da pasta criada para os perfis importados (no idioma ativo ao importar).
-pub fn IMPORT_FOLDER() -> &'static str {
-    tr!("Importados", "Imported", "Importados")
-}
 pub fn IMPORT_TARGET() -> &'static str {
     tr!(
-        "Os perfis vão para a pasta “Importados”.",
+        "Os perfis vão para a pasta “Imported”.",
         "Profiles go to the “Imported” folder.",
-        "Los perfiles van a la carpeta “Importados”."
+        "Los perfiles van a la carpeta “Imported”."
     )
 }
 pub fn IMPORT_JUMP() -> &'static str {
@@ -290,14 +286,14 @@ pub fn import_summary(total: usize, conflicts: usize) -> String {
 pub fn import_done(n: usize) -> String {
     match n {
         1 => tr!(
-            "1 perfil importado para “Importados”.".to_string(),
+            "1 perfil importado para “Imported”.".to_string(),
             "1 profile imported into “Imported”.".to_string(),
-            "1 perfil importado en “Importados”.".to_string()
+            "1 perfil importado en “Imported”.".to_string()
         ),
         n => tr!(
-            format!("{n} perfis importados para “Importados”."),
+            format!("{n} perfis importados para “Imported”."),
             format!("{n} profiles imported into “Imported”."),
-            format!("{n} perfiles importados en “Importados”.")
+            format!("{n} perfiles importados en “Imported”.")
         ),
     }
 }

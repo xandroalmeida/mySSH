@@ -222,10 +222,20 @@ pub fn parse_tags(s: &str) -> Vec<String> {
     out
 }
 
+// Nomes gravados (perfis, credenciais): fixos em inglês; só a interface é traduzida.
+pub const COPY_SUFFIX: &str = "(copy)";
+
+pub fn cred_label_password(profile: &str) -> String {
+    format!("Password for {profile}")
+}
+pub fn cred_label_passphrase(profile: &str) -> String {
+    format!("Passphrase for {profile}")
+}
+
 pub fn duplicate_profile(p: &Profile) -> Profile {
     let mut d = p.clone();
     d.id = myssh_core::ProfileId::new();
-    d.name = format!("{} {}", p.name, i18n::COPY_SUFFIX());
+    d.name = format!("{} {COPY_SUFFIX}", p.name);
     d
 }
 
@@ -408,7 +418,7 @@ mod tests {
         let p = prof("X", "h", "u", &["t"]);
         let d = duplicate_profile(&p);
         assert_ne!(d.id, p.id);
-        assert_eq!(d.name, format!("X {}", i18n::COPY_SUFFIX()));
+        assert_eq!(d.name, format!("X {COPY_SUFFIX}"));
         assert_eq!(d.tags, p.tags);
     }
 

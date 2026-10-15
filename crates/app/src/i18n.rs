@@ -436,20 +436,6 @@ pub fn ERR_SECRET_REQUIRED() -> &'static str {
     )
 }
 
-pub fn cred_label_password(profile: &str) -> String {
-    tr!(
-        format!("Senha de {profile}"),
-        format!("Password for {profile}"),
-        format!("Contraseña de {profile}")
-    )
-}
-pub fn cred_label_passphrase(profile: &str) -> String {
-    tr!(
-        format!("Passphrase de {profile}"),
-        format!("Passphrase for {profile}"),
-        format!("Passphrase de {profile}")
-    )
-}
 pub fn profile_saved(name: &str) -> String {
     tr!(
         format!("Perfil “{name}” salvo."),
@@ -472,9 +458,6 @@ pub fn profile_deleted(name: &str) -> String {
     )
 }
 
-pub fn COPY_SUFFIX() -> &'static str {
-    tr!("(cópia)", "(copy)", "(copia)")
-}
 pub fn DELETE_TITLE() -> &'static str {
     tr!("Excluir perfil?", "Delete profile?", "¿Eliminar perfil?")
 }

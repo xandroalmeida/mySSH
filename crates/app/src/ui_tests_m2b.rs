@@ -248,7 +248,11 @@ fn importar_ssh_config_fluxo_completo() {
     let web = app.profiles.iter().find(|p| p.name == "web").unwrap();
     let bastion = app.profiles.iter().find(|p| p.name == "bastion").unwrap();
     assert_eq!(web.jump, Some(bastion.id));
-    let folder = app.folders.iter().find(|f| f.name == "Importados").unwrap();
+    let folder = app
+        .folders
+        .iter()
+        .find(|f| f.name == crate::ssh_import::TARGET_FOLDER)
+        .unwrap();
     assert_eq!(web.folder, Some(folder.id));
     assert!(app.notice.is_some());
     // o arquivo do usuário não foi tocado

@@ -321,8 +321,10 @@ impl ProfileForm {
             SecretMode::Ask => Ok(None),
             SecretMode::Save if !typed.is_empty() => {
                 let label = match kind {
-                    CredentialKind::Password => i18n::cred_label_password(self.name.trim()),
-                    CredentialKind::KeyPassphrase => i18n::cred_label_passphrase(self.name.trim()),
+                    CredentialKind::Password => crate::logic::cred_label_password(self.name.trim()),
+                    CredentialKind::KeyPassphrase => {
+                        crate::logic::cred_label_passphrase(self.name.trim())
+                    }
                 };
                 let credential = Credential {
                     id: CredentialId::new(),

@@ -1536,8 +1536,8 @@ fn save_secret(
     let cred = Credential {
         id: CredentialId::new(),
         label: match kind {
-            SecretKind::Password => i18n::cred_label_password(name),
-            SecretKind::Passphrase => i18n::cred_label_passphrase(name),
+            SecretKind::Password => crate::logic::cred_label_password(name),
+            SecretKind::Passphrase => crate::logic::cred_label_passphrase(name),
         },
         kind: match kind {
             SecretKind::Password => CredentialKind::Password,

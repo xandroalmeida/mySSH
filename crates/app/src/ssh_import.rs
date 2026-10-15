@@ -13,6 +13,9 @@ use myssh_store::{Folder, Store};
 
 use crate::i18n;
 
+/// Nome da pasta dos perfis importados. Dado gravado: fixo em inglês, não traduzido.
+pub const TARGET_FOLDER: &str = "Imported";
+
 /// Nome da pasta de destino.
 
 #[derive(Debug, Clone)]
@@ -185,17 +188,17 @@ pub struct SaveReport {
     pub created_folder: bool,
 }
 
-/// Grava os perfis na pasta "Importados" (criada se necessário). Desfaz tudo se algum falhar.
+/// Grava os perfis na pasta "Imported" (criada se necessário). Desfaz tudo se algum falhar.
 pub fn save(store: &Store, profiles: Vec<Profile>) -> Result<SaveReport, String> {
     let fail = |e: myssh_store::StoreError| e.to_string();
     let folders = store.list_folders().map_err(fail)?;
     let (folder, created_folder) = match folders
         .iter()
-        .find(|f| f.parent.is_none() && f.name.trim().eq_ignore_ascii_case(i18n::IMPORT_FOLDER()))
+        .find(|f| f.parent.is_none() && f.name.trim().eq_ignore_ascii_case(TARGET_FOLDER))
     {
         Some(f) => (f.id, false),
         None => {
-            let f = Folder::new(i18n::IMPORT_FOLDER(), None);
+            let f = Folder::new(TARGET_FOLDER, None);
             store.create_folder(&f).map_err(fail)?;
             (f.id, true)
         }
@@ -356,7 +359,7 @@ Host dup
         let web = saved.iter().find(|s| s.name == "web").unwrap();
         let bastion = saved.iter().find(|s| s.name == "bastion").unwrap();
         assert_eq!(web.jump, Some(bastion.id));
-        assert_eq!(store.list_folders().unwrap()[0].name, i18n::IMPORT_FOLDER());
+        assert_eq!(store.list_folders().unwrap()[0].name, TARGET_FOLDER);
         assert_eq!(
             std::fs::read(&cfg).unwrap(),
             before,

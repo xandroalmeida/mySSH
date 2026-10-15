@@ -19,6 +19,7 @@ Gerenciador desktop de sessões SSH em Rust (macOS, Windows, Linux). UI e mensag
 - Nenhum segredo em logs, `Debug`, erros, argumentos de processo ou arquivos em texto puro. Use `secrecy`/`zeroize`.
 - Nenhuma operação de rede/disco pesada na thread de UI.
 - Textos de UI centralizados (módulo `i18n`), não espalhados.
+- Traduzir só o que o usuário vê na tela. Nomes gravados ou de uso interno (pastas criadas pelo app, rótulos de credenciais, nomes de perfis gerados, arquivos, chaves de configuração) são fixos em inglês.
 - Saída remota nunca executa comandos locais, abre URLs ou escreve no clipboard sem ação explícita.
 - Contratos centrais (`crates/core` tipos públicos) só mudam via Opus.
 - Commits locais como checkpoints; sem push.
