@@ -1,7 +1,7 @@
 ---
 name: release
-description: Versiona o mySSH (SemVer), gera release notes, cria a tag anotada vX.Y.Z, publica no GitHub, anexa o .dmg do macOS e atualiza a página do projeto (GitHub Pages).
-argument-hint: "[patch|minor|major|X.Y.Z] (padrão: inferido dos commits)"
+description: Versiona o mySSH (SemVer), gera release notes, cria a tag anotada vX.Y.Z, publica no GitHub com o pacote da plataforma atual e atualiza a página do projeto. Sem commits novos desde a última tag, só gera e anexa o pacote desta plataforma à release existente (build em várias máquinas).
+argument-hint: "[patch|minor|major|X.Y.Z] (padrão: inferido dos commits; sem commits novos, anexa o pacote desta plataforma)"
 ---
 
 # Release do mySSH
@@ -13,6 +13,21 @@ Argumento recebido: `$ARGUMENTS`
 (Se aparecer literalmente `$ARGUMENTS`, ou vier vazio, o pedido do usuário na conversa é o argumento.)
 
 Siga os passos em ordem. Pare e informe o usuário em qualquer falha: não pule passos, não use `--no-verify` e não force push.
+
+## 0. Escolher o modo
+Há dois modos. Cada máquina gera só o pacote da própria plataforma, então uma release completa é: rodar `/release` em uma máquina (cria a versão) e depois rodar `/release` nas outras (cada uma anexa o seu pacote).
+
+1. Faça primeiro as verificações de repositório do passo 1 (árvore limpa, `main`, `git fetch --tags origin`, não atrás de `origin/main`; se estiver atrás, `git pull --ff-only`).
+2. Última tag: `T=$(git describe --tags --abbrev=0 --match 'v*')`.
+3. Arquivos alterados desde a tag, **ignorando os da página** (o passo 8 sempre faz um commit da página depois da tag):
+   ```
+   git diff --name-only "$T" HEAD -- . ':(exclude)docs/index.html' ':(exclude)docs/pt-br/index.html' ':(exclude)docs/es/index.html' ':(exclude)tools/site/release.json'
+   ```
+4. Decida:
+   - **Saída vazia e sem argumento** → **modo binários**: siga só a seção "Modo binários" no fim deste arquivo.
+   - **Saída vazia, mas com argumento de versão** → não há nada novo para versionar: pergunte ao usuário se ele quer só anexar o pacote desta plataforma a `$T` ou criar mesmo uma versão nova.
+   - **Saída não vazia** → **modo release completa**: siga os passos 1 a 9.
+   - Sem nenhuma tag → primeira release: modo release completa.
 
 ## 1. Pré-condições
 - `git status --porcelain` vazio e branch `main`. Se houver alterações, pare e pergunte.
@@ -68,8 +83,9 @@ Omita as seções vazias. Grave em `docs/releases/vX.Y.Z.md` e acrescente o mesm
 
 ## 7. Publicar
 - `git push origin main` e depois `git push origin vX.Y.Z`
-- Pacote macOS (só se estiver em macOS): `make package-mac`. O alvo já recusa um binário de release que contenha ganchos de demo.
-- `gh release create vX.Y.Z --title "mySSH vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md`, anexando `target/release/mySSH_X.Y.Z_<arch>.dmg` se ele foi gerado. Use `--prerelease` enquanto a versão for `0.x`.
+- Gere o pacote da plataforma atual conforme "Pacotes por plataforma", abaixo.
+- `gh release create vX.Y.Z --title "mySSH vX.Y.Z" --notes-file docs/releases/vX.Y.Z.md <arquivos do pacote>`. Use `--prerelease` enquanto a versão for `0.x`.
+- Diga ao usuário que os pacotes das outras plataformas são anexados rodando `/release` em cada uma delas (modo binários).
 - Não habilite workflows de CI ou Release no GitHub: eles foram desabilitados de propósito.
 
 ## 8. Atualizar a página do projeto
@@ -81,4 +97,29 @@ A página (https://xandroalmeida.github.io/mySSH/, em inglês, pt-BR e espanhol)
 - Se a release ganhar um tipo novo de binário (por exemplo, Windows), confira em `classify()` de `tools/site/build.py` se ele é reconhecido.
 
 ## 9. Relatório final (curto)
-Informe a versão anterior e a nova, a tag, o link da release, o link da página atualizada, se o .dmg foi anexado, o resultado de `make check` e de `make test-real` (ou que foi pulado) e as release notes em poucas linhas.
+Informe a versão anterior e a nova, a tag, o link da release, o link da página atualizada, quais pacotes foram anexados e quais plataformas ainda faltam, o resultado de `make check` e de `make test-real` (ou que foi pulado) e as release notes em poucas linhas.
+
+## Pacotes por plataforma
+Gere só o pacote da plataforma em que está rodando (`uname -s`; no Windows, Git Bash/MSYS informa `MINGW*`/`MSYS*`). Os alvos do Makefile já recusam um binário de release que contenha ganchos de demo.
+
+| Plataforma | Comando | Arquivos gerados |
+|---|---|---|
+| macOS | `make package-mac` | `target/release/mySSH_X.Y.Z_<arch>.dmg` |
+| Linux | `make package-linux` (bibliotecas: `make deps-linux`) | `target/release/myssh_X.Y.Z_<deb-arch>.deb` e `target/release/myssh_X.Y.Z_<arch>.AppImage` |
+| Windows | `cargo build --release -p myssh-app` e depois, em `crates/app`, `cargo packager --release --formats nsis` | o instalador `.exe` em `target/release/` |
+
+- Confira que cada arquivo existe e que o nome traz a versão `X.Y.Z` da tag. Se não trouxer, pare: o código local não é o da tag.
+- Windows nunca foi validado (ver `docs/VALIDACAO.md`). Gere o pacote, mas avise o usuário e registre isso no relatório.
+- Plataforma não listada: pare e informe.
+
+## Modo binários (nenhum commit novo desde a última tag)
+Anexa o pacote desta plataforma à release que já existe, sem criar versão, commit de versão ou tag.
+
+1. `V=${T#v}`. A release precisa existir: `gh release view "$T" --json tagName,assets`. Se não existir, pare e informe (a tag foi criada mas a release não foi publicada).
+2. O código precisa ser o da tag: a verificação do passo 0 já garante que só os arquivos da página mudaram. Confira também que `[workspace.package] version` (`make version`) é igual a `$V`.
+3. Rode `make check` e informe o resultado. Se falhar, pare.
+4. Gere o pacote da plataforma atual conforme "Pacotes por plataforma".
+5. Se um arquivo com o mesmo nome já estiver anexado à release, pare e pergunte: o usuário pode querer manter o existente. Só substitua com `gh release upload --clobber` se ele pedir.
+6. `gh release upload "$T" <arquivos do pacote>`.
+7. Atualize a página (passo 8, com `vX.Y.Z` = `$T`), para que o novo download apareça nos três idiomas: regenere, faça o commit `docs(site): página atualizada para $T (pacote <plataforma>)` e `git push origin main`. Esse commit só mexe nos arquivos da página, então as outras máquinas continuam no modo binários.
+8. Relatório: tag, plataforma, arquivos anexados com tamanho, resultado de `make check`, link da release e da página, e as plataformas que ainda não têm pacote (pela lista de assets da release).
