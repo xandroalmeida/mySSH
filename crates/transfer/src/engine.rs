@@ -388,7 +388,14 @@ async fn copy_inner(
             while !dst.publish_new(&tp, &dest).await? {
                 tries += 1;
                 if tries > 100 {
-                    return Err(TransferError::Io("não há nome livre para renomear".into()));
+                    return Err(TransferError::Io(
+                        myssh_i18n::tr!(
+                            "não há nome livre para renomear",
+                            "no free name available to rename to",
+                            "no hay un nombre libre para renombrar"
+                        )
+                        .into(),
+                    ));
                 }
                 if cancelled() {
                     return Err(TransferError::Cancelled);

@@ -64,6 +64,6 @@ pub trait HostTrustStore: Send + Sync {
 
 #[derive(Debug, thiserror::Error)]
 pub enum TrustStoreError {
-    #[error("Falha ao acessar o armazenamento de hosts confiáveis: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("Falha ao acessar o armazenamento de hosts confiáveis: {}", .0), format!("Failed to access the trusted hosts store: {}", .0), format!("Error al acceder al almacén de hosts de confianza: {}", .0)))]
     Storage(String),
 }

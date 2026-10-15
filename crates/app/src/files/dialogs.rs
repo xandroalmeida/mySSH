@@ -292,7 +292,10 @@ pub fn conflict_dialog(
 }
 
 fn meta_size(m: Option<&RemoteOrLocalMeta>) -> String {
-    m.map_or_else(|| i18n::CONFLICT_UNKNOWN().to_string(), |m| fmt_size(m.size))
+    m.map_or_else(
+        || i18n::CONFLICT_UNKNOWN().to_string(),
+        |m| fmt_size(m.size),
+    )
 }
 
 fn meta_date(m: Option<&RemoteOrLocalMeta>) -> String {

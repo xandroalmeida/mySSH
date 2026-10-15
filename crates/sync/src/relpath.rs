@@ -5,15 +5,15 @@ use std::fmt;
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum PathError {
-    #[error("nome vazio")]
+    #[error("{}", myssh_i18n::tr!("nome vazio", "empty name", "nombre vacío"))]
     Empty,
-    #[error("nome '.' ou '..' não permitido")]
+    #[error("{}", myssh_i18n::tr!("nome '.' ou '..' não permitido", "name '.' or '..' not allowed", "nombre '.' o '..' no permitido"))]
     DotComponent,
-    #[error("nome contém separador ('/' ou '\\')")]
+    #[error("{}", myssh_i18n::tr!("nome contém separador ('/' ou '\\')", "name contains a separator ('/' or '\\')", "el nombre contiene un separador ('/' o '\\')"))]
     Separator,
-    #[error("nome contém NUL")]
+    #[error("{}", myssh_i18n::tr!("nome contém NUL", "name contains NUL", "el nombre contiene NUL"))]
     Nul,
-    #[error("nome com caracteres de controle ou invisíveis")]
+    #[error("{}", myssh_i18n::tr!("nome com caracteres de controle ou invisíveis", "name with control or invisible characters", "nombre con caracteres de control o invisibles"))]
     Unsafe,
 }
 
@@ -229,5 +229,21 @@ mod tests {
         assert_eq!(serde_json::from_str::<RelPath>(&j).unwrap(), p);
         assert!(serde_json::from_str::<RelPath>("\"../x\"").is_err());
         assert!(RelPath::parse("").unwrap().is_root());
+    }
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    use super::*;
+
+    #[test]
+    fn erros_traduzidos() {
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(PathError::Empty.to_string(), "empty name");
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(PathError::Empty.to_string(), "nombre vacío");
+        });
+        assert_eq!(PathError::Empty.to_string(), "nome vazio");
     }
 }

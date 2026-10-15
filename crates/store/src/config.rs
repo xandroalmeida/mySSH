@@ -176,10 +176,19 @@ impl Store {
     /// Tudo ou nada (transação única).
     pub fn import_config_json(&self, json: &str) -> Result<ImportReport> {
         if json.len() > MAX_IMPORT_BYTES {
-            return Err(bad("o arquivo é grande demais."));
+            return Err(bad(myssh_i18n::tr!(
+                "o arquivo é grande demais.",
+                "the file is too large.",
+                "el archivo es demasiado grande."
+            )));
         }
-        let cfg: ExportedConfig = serde_json::from_str(json)
-            .map_err(|e| StoreError::InvalidConfig(format!("JSON inválido ({e}).")))?;
+        let cfg: ExportedConfig = serde_json::from_str(json).map_err(|e| {
+            StoreError::InvalidConfig(myssh_i18n::tr!(
+                format!("JSON inválido ({e})."),
+                format!("Invalid JSON ({e})."),
+                format!("JSON no válido ({e}).")
+            ))
+        })?;
         self.import_config(cfg)
     }
 
@@ -264,7 +273,11 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
     let mut folder_ids = HashSet::new();
     for f in &cfg.folders {
         if !folder_ids.insert(f.id) {
-            return Err(bad("pastas com identificador duplicado."));
+            return Err(bad(myssh_i18n::tr!(
+                "pastas com identificador duplicado.",
+                "folders with duplicate identifiers.",
+                "carpetas con identificador duplicado."
+            )));
         }
         if f.name.trim().is_empty() {
             return Err(StoreError::EmptyFolderName);
@@ -277,7 +290,11 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
         let mut cur = f.parent;
         while let Some(p) = cur {
             if !folder_ids.contains(&p) {
-                return Err(bad("pasta pai inexistente."));
+                return Err(bad(myssh_i18n::tr!(
+                    "pasta pai inexistente.",
+                    "parent folder does not exist.",
+                    "la carpeta superior no existe."
+                )));
             }
             if !seen.insert(p) {
                 return Err(StoreError::FolderCycle);
@@ -289,7 +306,11 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
     let mut profile_ids = HashSet::new();
     for p in &cfg.profiles {
         if !profile_ids.insert(p.id) {
-            return Err(bad("perfis com identificador duplicado."));
+            return Err(bad(myssh_i18n::tr!(
+                "perfis com identificador duplicado.",
+                "profiles with duplicate identifiers.",
+                "perfiles con identificador duplicado."
+            )));
         }
     }
     let jumps: HashMap<ProfileId, Option<ProfileId>> =
@@ -297,18 +318,30 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
     for ep in &cfg.profiles {
         ep.clone().into_profile().validate()?;
         if ep.tags.iter().any(|t| t.chars().any(|c| c.is_control())) {
-            return Err(bad("tag com caracteres inválidos."));
+            return Err(bad(myssh_i18n::tr!(
+                "tag com caracteres inválidos.",
+                "tag with invalid characters.",
+                "etiqueta con caracteres no válidos."
+            )));
         }
         if let Some(f) = ep.folder
             && !folder_ids.contains(&f)
         {
-            return Err(bad("perfil referencia pasta inexistente."));
+            return Err(bad(myssh_i18n::tr!(
+                "perfil referencia pasta inexistente.",
+                "profile references a folder that does not exist.",
+                "un perfil hace referencia a una carpeta que no existe."
+            )));
         }
         let mut seen = HashSet::from([ep.id]);
         let mut cur = ep.jump;
         while let Some(j) = cur {
             if !profile_ids.contains(&j) {
-                return Err(bad("perfil referencia jump host inexistente."));
+                return Err(bad(myssh_i18n::tr!(
+                    "perfil referencia jump host inexistente.",
+                    "profile references a jump host that does not exist.",
+                    "un perfil hace referencia a un jump host que no existe."
+                )));
             }
             if !seen.insert(j) {
                 return Err(StoreError::JumpCycle);

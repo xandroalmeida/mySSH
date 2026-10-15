@@ -28,11 +28,11 @@ pub struct Entry {
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum TreeError {
-    #[error("não encontrado: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("não encontrado: {}", .0), format!("not found: {}", .0), format!("no encontrado: {}", .0)))]
     NotFound(String),
-    #[error("não é um diretório: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("não é um diretório: {}", .0), format!("not a directory: {}", .0), format!("no es un directorio: {}", .0)))]
     NotADirectory(String),
-    #[error("erro de E/S: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("erro de E/S: {}", .0), format!("I/O error: {}", .0), format!("error de E/S: {}", .0)))]
     Io(String),
 }
 

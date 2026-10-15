@@ -248,13 +248,13 @@ impl client::Handler for Handler {
         key: &russh::keys::PublicKeyOrCertificate,
     ) -> Result<bool, Self::Error> {
         let russh::keys::PublicKeyOrCertificate::PublicKey { key, .. } = key else {
-            return self.reject(error::HOST_CERT);
+            return self.reject(error::HOST_CERT());
         };
         let Some(presented) = host_key_from_public(key) else {
-            return self.reject(error::HOST_STORE);
+            return self.reject(error::HOST_STORE());
         };
         let Ok(verdict) = self.verdict(&presented).await else {
-            return self.reject(error::HOST_STORE);
+            return self.reject(error::HOST_STORE());
         };
         let known = match verdict {
             TrustVerdict::Trusted => return Ok(true),
@@ -273,7 +273,7 @@ impl client::Handler for Handler {
                     known,
                 })
                 .await;
-            return self.reject(error::HOST_CHANGED);
+            return self.reject(error::HOST_CHANGED());
         }
 
         // Desconhecido: pergunta ao usuário (relógio do connect_timeout pausado).
@@ -290,7 +290,7 @@ impl client::Handler for Handler {
                 })
                 .await;
         if !sent {
-            return self.reject(error::UI_GONE);
+            return self.reject(error::UI_GONE());
         }
         let answer = tokio::time::timeout(PROMPT_TIMEOUT, rx).await;
         self.paused.store(false, Ordering::Relaxed);
@@ -300,11 +300,11 @@ impl client::Handler for Handler {
                 if self.save(&presented).await.is_ok() {
                     Ok(true)
                 } else {
-                    self.reject(error::HOST_STORE)
+                    self.reject(error::HOST_STORE())
                 }
             }
-            Ok(Ok(HostKeyDecision::Reject)) | Ok(Err(_)) => self.reject(error::HOST_REJECTED),
-            Err(_) => self.reject(error::HOST_PROMPT_TIMEOUT),
+            Ok(Ok(HostKeyDecision::Reject)) | Ok(Err(_)) => self.reject(error::HOST_REJECTED()),
+            Err(_) => self.reject(error::HOST_PROMPT_TIMEOUT()),
         }
     }
 }
@@ -324,23 +324,23 @@ const MAX_KEY_FILE: u64 = 64 * 1024;
 /// sempre limitada por `take`.
 fn read_key_file(path: &std::path::Path) -> Result<Zeroizing<String>, String> {
     use std::io::Read;
-    let meta = std::fs::metadata(path).map_err(|_| error::KEY_READ.to_string())?;
+    let meta = std::fs::metadata(path).map_err(|_| error::KEY_READ().to_string())?;
     if !meta.is_file() {
-        return Err(error::KEY_NOT_FILE.to_string());
+        return Err(error::KEY_NOT_FILE().to_string());
     }
     if meta.len() > MAX_KEY_FILE {
-        return Err(error::KEY_TOO_BIG.to_string());
+        return Err(error::KEY_TOO_BIG().to_string());
     }
-    let file = std::fs::File::open(path).map_err(|_| error::KEY_READ.to_string())?;
+    let file = std::fs::File::open(path).map_err(|_| error::KEY_READ().to_string())?;
     let mut buf = Zeroizing::new(Vec::new());
     file.take(MAX_KEY_FILE + 1)
         .read_to_end(&mut buf)
-        .map_err(|_| error::KEY_READ.to_string())?;
+        .map_err(|_| error::KEY_READ().to_string())?;
     if buf.len() as u64 > MAX_KEY_FILE {
-        return Err(error::KEY_TOO_BIG.to_string());
+        return Err(error::KEY_TOO_BIG().to_string());
     }
-    let text =
-        String::from_utf8(std::mem::take(&mut *buf)).map_err(|_| error::KEY_DECODE.to_string())?;
+    let text = String::from_utf8(std::mem::take(&mut *buf))
+        .map_err(|_| error::KEY_DECODE().to_string())?;
     Ok(Zeroizing::new(text))
 }
 
@@ -351,9 +351,9 @@ async fn load_key(
     let p = path.to_path_buf();
     let text = tokio::task::spawn_blocking(move || read_key_file(&p))
         .await
-        .map_err(|_| error::KEY_READ.to_string())??;
+        .map_err(|_| error::KEY_READ().to_string())??;
     decode_secret_key(&text, passphrase.map(|p| p.expose_secret()))
-        .map_err(|_| error::KEY_DECODE.to_string())
+        .map_err(|_| error::KEY_DECODE().to_string())
 }
 
 /// Diz se a chave privada em `path` exige passphrase (leitura síncrona: chamar fora da thread
@@ -363,7 +363,7 @@ pub fn key_requires_passphrase(path: &std::path::Path) -> Result<bool, String> {
     match decode_secret_key(&text, None) {
         Ok(_) => Ok(false),
         Err(russh::keys::Error::KeyIsEncrypted) => Ok(true),
-        Err(_) => Err(error::KEY_DECODE.to_string()),
+        Err(_) => Err(error::KEY_DECODE().to_string()),
     }
 }
 
@@ -385,7 +385,7 @@ async fn connect_agent() -> Result<DynAgent, String> {
     use russh::keys::agent::client::AgentClient;
     let agent = AgentClient::connect_env()
         .await
-        .map_err(|_| error::NO_AGENT.to_string())?;
+        .map_err(|_| error::NO_AGENT().to_string())?;
     Ok(agent.dynamic())
 }
 
@@ -399,12 +399,12 @@ async fn connect_agent() -> Result<DynAgent, String> {
     AgentClient::connect_pageant()
         .await
         .map(|a| a.dynamic())
-        .map_err(|_| error::NO_AGENT.to_string())
+        .map_err(|_| error::NO_AGENT().to_string())
 }
 
 #[cfg(not(any(unix, windows)))]
 async fn connect_agent() -> Result<DynAgent, String> {
-    Err(error::UNSUPPORTED_AUTH.into())
+    Err(error::UNSUPPORTED_AUTH().into())
 }
 
 /// Tenta cada identidade do agente. `Success` ou a primeira falha **parcial** (chave aceita, falta
@@ -416,7 +416,7 @@ async fn authenticate_agent(session: &mut Handle, user: &str) -> Result<AuthResu
     let ids = agent
         .request_identities()
         .await
-        .map_err(|_| error::NO_AGENT.to_string())?;
+        .map_err(|_| error::NO_AGENT().to_string())?;
     for id in ids {
         let AgentIdentity::PublicKey { key, .. } = id else {
             continue;
@@ -436,7 +436,7 @@ async fn authenticate_agent(session: &mut Handle, user: &str) -> Result<AuthResu
             }
         }
     }
-    Err(error::AGENT_NO_KEYS.into())
+    Err(error::AGENT_NO_KEYS().into())
 }
 
 // ------------------------------------------------------------------ keyboard-interactive
@@ -498,14 +498,14 @@ async fn ask_user(
             .await;
     if !sent {
         ctx.paused.store(false, Ordering::Relaxed);
-        return Err(error::UI_GONE.into());
+        return Err(error::UI_GONE().into());
     }
     let answer = tokio::time::timeout(PROMPT_TIMEOUT, rx).await;
     ctx.paused.store(false, Ordering::Relaxed);
     match answer {
         Ok(Ok(v)) => Ok(v),
-        Ok(Err(_)) => Err(error::AUTH_CANCELLED.into()),
-        Err(_) => Err(error::AUTH_PROMPT_TIMEOUT.into()),
+        Ok(Err(_)) => Err(error::AUTH_CANCELLED().into()),
+        Err(_) => Err(error::AUTH_PROMPT_TIMEOUT().into()),
     }
 }
 
@@ -532,7 +532,7 @@ async fn keyboard_interactive(
                 prompts,
             } => {
                 if prompts.len() > KI_MAX_PROMPTS {
-                    return Err(error::KI_PROTOCOL.into());
+                    return Err(error::KI_PROTOCOL().into());
                 }
                 let prompts: Vec<(String, bool)> = prompts
                     .into_iter()
@@ -573,7 +573,7 @@ async fn keyboard_interactive(
             }
         }
     }
-    Err(error::KI_PROTOCOL.into())
+    Err(error::KI_PROTOCOL().into())
 }
 
 async fn authenticate(
@@ -603,7 +603,7 @@ async fn authenticate(
         AuthMaterial::KeyboardInteractive => {
             return match keyboard_interactive(session, user, ctx, KiMode::Interactive).await? {
                 true => Ok(()),
-                false => Err(error::AUTH_REJECTED.into()),
+                false => Err(error::AUTH_REJECTED().into()),
             };
         }
     };
@@ -615,7 +615,7 @@ async fn authenticate(
         return Ok(());
     };
     if !remaining_methods.contains(&MethodKind::KeyboardInteractive) {
-        return Err(error::AUTH_REJECTED.into());
+        return Err(error::AUTH_REJECTED().into());
     }
     // O servidor aceitou este fator mas exige outro (ex.: `publickey,keyboard-interactive`): segue
     // para keyboard-interactive. Senha recusada com keyboard-interactive disponível: tenta KI.
@@ -626,11 +626,11 @@ async fn authenticate(
         }
         AuthMaterial::Password(pw) => KiMode::AutoPassword(pw),
         // Chave/agente simplesmente não aceitos: não pedir nada ao usuário.
-        _ => return Err(error::AUTH_REJECTED.into()),
+        _ => return Err(error::AUTH_REJECTED().into()),
     };
     match keyboard_interactive(session, user, ctx, mode).await? {
         true => Ok(()),
-        false => Err(error::AUTH_REJECTED.into()),
+        false => Err(error::AUTH_REJECTED().into()),
     }
 }
 
@@ -652,7 +652,7 @@ async fn handshake_and_auth<R>(
 where
     R: AsyncRead + AsyncWrite + Unpin + Send + 'static,
 {
-    let timeout = || error::at_hop(hop, error::TIMEOUT.to_string());
+    let timeout = || error::at_hop(hop, error::TIMEOUT().to_string());
     let paused = Arc::new(AtomicBool::new(false));
     let abort = Arc::new(Mutex::new(None));
     let handler = Handler {
@@ -681,7 +681,7 @@ where
         }
     };
     if !emit.state(SessionState::AwaitingAuth).await {
-        return Err(error::UI_GONE.into());
+        return Err(error::UI_GONE().into());
     }
     let ctx = AuthCtx {
         emit,
@@ -763,7 +763,7 @@ impl Connection {
             .chain(std::iter::once(t.endpoint))
         {
             if seen.contains(&ep) {
-                return Err(error::JUMP_LOOP.into());
+                return Err(error::JUMP_LOOP().into());
             }
             seen.push(ep);
         }
@@ -790,11 +790,11 @@ impl Connection {
                 )
             };
             if i > 0 && !emit.state(SessionState::Connecting).await {
-                return Err(error::UI_GONE.into());
+                return Err(error::UI_GONE().into());
             }
             let mut budget = total;
             let nopause = AtomicBool::new(false);
-            let timeout = || error::at_hop(hop, error::TIMEOUT.to_string());
+            let timeout = || error::at_hop(hop, error::TIMEOUT().to_string());
             let handle = match chain.last() {
                 None => {
                     let stream = with_budget(
@@ -834,7 +834,7 @@ impl Connection {
                     )
                     .await
                     .map_err(|_| timeout())?
-                    .map_err(|_| error::at_hop(Some(i - 1), error::JUMP_OPEN.to_string()))?;
+                    .map_err(|_| error::at_hop(Some(i - 1), error::JUMP_OPEN().to_string()))?;
                     handshake_and_auth(
                         channel.into_stream(),
                         endpoint,
@@ -851,7 +851,9 @@ impl Connection {
             };
             chain.push(handle);
         }
-        let handle = chain.pop().ok_or_else(|| error::CONN_CLOSED.to_string())?;
+        let handle = chain
+            .pop()
+            .ok_or_else(|| error::CONN_CLOSED().to_string())?;
         Ok(Arc::new(Connection {
             handle,
             parents: chain,
@@ -887,7 +889,7 @@ impl Connection {
 
     async fn open_session_channel(self: &Arc<Self>) -> Result<(Chan, ChannelGuard), String> {
         if self.is_closed() {
-            return Err(error::CONN_CLOSED.into());
+            return Err(error::CONN_CLOSED().into());
         }
         let channel = self
             .handle
@@ -935,7 +937,7 @@ impl Connection {
             .map_err(|e| error::russh_message(&e))?;
         let session = russh_sftp::client::SftpSession::new(channel.into_stream())
             .await
-            .map_err(|_| error::SFTP_FAILED.to_string())?;
+            .map_err(|_| error::SFTP_FAILED().to_string())?;
         Ok(Sftp {
             session,
             _guard: guard,
@@ -954,7 +956,7 @@ impl ShellChannel {
         self.channel
             .data(bytes)
             .await
-            .map_err(|_| error::CONNECTION_LOST.to_string())
+            .map_err(|_| error::CONNECTION_LOST().to_string())
     }
 
     pub async fn window_change(&self, size: PtySize) -> Result<(), String> {
@@ -966,7 +968,7 @@ impl ShellChannel {
                 size.pix_h as u32,
             )
             .await
-            .map_err(|_| error::CONNECTION_LOST.to_string())
+            .map_err(|_| error::CONNECTION_LOST().to_string())
     }
 
     /// Próxima mensagem do canal (`None` = canal fechado).
@@ -1125,12 +1127,12 @@ mod tests {
     fn chave_diretorio_e_arquivo_grande_sao_recusados() {
         let d = tmp_dir("key-big");
         let e = key_requires_passphrase(&d).unwrap_err();
-        assert_eq!(e, error::KEY_NOT_FILE);
+        assert_eq!(e, error::KEY_NOT_FILE());
         let big = d.join("big");
         std::fs::write(&big, vec![b'A'; 200 * 1024]).unwrap();
         assert_eq!(
             key_requires_passphrase(&big).unwrap_err(),
-            error::KEY_TOO_BIG
+            error::KEY_TOO_BIG()
         );
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -1154,10 +1156,10 @@ mod tests {
         let r = rx
             .recv_timeout(Duration::from_secs(5))
             .expect("FIFO travou a leitura da chave");
-        assert_eq!(r.unwrap_err(), error::KEY_NOT_FILE);
+        assert_eq!(r.unwrap_err(), error::KEY_NOT_FILE());
         assert_eq!(
             key_requires_passphrase(std::path::Path::new("/dev/zero")).unwrap_err(),
-            error::KEY_NOT_FILE
+            error::KEY_NOT_FILE()
         );
         let _ = std::fs::remove_dir_all(&d);
     }
@@ -1221,6 +1223,6 @@ mod tests {
             &emit,
         )
         .await;
-        assert_eq!(r.err().as_deref(), Some(error::JUMP_LOOP));
+        assert_eq!(r.err().as_deref(), Some(error::JUMP_LOOP()));
     }
 }

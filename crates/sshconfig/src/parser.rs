@@ -174,7 +174,12 @@ impl Parser<'_> {
                         cur,
                         line,
                         file,
-                        "Aspas não fechadas: linha ignorada.".into(),
+                        myssh_i18n::tr!(
+                            "Aspas não fechadas: linha ignorada.",
+                            "Unclosed quotes: line ignored.",
+                            "Comillas sin cerrar: línea ignorada."
+                        )
+                        .into(),
                     );
                     continue;
                 }
@@ -182,7 +187,17 @@ impl Parser<'_> {
             match key.as_str() {
                 "host" => {
                     if args.is_empty() {
-                        self.warn(cur, line, file, "Host sem padrão: bloco ignorado.".into());
+                        self.warn(
+                            cur,
+                            line,
+                            file,
+                            myssh_i18n::tr!(
+                                "Host sem padrão: bloco ignorado.",
+                                "Host without a pattern: block ignored.",
+                                "Host sin patrón: bloque ignorado."
+                            )
+                            .into(),
+                        );
                         cur = None;
                         continue;
                     }
@@ -197,13 +212,23 @@ impl Parser<'_> {
                     self.global_warnings.push(Warning {
                         line,
                         file: file.to_string(),
-                        msg: "Bloco Match ignorado: condições Match não são suportadas.".into(),
+                        msg: myssh_i18n::tr!(
+                            "Bloco Match ignorado: condições Match não são suportadas.",
+                            "Match block ignored: Match conditions are not supported.",
+                            "Bloque Match ignorado: las condiciones Match no están soportadas."
+                        )
+                        .into(),
                     });
                     if has_exec {
                         self.global_warnings.push(Warning {
                             line,
                             file: file.to_string(),
-                            msg: "Match exec ignorada: executa comando local.".into(),
+                            msg: myssh_i18n::tr!(
+                                "Match exec ignorada: executa comando local.",
+                                "Match exec ignored: it runs a local command.",
+                                "Match exec ignorado: ejecuta un comando local."
+                            )
+                            .into(),
                         });
                     }
                     cur = None;
@@ -215,7 +240,17 @@ impl Parser<'_> {
                         cur,
                         line,
                         file,
-                        format!("Diretiva {} ignorada: executa comando local.", name_of(raw)),
+                        myssh_i18n::tr!(
+                            format!("Diretiva {} ignorada: executa comando local.", name_of(raw)),
+                            format!(
+                                "Directive {} ignored: it runs a local command.",
+                                name_of(raw)
+                            ),
+                            format!(
+                                "Directiva {} ignorada: ejecuta un comando local.",
+                                name_of(raw)
+                            )
+                        ),
                     );
                 }
                 k if SUPPORTED_KEYS.contains(&k) => {
@@ -224,7 +259,11 @@ impl Parser<'_> {
                             cur,
                             line,
                             file,
-                            format!("Diretiva {} sem valor: ignorada.", name_of(raw)),
+                            myssh_i18n::tr!(
+                                format!("Diretiva {} sem valor: ignorada.", name_of(raw)),
+                                format!("Directive {} has no value: ignored.", name_of(raw)),
+                                format!("Directiva {} sin valor: ignorada.", name_of(raw))
+                            ),
                         );
                     } else if let Some(i) = cur {
                         self.blocks[i].directives.push(Directive {
@@ -239,7 +278,11 @@ impl Parser<'_> {
                     cur,
                     line,
                     file,
-                    format!("Diretiva {} ignorada (não suportada).", name_of(raw)),
+                    myssh_i18n::tr!(
+                        format!("Diretiva {} ignorada (não suportada).", name_of(raw)),
+                        format!("Directive {} ignored (not supported).", name_of(raw)),
+                        format!("Directiva {} ignorada (no soportada).", name_of(raw))
+                    ),
                 ),
             }
         }
@@ -255,7 +298,17 @@ impl Parser<'_> {
         cur: Option<usize>,
     ) {
         if args.is_empty() {
-            self.warn(cur, line, file, "Include sem caminho: ignorado.".into());
+            self.warn(
+                cur,
+                line,
+                file,
+                myssh_i18n::tr!(
+                    "Include sem caminho: ignorado.",
+                    "Include without a path: ignored.",
+                    "Include sin ruta: ignorado."
+                )
+                .into(),
+            );
             return;
         }
         if depth + 1 > MAX_INCLUDE_DEPTH {
@@ -263,7 +316,13 @@ impl Parser<'_> {
                 cur,
                 line,
                 file,
-                format!("Include ignorado: profundidade máxima ({MAX_INCLUDE_DEPTH}) excedida."),
+                myssh_i18n::tr!(
+                    format!(
+                        "Include ignorado: profundidade máxima ({MAX_INCLUDE_DEPTH}) excedida."
+                    ),
+                    format!("Include ignored: maximum depth ({MAX_INCLUDE_DEPTH}) exceeded."),
+                    format!("Include ignorado: profundidad máxima ({MAX_INCLUDE_DEPTH}) excedida.")
+                ),
             );
             return;
         }
@@ -293,10 +352,22 @@ impl Parser<'_> {
                             cur,
                             line,
                             file,
-                            format!(
-                                "Includes restantes ignorados: orçamento da importação esgotado \
-                                 ({MAX_INCLUDE_FILES} arquivos ou {} MiB no total).",
-                                MAX_INCLUDE_TOTAL_BYTES / (1024 * 1024)
+                            myssh_i18n::tr!(
+                                format!(
+                                    "Includes restantes ignorados: orçamento da importação esgotado \
+                                     ({MAX_INCLUDE_FILES} arquivos ou {} MiB no total).",
+                                    MAX_INCLUDE_TOTAL_BYTES / (1024 * 1024)
+                                ),
+                                format!(
+                                    "Remaining Includes ignored: import budget exhausted \
+                                     ({MAX_INCLUDE_FILES} files or {} MiB in total).",
+                                    MAX_INCLUDE_TOTAL_BYTES / (1024 * 1024)
+                                ),
+                                format!(
+                                    "Includes restantes ignorados: presupuesto de importación agotado \
+                                     ({MAX_INCLUDE_FILES} archivos o {} MiB en total).",
+                                    MAX_INCLUDE_TOTAL_BYTES / (1024 * 1024)
+                                )
                             ),
                         );
                     }
@@ -307,7 +378,11 @@ impl Parser<'_> {
                         cur,
                         line,
                         file,
-                        format!("Include ignorado: ciclo detectado em {path}."),
+                        myssh_i18n::tr!(
+                            format!("Include ignorado: ciclo detectado em {path}."),
+                            format!("Include ignored: cycle detected at {path}."),
+                            format!("Include ignorado: ciclo detectado en {path}.")
+                        ),
                     );
                     continue;
                 }
@@ -327,7 +402,11 @@ impl Parser<'_> {
                         cur,
                         line,
                         file,
-                        format!("Não foi possível ler o Include {path}: {}.", io_msg(&e)),
+                        myssh_i18n::tr!(
+                            format!("Não foi possível ler o Include {path}: {}.", io_msg(&e)),
+                            format!("Could not read Include {path}: {}.", io_msg(&e)),
+                            format!("No se pudo leer el Include {path}: {}.", io_msg(&e))
+                        ),
                     ),
                 }
             }
@@ -337,10 +416,22 @@ impl Parser<'_> {
 
 fn io_msg(e: &std::io::Error) -> &'static str {
     match e.kind() {
-        std::io::ErrorKind::NotFound => "arquivo não encontrado",
-        std::io::ErrorKind::PermissionDenied => "sem permissão",
-        std::io::ErrorKind::InvalidData => "arquivo inválido ou maior que 1 MiB",
-        _ => "erro de leitura",
+        std::io::ErrorKind::NotFound => {
+            myssh_i18n::tr!(
+                "arquivo não encontrado",
+                "file not found",
+                "archivo no encontrado"
+            )
+        }
+        std::io::ErrorKind::PermissionDenied => {
+            myssh_i18n::tr!("sem permissão", "permission denied", "sin permiso")
+        }
+        std::io::ErrorKind::InvalidData => myssh_i18n::tr!(
+            "arquivo inválido ou maior que 1 MiB",
+            "invalid file or larger than 1 MiB",
+            "archivo no válido o mayor de 1 MiB"
+        ),
+        _ => myssh_i18n::tr!("erro de leitura", "read error", "error de lectura"),
     }
 }
 
@@ -367,5 +458,21 @@ fn name_of(raw: &str) -> String {
         format!("{}…", &name[..MAX_DIRECTIVE_NAME_CHARS])
     } else {
         name.to_string()
+    }
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    use super::*;
+
+    #[test]
+    fn io_msg_traduzida() {
+        let e = std::io::Error::from(std::io::ErrorKind::NotFound);
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(io_msg(&e), "file not found")
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(io_msg(&e), "archivo no encontrado")
+        });
     }
 }

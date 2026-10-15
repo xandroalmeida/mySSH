@@ -1,6 +1,6 @@
 # mySSH
 
-Gerenciador desktop de sessões SSH escrito em Rust (macOS, Windows e Linux), com interface em pt-BR. Sem telemetria e sem verificação automática de atualização: a única rede usada é a das conexões que você iniciar.
+Gerenciador desktop de sessões SSH escrito em Rust (macOS, Windows e Linux), com interface em inglês, português (Brasil) e espanhol (segue o idioma do sistema, com inglês como padrão; dá para escolher em Configurações → Idioma). Sem telemetria e sem verificação automática de atualização: a única rede usada é a das conexões que você iniciar.
 
 > Estado: versão 0.1.0, validada em **macOS arm64** e **Linux x86_64** (Ubuntu 24.04, Wayland). Windows tem CI e empacotamento preparados, mas nunca foi executado (ver `docs/VALIDACAO.md`). Os pacotes são **sem assinatura**.
 

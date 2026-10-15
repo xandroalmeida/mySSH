@@ -981,7 +981,9 @@ fn real_capturas() {
     )
     .unwrap();
     h.state_mut().open_profile(key.id);
-    wait(&mut h, "bloqueio", 15, |a| status(a, 2) == i18n::ST_BLOCKED());
+    wait(&mut h, "bloqueio", 15, |a| {
+        status(a, 2) == i18n::ST_BLOCKED()
+    });
     shot(&mut h, "24-chave-alterada");
     click(&mut h, i18n::HKC_OPEN_TRUSTED());
     shot(&mut h, "25-hosts-confiaveis");

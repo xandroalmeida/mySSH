@@ -391,7 +391,11 @@ impl App {
                         ui.label(i18n::F_PASSPHRASE());
                         ui.vertical(|ui| {
                             ui.radio_value(&mut f.passphrase_mode, SecretMode::Ask, i18n::PP_ASK());
-                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Save, i18n::PP_SAVE());
+                            ui.radio_value(
+                                &mut f.passphrase_mode,
+                                SecretMode::Save,
+                                i18n::PP_SAVE(),
+                            );
                         });
                         ui.end_row();
                         if f.passphrase_mode == SecretMode::Save {
@@ -550,9 +554,34 @@ impl App {
                                         ThemePref::Light,
                                         i18n::THEME_LIGHT(),
                                     );
-                                    ui.radio_value(&mut s.theme, ThemePref::Dark, i18n::THEME_DARK());
+                                    ui.radio_value(
+                                        &mut s.theme,
+                                        ThemePref::Dark,
+                                        i18n::THEME_DARK(),
+                                    );
                                 });
                                 ui.weak(i18n::TH_SYSTEM_HELP());
+                            });
+                            ui.end_row();
+
+                            ui.label(i18n::S_LANGUAGE());
+                            ui.vertical(|ui| {
+                                let name = |l: Option<myssh_i18n::Lang>| {
+                                    l.map_or(i18n::LANG_AUTO(), myssh_i18n::Lang::native_name)
+                                };
+                                egui::ComboBox::from_id_salt("settings-language")
+                                    .selected_text(name(s.language))
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(&mut s.language, None, name(None));
+                                        for l in myssh_i18n::Lang::ALL {
+                                            ui.selectable_value(
+                                                &mut s.language,
+                                                Some(l),
+                                                name(Some(l)),
+                                            );
+                                        }
+                                    });
+                                ui.weak(i18n::LANG_HELP());
                             });
                             ui.end_row();
 

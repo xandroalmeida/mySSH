@@ -239,15 +239,15 @@ pub struct Plan {
 
 #[derive(Debug, thiserror::Error)]
 pub enum PlanError {
-    #[error("seguir symlinks não é suportado")]
+    #[error("{}", myssh_i18n::tr!("seguir symlinks não é suportado", "following symlinks is not supported", "seguir enlaces simbólicos no está soportado"))]
     FollowSymlinksUnsupported,
-    #[error("raiz da origem não existe")]
+    #[error("{}", myssh_i18n::tr!("raiz da origem não existe", "source root does not exist", "la raíz del origen no existe"))]
     SourceMissing,
-    #[error("raiz da origem não é um diretório")]
+    #[error("{}", myssh_i18n::tr!("raiz da origem não é um diretório", "source root is not a directory", "la raíz del origen no es un directorio"))]
     SourceNotDir,
-    #[error("raiz do destino não é um diretório")]
+    #[error("{}", myssh_i18n::tr!("raiz do destino não é um diretório", "destination root is not a directory", "la raíz del destino no es un directorio"))]
     DestNotDir,
-    #[error("limite de {0} entradas excedido")]
+    #[error("{}", myssh_i18n::tr!(format!("limite de {} entradas excedido", .0), format!("limit of {} entries exceeded", .0), format!("límite de {} entradas excedido", .0)))]
     TooManyEntries(usize),
     #[error(transparent)]
     Tree(#[from] TreeError),

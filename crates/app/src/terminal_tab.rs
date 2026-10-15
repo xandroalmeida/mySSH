@@ -458,7 +458,9 @@ impl TerminalTab {
                         SessionState::Connecting | SessionState::Reconnecting => {
                             b("⏳", i18n::ST_CONNECTING(), AMBER)
                         }
-                        SessionState::AwaitingHostTrust => b("🔒", i18n::ST_AWAITING_TRUST(), AMBER),
+                        SessionState::AwaitingHostTrust => {
+                            b("🔒", i18n::ST_AWAITING_TRUST(), AMBER)
+                        }
                         SessionState::AwaitingAuth => b("🔑", i18n::ST_AUTHENTICATING(), AMBER),
                         SessionState::Connected => b("✔", i18n::ST_CONNECTED(), GREEN),
                         SessionState::Disconnected => b("○", i18n::ST_DISCONNECTED(), GRAY),
@@ -1317,7 +1319,7 @@ fn auth_text(a: &AuthMethod) -> &'static str {
 }
 
 fn friendly_error(auth: &AuthMethod, msg: &str) -> String {
-    if msg == AUTH_REJECTED {
+    if msg == AUTH_REJECTED() {
         match auth {
             AuthMethod::Password { .. } => return i18n::ERR_AUTH_PASSWORD().into(),
             AuthMethod::KeyFile { .. } => return i18n::ERR_AUTH_KEY().into(),
@@ -1387,8 +1389,8 @@ fn hop_label(hops: &[Profile], hop: Option<usize>) -> Option<String> {
 /// Erros de salto chegam como "Jump host N: <mensagem>".
 fn ask_again_index(hops: &[Profile], target_auth: &AuthMethod, msg: &str) -> Option<usize> {
     let rejected = |auth: &AuthMethod, m: &str| match auth {
-        AuthMethod::Password { .. } => m == AUTH_REJECTED,
-        AuthMethod::KeyFile { .. } => m == KEY_DECODE,
+        AuthMethod::Password { .. } => m == AUTH_REJECTED(),
+        AuthMethod::KeyFile { .. } => m == KEY_DECODE(),
         _ => false,
     };
     if let Some(rest) = msg.strip_prefix("Jump host ")
@@ -1706,7 +1708,10 @@ mod tests {
     #[test]
     fn erro_de_autenticacao_vira_mensagem_clara() {
         let pw = AuthMethod::Password { credential: None };
-        assert_eq!(friendly_error(&pw, AUTH_REJECTED), i18n::ERR_AUTH_PASSWORD());
+        assert_eq!(
+            friendly_error(&pw, AUTH_REJECTED()),
+            i18n::ERR_AUTH_PASSWORD()
+        );
         assert_eq!(friendly_error(&pw, "outro"), "outro");
     }
 }

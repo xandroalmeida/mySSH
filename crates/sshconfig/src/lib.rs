@@ -223,7 +223,11 @@ fn build_preview(
                     global_warnings.push(Warning {
                         line: 0,
                         file: opts.root_name.clone(),
-                        msg: format!("Host \"{p}\" duplicado: usado apenas o primeiro bloco."),
+                        msg: myssh_i18n::tr!(
+                            format!("Host \"{p}\" duplicado: usado apenas o primeiro bloco."),
+                            format!("Host \"{p}\" is duplicated: only the first block was used."),
+                            format!("Host \"{p}\" duplicado: se usó solo el primer bloque.")
+                        ),
                     });
                 }
             }
@@ -246,9 +250,14 @@ fn build_preview(
         let (mut cand, hop) = build_candidate(&ctx, &job, warnings);
         if let Some((tok, d)) = hop {
             match parse_hop(&tok) {
-                None => cand
-                    .warnings
-                    .push(w(&d, format!("ProxyJump \"{tok}\" inválido: ignorado."))),
+                None => cand.warnings.push(w(
+                    &d,
+                    myssh_i18n::tr!(
+                        format!("ProxyJump \"{tok}\" inválido: ignorado."),
+                        format!("ProxyJump \"{tok}\" is invalid: ignored."),
+                        format!("ProxyJump \"{tok}\" no válido: ignorado.")
+                    ),
+                )),
                 Some(h) => {
                     let plain = h.user.is_none() && h.port.is_none();
                     let target = if plain && known.contains(&h.host) {
@@ -267,9 +276,19 @@ fn build_preview(
                             alias: name.clone(),
                             user: h.user,
                             port: h.port,
-                            note: Some(format!(
-                                "Criado a partir do ProxyJump do perfil \"{}\".",
-                                cand.alias
+                            note: Some(myssh_i18n::tr!(
+                                format!(
+                                    "Criado a partir do ProxyJump do perfil \"{}\".",
+                                    cand.alias
+                                ),
+                                format!(
+                                    "Created from the ProxyJump of profile \"{}\".",
+                                    cand.alias
+                                ),
+                                format!(
+                                    "Creado a partir del ProxyJump del perfil \"{}\".",
+                                    cand.alias
+                                )
                             )),
                         });
                         name
@@ -277,7 +296,12 @@ fn build_preview(
                     if target == cand.alias {
                         cand.warnings.push(w(
                             &d,
-                            "ProxyJump aponta para o próprio host: ignorado.".into(),
+                            myssh_i18n::tr!(
+                                "ProxyJump aponta para o próprio host: ignorado.",
+                                "ProxyJump points to the host itself: ignored.",
+                                "ProxyJump apunta al propio host: ignorado."
+                            )
+                            .into(),
                         ));
                     } else {
                         cand.jump_alias = Some(target);
@@ -320,7 +344,11 @@ fn build_candidate(
                 None => {
                     warnings.push(w(
                         d,
-                        format!("Port \"{}\" inválida: usada a 22.", d.args[0]),
+                        myssh_i18n::tr!(
+                            format!("Port \"{}\" inválida: usada a 22.", d.args[0]),
+                            format!("Port \"{}\" is invalid: 22 was used.", d.args[0]),
+                            format!("Port \"{}\" no válido: se usó 22.", d.args[0])
+                        ),
                     ));
                     22
                 }
@@ -359,7 +387,11 @@ fn build_candidate(
             Ok(n) => profile.keepalive_secs = Some(n),
             Err(_) => warnings.push(w(
                 d,
-                format!("ServerAliveInterval \"{}\" inválido: ignorado.", d.args[0]),
+                myssh_i18n::tr!(
+                    format!("ServerAliveInterval \"{}\" inválido: ignorado.", d.args[0]),
+                    format!("ServerAliveInterval \"{}\" is invalid: ignored.", d.args[0]),
+                    format!("ServerAliveInterval \"{}\" no válido: ignorado.", d.args[0])
+                ),
             )),
         }
     }
@@ -368,7 +400,11 @@ fn build_candidate(
             Ok(n) if n > 0 => profile.connect_timeout_secs = n,
             _ => warnings.push(w(
                 d,
-                format!("ConnectTimeout \"{}\" inválido: ignorado.", d.args[0]),
+                myssh_i18n::tr!(
+                    format!("ConnectTimeout \"{}\" inválido: ignorado.", d.args[0]),
+                    format!("ConnectTimeout \"{}\" is invalid: ignored.", d.args[0]),
+                    format!("ConnectTimeout \"{}\" no válido: ignorado.", d.args[0])
+                ),
             )),
         }
     }
@@ -377,8 +413,7 @@ fn build_candidate(
     {
         warnings.push(w(
             d,
-            "ForwardAgent importado como desligado: desabilitado por segurança, ative manualmente."
-                .into(),
+            myssh_i18n::tr!("ForwardAgent importado como desligado: desabilitado por segurança, ative manualmente.", "ForwardAgent imported as off: disabled for security, enable it manually.", "ForwardAgent importado como desactivado: deshabilitado por seguridad, actívalo manualmente.").into(),
         ));
     }
 
@@ -394,10 +429,22 @@ fn build_candidate(
             if toks.len() > 1 {
                 warnings.push(w(
                     d,
-                    format!(
-                        "ProxyJump com {} saltos: apenas o último (\"{}\") foi importado; configure os anteriores como jump do próprio salto.",
-                        toks.len(),
-                        toks[toks.len() - 1]
+                    myssh_i18n::tr!(
+                        format!(
+                            "ProxyJump com {} saltos: apenas o último (\"{}\") foi importado; configure os anteriores como jump do próprio salto.",
+                            toks.len(),
+                            toks[toks.len() - 1]
+                        ),
+                        format!(
+                            "ProxyJump with {} hops: only the last one (\"{}\") was imported; configure the previous ones as the jump of the hop itself.",
+                            toks.len(),
+                            toks[toks.len() - 1]
+                        ),
+                        format!(
+                            "ProxyJump con {} saltos: solo se importó el último (\"{}\"); configura los anteriores como jump del propio salto.",
+                            toks.len(),
+                            toks[toks.len() - 1]
+                        )
                     ),
                 ));
             }
@@ -409,7 +456,11 @@ fn build_candidate(
         warnings.push(Warning {
             line: 0,
             file: ctx.opts.root_name.clone(),
-            msg: format!("Perfil \"{alias}\" inválido: {e}"),
+            msg: myssh_i18n::tr!(
+                format!("Perfil \"{alias}\" inválido: {e}"),
+                format!("Profile \"{alias}\" is invalid: {e}"),
+                format!("Perfil \"{alias}\" no válido: {e}")
+            ),
         });
     }
 
@@ -444,12 +495,21 @@ pub fn resolve_jumps(cands: &mut [Candidate]) {
                 Some(_) => c.warnings.push(Warning {
                     line: 0,
                     file: String::new(),
-                    msg: "O salto aponta para o próprio perfil: ignorado.".into(),
+                    msg: myssh_i18n::tr!(
+                        "O salto aponta para o próprio perfil: ignorado.",
+                        "The jump points to the profile itself: ignored.",
+                        "El salto apunta al propio perfil: ignorado."
+                    )
+                    .into(),
                 }),
                 None => c.warnings.push(Warning {
                     line: 0,
                     file: String::new(),
-                    msg: format!("Salto \"{a}\" não encontrado entre os perfis importados."),
+                    msg: myssh_i18n::tr!(
+                        format!("Salto \"{a}\" não encontrado entre os perfis importados."),
+                        format!("Jump \"{a}\" not found among the imported profiles."),
+                        format!("Salto \"{a}\" no encontrado entre los perfiles importados.")
+                    ),
                 }),
             }
         }
@@ -473,7 +533,12 @@ pub fn resolve_jumps(cands: &mut [Candidate]) {
             c.warnings.push(Warning {
                 line: 0,
                 file: String::new(),
-                msg: "Ciclo de saltos (ProxyJump) detectado: salto ignorado.".into(),
+                msg: myssh_i18n::tr!(
+                    "Ciclo de saltos (ProxyJump) detectado: salto ignorado.",
+                    "Jump cycle (ProxyJump) detected: jump ignored.",
+                    "Ciclo de saltos (ProxyJump) detectado: salto ignorado."
+                )
+                .into(),
             });
         }
     }

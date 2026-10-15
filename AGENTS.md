@@ -1,6 +1,6 @@
 # AGENTS.md — mySSH
 
-Gerenciador desktop de sessões SSH em Rust (macOS, Windows, Linux). UI e mensagens em pt-BR.
+Gerenciador desktop de sessões SSH em Rust (macOS, Windows, Linux). UI e mensagens em inglês, pt-BR e espanhol: todo texto novo entra nos três idiomas via `myssh_i18n::tr!(pt_br, en, es)` (textos do app em `crates/app/src/i18n*`).
 
 ## Papéis
 - **Opus (claude-opus-5-5)**: arquitetura, contratos entre módulos, distribuição de tarefas, revisão e integração. Marca tarefas como concluídas.

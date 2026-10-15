@@ -53,17 +53,17 @@ pub use myssh_sync;
 pub enum SyncError {
     #[error(transparent)]
     Plan(#[from] PlanError),
-    #[error("Erro ao ler a árvore de arquivos: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("Erro ao ler a árvore de arquivos: {}", .0), format!("Error reading the file tree: {}", .0), format!("Error al leer el árbol de archivos: {}", .0)))]
     Tree(#[from] TreeError),
     #[error("{0}")]
     Transfer(TransferError),
-    #[error("O plano está desatualizado ({} item(ns) mudaram após o preview); gere um novo plano.", .0.len())]
+    #[error("{}", myssh_i18n::tr!(format!("O plano está desatualizado ({} item(ns) mudaram após o preview); gere um novo plano.", .0.len()), format!("The plan is out of date ({} item(s) changed after the preview); generate a new plan.", .0.len()), format!("El plan está desactualizado ({} elemento(s) cambiaron tras la vista previa); genera un plan nuevo.", .0.len())))]
     PlanStale(Vec<Changed>),
-    #[error("A direção do plano não corresponde à do executor.")]
+    #[error("{}", myssh_i18n::tr!("A direção do plano não corresponde à do executor.", "The plan direction does not match the executor's.", "La dirección del plan no coincide con la del ejecutor."))]
     DirectionMismatch,
-    #[error("Caminho fora da raiz da sincronização: «{0}».")]
+    #[error("{}", myssh_i18n::tr!(format!("Caminho fora da raiz da sincronização: «{}».", .0), format!("Path outside the sync root: «{}».", .0), format!("Ruta fuera de la raíz de la sincronización: «{}».", .0)))]
     OutsideRoot(String),
-    #[error("Erro de E/S: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("Erro de E/S: {}", .0), format!("I/O error: {}", .0), format!("Error de E/S: {}", .0)))]
     Io(String),
 }
 
@@ -489,5 +489,27 @@ mod tests {
                 .file_type()
                 .is_file()
         );
+    }
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    use super::*;
+
+    #[test]
+    fn erros_traduzidos() {
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(
+                SyncError::OutsideRoot("x".into()).to_string(),
+                "Path outside the sync root: «x»."
+            );
+            assert_eq!(exec::changed(), "changed after the preview");
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(
+                SyncError::DirectionMismatch.to_string(),
+                "La dirección del plan no coincide con la del ejecutor."
+            );
+        });
     }
 }

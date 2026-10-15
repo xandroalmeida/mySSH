@@ -20,7 +20,7 @@ pub struct Listing {
 
 pub(crate) async fn open_sftp(conn: &Arc<Connection>) -> Result<Sftp, TransferError> {
     conn.open_sftp().await.map_err(|m| {
-        if conn.is_closed() || m.contains("conexão") {
+        if conn.is_closed() || myssh_ssh::is_connection_lost_message(&m) {
             TransferError::ConnectionLost
         } else {
             TransferError::Remote(crate::error::sanitize(&m))

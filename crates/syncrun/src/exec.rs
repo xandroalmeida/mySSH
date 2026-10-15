@@ -150,7 +150,11 @@ impl<'a> Run<'a> {
         .await
         {
             self.emit(SyncEvent::Warning {
-                message: format!("Não foi possível gravar o journal: {e}"),
+                message: myssh_i18n::tr!(
+                    format!("Não foi possível gravar o journal: {e}"),
+                    format!("Could not write the journal: {e}"),
+                    format!("No se pudo escribir el journal: {e}")
+                ),
             })
             .await;
         }
@@ -274,8 +278,16 @@ impl<'a> Run<'a> {
 
     async fn process(&mut self, ji: JournalItem) {
         let Some(pi) = self.items.get(&ji.path).copied() else {
-            self.set_skipped(&ji.path, ji.op, "item não consta mais no plano")
-                .await;
+            self.set_skipped(
+                &ji.path,
+                ji.op,
+                myssh_i18n::tr!(
+                    "item não consta mais no plano",
+                    "item is no longer in the plan",
+                    "el elemento ya no está en el plan"
+                ),
+            )
+            .await;
             return;
         };
         self.current = ji.path.to_string();
@@ -292,7 +304,16 @@ impl<'a> Run<'a> {
         let root = RelPath::root();
         match self.dst.stat(&root).await? {
             Some(e) if e.kind == EntryKind::Dir => {}
-            Some(_) => return Err(SyncError::Io("a raiz do destino não é um diretório".into())),
+            Some(_) => {
+                return Err(SyncError::Io(
+                    myssh_i18n::tr!(
+                        "a raiz do destino não é um diretório",
+                        "the destination root is not a directory",
+                        "la raíz del destino no es un directorio"
+                    )
+                    .into(),
+                ));
+            }
             None => {
                 if let Some(b) = &self.browser {
                     // mkdir -p remoto, componente a componente
@@ -332,12 +353,20 @@ impl<'a> Run<'a> {
                     self.verified.insert(c.clone());
                 }
                 Ok(Some(e)) => {
-                    return Err(format!(
-                        "«{c}» no destino é {}, não um diretório",
-                        kind_name(e.kind)
+                    let k = kind_name(e.kind);
+                    return Err(myssh_i18n::tr!(
+                        format!("«{c}» no destino é {k}, não um diretório"),
+                        format!("«{c}» at the destination is {k}, not a directory"),
+                        format!("«{c}» en el destino es {k}, no un directorio")
                     ));
                 }
-                Ok(None) => return Err(format!("«{c}» não existe no destino")),
+                Ok(None) => {
+                    return Err(myssh_i18n::tr!(
+                        format!("«{c}» não existe no destino"),
+                        format!("«{c}» does not exist at the destination"),
+                        format!("«{c}» no existe en el destino")
+                    ));
+                }
                 Err(e) => return Err(e.to_string()),
             }
         }
@@ -349,7 +378,7 @@ impl<'a> Run<'a> {
         if is_under(&self.failed_dirs, &ji.path) {
             self.failed_dirs.push(ji.path.clone());
             return self
-                .set_failed(&ji.path, ji.op, 0, "diretório pai não foi criado".into())
+                .set_failed(&ji.path, ji.op, 0, parent_not_created())
                 .await;
         }
         if let Err(m) = self.verify_chain(&parent).await {
@@ -382,8 +411,17 @@ impl<'a> Run<'a> {
             }
             Err(m) => {
                 self.failed_dirs.push(ji.path.clone());
-                self.set_failed(&ji.path, ji.op, 0, format!("não foi possível criar: {m}"))
-                    .await;
+                self.set_failed(
+                    &ji.path,
+                    ji.op,
+                    0,
+                    myssh_i18n::tr!(
+                        format!("não foi possível criar: {m}"),
+                        format!("could not create: {m}"),
+                        format!("no se pudo crear: {m}")
+                    ),
+                )
+                .await;
             }
         }
     }
@@ -396,7 +434,15 @@ impl<'a> Run<'a> {
         if let Action::Conflict { reason } = &pi.action {
             if self.decisions.conflicts.get(&ji.path) != Some(&ConflictChoice::UseSource) {
                 return self
-                    .set_skipped(&ji.path, ji.op, "conflito sem decisão do usuário")
+                    .set_skipped(
+                        &ji.path,
+                        ji.op,
+                        myssh_i18n::tr!(
+                            "conflito sem decisão do usuário",
+                            "conflict without a user decision",
+                            "conflicto sin decisión del usuario"
+                        ),
+                    )
                     .await;
             }
             let ok = matches!(
@@ -413,7 +459,12 @@ impl<'a> Run<'a> {
                         &ji.path,
                         ji.op,
                         size,
-                        "conflito de tipo ou de nomes: resolva manualmente".into(),
+                        myssh_i18n::tr!(
+                            "conflito de tipo ou de nomes: resolva manualmente",
+                            "type or name conflict: resolve manually",
+                            "conflicto de tipo o de nombres: resuelve manualmente"
+                        )
+                        .into(),
                     )
                     .await;
             }
@@ -421,7 +472,7 @@ impl<'a> Run<'a> {
         let parent = ji.path.parent().unwrap_or_else(RelPath::root);
         if is_under(&self.failed_dirs, &ji.path) {
             return self
-                .set_failed(&ji.path, ji.op, size, "diretório pai não foi criado".into())
+                .set_failed(&ji.path, ji.op, size, parent_not_created())
                 .await;
         }
         if let Err(m) = self.verify_chain(&parent).await {
@@ -434,7 +485,9 @@ impl<'a> Run<'a> {
         };
         let expected = if ji.op == Op::Create { None } else { pi.dst };
         if now != expected {
-            return self.set_failed(&ji.path, ji.op, size, CHANGED.into()).await;
+            return self
+                .set_failed(&ji.path, ji.op, size, changed().into())
+                .await;
         }
         // Janela de transferências.
         while self.in_flight.len() >= self.r.concurrency && !self.cancel.is_cancelled() {
@@ -542,13 +595,23 @@ impl<'a> Run<'a> {
                         &f.path,
                         f.op,
                         f.size,
-                        "o destino apareceu depois do plano; não foi sobrescrito".into(),
+                        myssh_i18n::tr!(
+                            "o destino apareceu depois do plano; não foi sobrescrito",
+                            "the destination appeared after the plan; it was not overwritten",
+                            "el destino apareció después del plan; no se sobrescribió"
+                        )
+                        .into(),
                     )
                     .await;
                 } else {
-                    let m = f
-                        .last_error
-                        .unwrap_or_else(|| "falha na transferência".into());
+                    let m = f.last_error.unwrap_or_else(|| {
+                        myssh_i18n::tr!(
+                            "falha na transferência",
+                            "transfer failed",
+                            "falló la transferencia"
+                        )
+                        .into()
+                    });
                     self.set_failed(&f.path, f.op, f.size, m).await;
                 }
             }
@@ -564,7 +627,17 @@ impl<'a> Run<'a> {
         }
         let Some(expected) = pi.dst else {
             return self
-                .set_failed(&ji.path, ji.op, 0, "plano sem estado do destino".into())
+                .set_failed(
+                    &ji.path,
+                    ji.op,
+                    0,
+                    myssh_i18n::tr!(
+                        "plano sem estado do destino",
+                        "plan without destination state",
+                        "plan sin estado del destino"
+                    )
+                    .into(),
+                )
                 .await;
         };
         let parent = ji.path.parent().unwrap_or_else(RelPath::root);
@@ -587,7 +660,7 @@ impl<'a> Run<'a> {
             Snapshot::from(&now) == expected
         };
         if !same {
-            return self.set_failed(&ji.path, ji.op, 0, CHANGED.into()).await;
+            return self.set_failed(&ji.path, ji.op, 0, changed().into()).await;
         }
         let res: Result<(), String> = if let Some(b) = &self.browser {
             match remote_path(&self.r.remote_root, &ji.path) {
@@ -612,11 +685,35 @@ impl<'a> Run<'a> {
                 self.set_done(&ji.path, ji.op, 0).await;
             }
             Err(m) => {
-                self.set_failed(&ji.path, ji.op, 0, format!("não foi possível apagar: {m}"))
-                    .await;
+                self.set_failed(
+                    &ji.path,
+                    ji.op,
+                    0,
+                    myssh_i18n::tr!(
+                        format!("não foi possível apagar: {m}"),
+                        format!("could not delete: {m}"),
+                        format!("no se pudo eliminar: {m}")
+                    ),
+                )
+                .await;
             }
         }
     }
 }
 
-pub(crate) const CHANGED: &str = "alterado após o preview";
+pub(crate) fn changed() -> &'static str {
+    myssh_i18n::tr!(
+        "alterado após o preview",
+        "changed after the preview",
+        "cambió tras la vista previa"
+    )
+}
+
+fn parent_not_created() -> String {
+    myssh_i18n::tr!(
+        "diretório pai não foi criado",
+        "parent directory was not created",
+        "el directorio padre no se creó"
+    )
+    .into()
+}

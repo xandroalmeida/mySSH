@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 
+use myssh_i18n::tr;
 use myssh_syncrun::myssh_sync::{
     Action, ConflictReason, EntryKind, Exclusions, Plan, PlanItem, RelPath, SkipReason,
     UpdateReason,
@@ -10,71 +11,145 @@ use myssh_syncrun::{ConflictChoice, Decisions};
 
 pub fn update_reason(r: &UpdateReason) -> String {
     match r {
-        UpdateReason::SourceNewer => "A origem é mais nova que o destino.".into(),
-        UpdateReason::SizeDiffers => "O tamanho é diferente.".into(),
-        UpdateReason::ContentDiffers => "O conteúdo é diferente.".into(),
-        UpdateReason::RequiresHash => {
-            "Mesmo tamanho: só a comparação de conteúdo pode decidir.".into()
-        }
+        UpdateReason::SourceNewer => tr!(
+            "A origem é mais nova que o destino.",
+            "The source is newer than the destination.",
+            "El origen es más nuevo que el destino."
+        )
+        .into(),
+        UpdateReason::SizeDiffers => tr!(
+            "O tamanho é diferente.",
+            "The size is different.",
+            "El tamaño es distinto."
+        )
+        .into(),
+        UpdateReason::ContentDiffers => tr!(
+            "O conteúdo é diferente.",
+            "The content is different.",
+            "El contenido es distinto."
+        )
+        .into(),
+        UpdateReason::RequiresHash => tr!(
+            "Mesmo tamanho: só a comparação de conteúdo pode decidir.",
+            "Same size: only a content comparison can decide.",
+            "Mismo tamaño: solo la comparación de contenido puede decidir."
+        )
+        .into(),
     }
 }
 
 pub fn conflict_reason(r: &ConflictReason) -> String {
     match r {
-        ConflictReason::TypeMismatch => {
-            "Tipos diferentes: um lado é arquivo e o outro é pasta.".into()
-        }
-        ConflictReason::DestModifiedAfter => {
-            "O destino foi modificado depois da origem e tem outro tamanho.".into()
-        }
-        ConflictReason::DestNewer => {
-            "O destino é mais novo que a origem, com o mesmo tamanho: não dá para saber qual vale."
-                .into()
-        }
-        ConflictReason::MtimeUnknown => "Um dos lados não informa a data de modificação.".into(),
-        ConflictReason::SourceCollision { other } => {
-            format!("Dois nomes da origem colidem no destino (este e «{other}»).")
-        }
-        ConflictReason::DestCollision { existing } => {
-            format!("O nome colide com «{existing}», que já existe no destino.")
-        }
-        ConflictReason::DestSpecial => "O destino é um link ou arquivo especial.".into(),
+        ConflictReason::TypeMismatch => tr!(
+            "Tipos diferentes: um lado é arquivo e o outro é pasta.",
+            "Different types: one side is a file and the other is a folder.",
+            "Tipos distintos: un lado es un archivo y el otro es una carpeta."
+        )
+        .into(),
+        ConflictReason::DestModifiedAfter => tr!(
+            "O destino foi modificado depois da origem e tem outro tamanho.",
+            "The destination was modified after the source and has a different size.",
+            "El destino se modificó después del origen y tiene otro tamaño."
+        )
+        .into(),
+        ConflictReason::DestNewer => tr!(
+            "O destino é mais novo que a origem, com o mesmo tamanho: não dá para saber qual vale.",
+            "The destination is newer than the source, with the same size: it is not possible to tell which one counts.",
+            "El destino es más nuevo que el origen, con el mismo tamaño: no se puede saber cuál vale."
+        )
+        .into(),
+        ConflictReason::MtimeUnknown => tr!(
+            "Um dos lados não informa a data de modificação.",
+            "One of the sides does not report the modification date.",
+            "Uno de los lados no informa la fecha de modificación."
+        )
+        .into(),
+        ConflictReason::SourceCollision { other } => tr!(
+            format!("Dois nomes da origem colidem no destino (este e «{other}»)."),
+            format!("Two source names collide at the destination (this one and «{other}»)."),
+            format!("Dos nombres del origen colisionan en el destino (este y «{other}»).")
+        ),
+        ConflictReason::DestCollision { existing } => tr!(
+            format!("O nome colide com «{existing}», que já existe no destino."),
+            format!("The name collides with «{existing}», which already exists at the destination."),
+            format!("El nombre colisiona con «{existing}», que ya existe en el destino.")
+        ),
+        ConflictReason::DestSpecial => tr!(
+            "O destino é um link ou arquivo especial.",
+            "The destination is a link or a special file.",
+            "El destino es un enlace o un archivo especial."
+        )
+        .into(),
     }
 }
 
 pub fn skip_reason(r: &SkipReason) -> String {
     match r {
-        SkipReason::Identical => "Já está igual.".into(),
-        SkipReason::Symlink => "Link simbólico (nunca é seguido).".into(),
-        SkipReason::SpecialFile => "Arquivo especial (ignorado).".into(),
-        SkipReason::InvalidName { name } => format!("Nome inválido: «{name}»."),
-        SkipReason::WindowsInvalidName { name } => {
-            format!("Nome inválido ou reservado no Windows: «{name}».")
-        }
-        SkipReason::MaxDepth => "Profundidade máxima excedida.".into(),
-        SkipReason::ContainsExcluded => {
-            "A pasta do destino contém itens excluídos por padrão e não pode ser apagada.".into()
-        }
+        SkipReason::Identical => tr!("Já está igual.", "Already identical.", "Ya es igual.").into(),
+        SkipReason::Symlink => tr!(
+            "Link simbólico (nunca é seguido).",
+            "Symbolic link (never followed).",
+            "Enlace simbólico (nunca se sigue)."
+        )
+        .into(),
+        SkipReason::SpecialFile => tr!(
+            "Arquivo especial (ignorado).",
+            "Special file (ignored).",
+            "Archivo especial (ignorado)."
+        )
+        .into(),
+        SkipReason::InvalidName { name } => tr!(
+            format!("Nome inválido: «{name}»."),
+            format!("Invalid name: «{name}»."),
+            format!("Nombre no válido: «{name}».")
+        ),
+        SkipReason::WindowsInvalidName { name } => tr!(
+            format!("Nome inválido ou reservado no Windows: «{name}»."),
+            format!("Name invalid or reserved on Windows: «{name}»."),
+            format!("Nombre no válido o reservado en Windows: «{name}».")
+        ),
+        SkipReason::MaxDepth => tr!(
+            "Profundidade máxima excedida.",
+            "Maximum depth exceeded.",
+            "Profundidad máxima excedida."
+        )
+        .into(),
+        SkipReason::ContainsExcluded => tr!(
+            "A pasta do destino contém itens excluídos por padrão e não pode ser apagada.",
+            "The destination folder contains items excluded by default and cannot be deleted.",
+            "La carpeta de destino contiene elementos excluidos por defecto y no se puede borrar."
+        )
+        .into(),
     }
 }
 
 /// Rótulo curto da ação.
 pub fn action_label(a: &Action) -> &'static str {
     match a {
-        Action::Create => "Criar",
-        Action::Update { .. } => "Atualizar",
-        Action::Delete => "Excluir",
-        Action::Conflict { .. } => "Conflito",
-        Action::Skip { .. } => "Pular",
+        Action::Create => tr!("Criar", "Create", "Crear"),
+        Action::Update { .. } => tr!("Atualizar", "Update", "Actualizar"),
+        Action::Delete => tr!("Excluir", "Delete", "Eliminar"),
+        Action::Conflict { .. } => tr!("Conflito", "Conflict", "Conflicto"),
+        Action::Skip { .. } => tr!("Pular", "Skip", "Omitir"),
     }
 }
 
-/// Motivo legível em pt-BR de qualquer ação.
+/// Motivo legível (no idioma ativo) de qualquer ação.
 pub fn reason_text(a: &Action) -> String {
     match a {
-        Action::Create => "Não existe no destino.".into(),
+        Action::Create => tr!(
+            "Não existe no destino.",
+            "It does not exist at the destination.",
+            "No existe en el destino."
+        )
+        .into(),
         Action::Update { reason } => update_reason(reason),
-        Action::Delete => "Existe só no destino (modo espelho).".into(),
+        Action::Delete => tr!(
+            "Existe só no destino (modo espelho).",
+            "It exists only at the destination (mirror mode).",
+            "Existe solo en el destino (modo espejo)."
+        )
+        .into(),
         Action::Conflict { reason } => conflict_reason(reason),
         Action::Skip { reason } => skip_reason(reason),
     }
@@ -102,12 +177,12 @@ impl Filter {
 
     pub fn label(self) -> &'static str {
         match self {
-            Filter::All => "Todos",
-            Filter::Create => "Criar",
-            Filter::Update => "Atualizar",
-            Filter::Conflict => "Conflitos",
-            Filter::Delete => "Excluir",
-            Filter::Skip => "Pular",
+            Filter::All => tr!("Todos", "All", "Todos"),
+            Filter::Create => tr!("Criar", "Create", "Crear"),
+            Filter::Update => tr!("Atualizar", "Update", "Actualizar"),
+            Filter::Conflict => tr!("Conflitos", "Conflicts", "Conflictos"),
+            Filter::Delete => tr!("Excluir", "Delete", "Eliminar"),
+            Filter::Skip => tr!("Pular", "Skip", "Omitir"),
         }
     }
 
@@ -207,14 +282,22 @@ pub fn can_execute(plan: &Plan, confirm_deletes: bool, d: &Decisions) -> bool {
 pub fn execute_label(plan: &Plan, confirm_deletes: bool) -> String {
     let n = delete_count(plan);
     if n > 0 && confirm_deletes {
-        format!("Executar e excluir {n}")
+        tr!(
+            format!("Executar e excluir {n}"),
+            format!("Run and delete {n}"),
+            format!("Ejecutar y eliminar {n}")
+        )
     } else {
-        "Executar".into()
+        tr!("Executar", "Run", "Ejecutar").into()
     }
 }
 
 pub fn confirm_deletes_label(n: usize) -> String {
-    format!("Confirmo excluir {n} itens no destino")
+    tr!(
+        format!("Confirmo excluir {n} itens no destino"),
+        format!("I confirm deleting {n} items at the destination"),
+        format!("Confirmo eliminar {n} elementos en el destino")
+    )
 }
 
 /// Linhas do campo de exclusões → `Exclusions` (vazias e comentários `#` são ignorados).
@@ -225,8 +308,13 @@ pub fn parse_exclusions(text: &str) -> Result<Exclusions, String> {
         if l.is_empty() || l.starts_with('#') {
             continue;
         }
-        e.add(l)
-            .map_err(|err| format!("Padrão inválido «{l}»: {err}"))?;
+        e.add(l).map_err(|err| {
+            tr!(
+                format!("Padrão inválido «{l}»: {err}"),
+                format!("Invalid pattern «{l}»: {err}"),
+                format!("Patrón no válido «{l}»: {err}")
+            )
+        })?;
     }
     Ok(e)
 }
@@ -314,6 +402,20 @@ mod tests {
         assert_eq!(reason_text(&Action::Create), "Não existe no destino.");
         assert!(reason_text(&Action::Delete).contains("espelho"));
         assert_eq!(action_label(&Action::Delete), "Excluir");
+    }
+
+    #[test]
+    fn textos_em_ingles_e_espanhol() {
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(
+                reason_text(&Action::Create),
+                "It does not exist at the destination."
+            );
+            assert_eq!(action_label(&Action::Delete), "Delete");
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(action_label(&Action::Delete), "Eliminar");
+        });
     }
 
     #[test]

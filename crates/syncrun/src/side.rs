@@ -101,7 +101,12 @@ async fn digest<R: tokio::io::AsyncRead + Unpin>(
         .map_err(|e| TreeError::Io(e.to_string()))?;
     if extra > 0 {
         return Err(TreeError::Io(
-            "origem alterada durante a leitura (mais dados que o declarado)".into(),
+            myssh_i18n::tr!(
+                "origem alterada durante a leitura (mais dados que o declarado)",
+                "source changed while reading (more data than declared)",
+                "origen modificado durante la lectura (más datos de los declarados)"
+            )
+            .into(),
         ));
     }
     Ok(h.finalize().to_vec())
@@ -134,7 +139,11 @@ impl Hasher {
                     .await
                     .map_err(|e| TreeError::Io(e.to_string()))?;
                 if !md.file_type().is_file() {
-                    return Err(TreeError::Io(format!("não é arquivo regular: {rel}")));
+                    return Err(TreeError::Io(myssh_i18n::tr!(
+                        format!("não é arquivo regular: {rel}"),
+                        format!("not a regular file: {rel}"),
+                        format!("no es un archivo regular: {rel}")
+                    )));
                 }
                 let f = tokio::fs::File::open(&p)
                     .await
@@ -148,7 +157,11 @@ impl Hasher {
                     .await
                     .map_err(|e| TreeError::Io(e.to_string()))?;
                 if !a.is_regular() {
-                    return Err(TreeError::Io(format!("não é arquivo regular: {rel}")));
+                    return Err(TreeError::Io(myssh_i18n::tr!(
+                        format!("não é arquivo regular: {rel}"),
+                        format!("not a regular file: {rel}"),
+                        format!("no es un archivo regular: {rel}")
+                    )));
                 }
                 let f = sftp
                     .open(p)
@@ -162,10 +175,14 @@ impl Hasher {
 
 pub(crate) fn kind_name(k: EntryKind) -> &'static str {
     match k {
-        EntryKind::File => "arquivo",
-        EntryKind::Dir => "diretório",
-        EntryKind::Symlink => "link simbólico",
-        EntryKind::Other => "arquivo especial",
+        EntryKind::File => myssh_i18n::tr!("arquivo", "a file", "un archivo"),
+        EntryKind::Dir => myssh_i18n::tr!("diretório", "a directory", "un directorio"),
+        EntryKind::Symlink => {
+            myssh_i18n::tr!("link simbólico", "a symbolic link", "un enlace simbólico")
+        }
+        EntryKind::Other => {
+            myssh_i18n::tr!("arquivo especial", "a special file", "un archivo especial")
+        }
     }
 }
 

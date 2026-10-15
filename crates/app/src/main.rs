@@ -49,6 +49,8 @@ use myssh_store::Store;
 use crate::app::{App, VaultMode};
 
 fn main() -> eframe::Result {
+    // Idioma do sistema até as configurações salvas serem lidas (em `App`).
+    myssh_i18n::set_lang(settings::system_lang());
     // Runtime criado uma vez; usado por tarefas de cofre e, depois, pelas sessões SSH.
     let rt = Arc::new(
         tokio::runtime::Builder::new_multi_thread()

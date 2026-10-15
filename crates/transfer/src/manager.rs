@@ -528,9 +528,19 @@ async fn execute(sh: &Arc<Shared>, job: &Arc<JobShared>, req: &TransferRequest, 
             job.emit.emit(TransferEvent::FileError {
                 id: job.id,
                 path: plan.name.clone(),
-                message: format!(
-                    "{} {rest} arquivo(s) não foram transferidos.",
-                    TransferError::ConnectionLost
+                message: myssh_i18n::tr!(
+                    format!(
+                        "{} {rest} arquivo(s) não foram transferidos.",
+                        TransferError::ConnectionLost
+                    ),
+                    format!(
+                        "{} {rest} file(s) were not transferred.",
+                        TransferError::ConnectionLost
+                    ),
+                    format!(
+                        "{} {rest} archivo(s) no se transfirieron.",
+                        TransferError::ConnectionLost
+                    )
                 ),
             });
         }
@@ -562,8 +572,16 @@ async fn execute(sh: &Arc<Shared>, job: &Arc<JobShared>, req: &TransferRequest, 
                     job.emit.emit(TransferEvent::FileError {
                         id: job.id,
                         path: path.clone(),
-                        message: format!(
-                            "Diretório criado, mas não foi possível preservar data/permissões: {e}"
+                        message: myssh_i18n::tr!(
+                            format!(
+                                "Diretório criado, mas não foi possível preservar data/permissões: {e}"
+                            ),
+                            format!(
+                                "Directory created, but its date/permissions could not be preserved: {e}"
+                            ),
+                            format!(
+                                "Directorio creado, pero no se pudo conservar la fecha/permisos: {e}"
+                            )
                         ),
                     });
                 }
@@ -610,8 +628,16 @@ async fn file_task(
                 job.emit.emit(TransferEvent::FileError {
                     id: job.id,
                     path: display,
-                    message: format!(
-                        "Arquivo transferido, mas não foi possível preservar data/permissões: {w}"
+                    message: myssh_i18n::tr!(
+                        format!(
+                            "Arquivo transferido, mas não foi possível preservar data/permissões: {w}"
+                        ),
+                        format!(
+                            "File transferred, but its date/permissions could not be preserved: {w}"
+                        ),
+                        format!(
+                            "Archivo transferido, pero no se pudo conservar la fecha/permisos: {w}"
+                        )
                     ),
                 });
             }
@@ -657,7 +683,11 @@ async fn process(
     let mut rename_base = None;
     if let Some(ex) = dst_side.lstat(&dst_path).await? {
         if ex.kind == crate::Kind::Dir {
-            return Err(TransferError::DestinationKind("um diretório"));
+            return Err(TransferError::DestinationKind(myssh_i18n::tr!(
+                "um diretório",
+                "a directory",
+                "un directorio"
+            )));
         }
         match resolve(ctx, display, &ex).await? {
             Resolve::Skip => return Ok(Outcome::Skipped),

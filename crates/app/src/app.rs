@@ -157,6 +157,8 @@ pub struct App {
     pub(crate) settings: Settings,
     saved_settings: Settings,
     applied_theme: Option<crate::settings::ThemePref>,
+    /// Idioma do sistema, detectado uma vez (usado em "Automático").
+    system_lang: myssh_i18n::Lang,
     pub(crate) profiles: Vec<Profile>,
     pub(crate) folders: Vec<Folder>,
     pub(crate) filter: ViewFilter,
@@ -214,6 +216,7 @@ impl App {
             saved_settings: settings.clone(),
             settings,
             applied_theme: None,
+            system_lang: crate::settings::system_lang(),
             profiles: Vec::new(),
             folders: Vec::new(),
             filter: ViewFilter::default(),
@@ -1007,6 +1010,11 @@ impl App {
         if self.applied_theme != Some(self.settings.theme) {
             ctx.set_theme(self.settings.theme.to_egui());
             self.applied_theme = Some(self.settings.theme);
+        }
+        let lang = self.settings.effective_lang(self.system_lang);
+        if myssh_i18n::lang() != lang {
+            myssh_i18n::set_lang(lang);
+            ctx.request_repaint();
         }
         if self.settings != self.saved_settings && !ctx.input(|i| i.pointer.any_down()) {
             self.vault.set_idle_timeout(self.settings.vault_timeout());

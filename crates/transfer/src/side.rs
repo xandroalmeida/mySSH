@@ -313,8 +313,16 @@ impl<'a> Side<'a> {
         if let Some(m) = self.lstat(path).await? {
             return match m.kind {
                 Kind::Dir => Ok(false),
-                Kind::Symlink => Err(TransferError::DestinationKind("um link simbólico")),
-                _ => Err(TransferError::DestinationKind("um arquivo")),
+                Kind::Symlink => Err(TransferError::DestinationKind(myssh_i18n::tr!(
+                    "um link simbólico",
+                    "a symbolic link",
+                    "un enlace simbólico"
+                ))),
+                _ => Err(TransferError::DestinationKind(myssh_i18n::tr!(
+                    "um arquivo",
+                    "a file",
+                    "un archivo"
+                ))),
             };
         }
         let r = match self {
@@ -389,7 +397,14 @@ impl<'a> Side<'a> {
                 return Ok(cand);
             }
         }
-        Err(TransferError::Io("não há nome livre para renomear".into()))
+        Err(TransferError::Io(
+            myssh_i18n::tr!(
+                "não há nome livre para renomear",
+                "no free name available to rename to",
+                "no hay un nombre libre para renombrar"
+            )
+            .into(),
+        ))
     }
 
     /// Publica `temp` como `dest` (substituindo um arquivo existente).
@@ -574,7 +589,16 @@ impl<'a> Side<'a> {
                     let p = path.to_string();
                     tokio::task::spawn_blocking(move || filetime::set_file_mtime(&p, ft))
                         .await
-                        .map_err(|_| TransferError::Io("tarefa interrompida".into()))?
+                        .map_err(|_| {
+                            TransferError::Io(
+                                myssh_i18n::tr!(
+                                    "tarefa interrompida",
+                                    "task interrupted",
+                                    "tarea interrumpida"
+                                )
+                                .into(),
+                            )
+                        })?
                         .map_err(io_err)?;
                 }
                 #[cfg(unix)]

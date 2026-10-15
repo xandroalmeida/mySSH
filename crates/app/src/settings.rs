@@ -1,5 +1,6 @@
 //! Configurações globais, persistidas na tabela `settings` do store.
 
+use myssh_i18n::Lang;
 use myssh_store::Store;
 
 use crate::files::contract::Overwrite;
@@ -51,6 +52,8 @@ pub struct Settings {
     pub vault_lock_on_suspend: bool,
     /// Política padrão de sobrescrita nas transferências de arquivos.
     pub files_overwrite: Overwrite,
+    /// Idioma da interface; `None` = automático (idioma do sistema, ou inglês).
+    pub language: Option<Lang>,
 }
 
 pub const FONT_MIN: f32 = 8.0;
@@ -67,6 +70,7 @@ impl Default for Settings {
             prod_warning: true,
             vault_lock_on_suspend: true,
             files_overwrite: Overwrite::Ask,
+            language: None,
         }
     }
 }
@@ -78,6 +82,18 @@ const K_LOCK: &str = "vault.lock_minutes";
 const K_PROD: &str = "ui.prod_warning";
 const K_SUSPEND: &str = "vault.lock_on_suspend";
 const K_FILES_OVERWRITE: &str = "files.overwrite";
+const K_LANGUAGE: &str = "ui.language";
+const LANGUAGE_AUTO: &str = "auto";
+
+/// Idioma do sistema (fora dos testes, que ficam no idioma-fonte pt-BR para não depender da
+/// máquina nem alterar o idioma global durante testes paralelos).
+pub fn system_lang() -> Lang {
+    if cfg!(test) {
+        Lang::PtBr
+    } else {
+        myssh_i18n::detect_system()
+    }
+}
 
 impl Settings {
     /// Lê valores via `get`; chaves ausentes ou inválidas caem no padrão.
@@ -106,6 +122,7 @@ impl Settings {
             files_overwrite: get(K_FILES_OVERWRITE)
                 .and_then(|s| parse_overwrite(&s))
                 .unwrap_or(d.files_overwrite),
+            language: get(K_LANGUAGE).and_then(|s| Lang::parse(&s)).or(d.language),
         }
     }
 
@@ -113,7 +130,7 @@ impl Settings {
         Self::from_getter(|k| store.get_setting(k).ok().flatten())
     }
 
-    pub fn pairs(&self) -> [(&'static str, String); 7] {
+    pub fn pairs(&self) -> [(&'static str, String); 8] {
         [
             (K_THEME, self.theme.key().to_string()),
             (K_FONT, format!("{}", self.terminal_font_size)),
@@ -125,6 +142,10 @@ impl Settings {
                 K_FILES_OVERWRITE,
                 overwrite_key(self.files_overwrite).to_string(),
             ),
+            (
+                K_LANGUAGE,
+                self.language.map_or(LANGUAGE_AUTO, Lang::key).to_string(),
+            ),
         ]
     }
 
@@ -133,6 +154,11 @@ impl Settings {
             store.set_setting(k, &v)?;
         }
         Ok(())
+    }
+
+    /// Idioma efetivo: o escolhido ou, em automático, `system`.
+    pub fn effective_lang(&self, system: Lang) -> Lang {
+        self.language.unwrap_or(system)
     }
 
     pub fn vault_timeout(&self) -> Option<std::time::Duration> {
@@ -172,6 +198,22 @@ mod tests {
         assert!(!s.vault_lock_on_suspend);
         // valor inválido da política cai no padrão
         assert_eq!(s.files_overwrite, Overwrite::Ask);
+        // idioma desconhecido = automático
+        assert_eq!(s.language, None);
+    }
+
+    #[test]
+    fn idioma_automatico_segue_o_sistema() {
+        let auto = Settings::default();
+        assert_eq!(auto.effective_lang(Lang::Es), Lang::Es);
+        let fixo = Settings {
+            language: Some(Lang::En),
+            ..Settings::default()
+        };
+        assert_eq!(fixo.effective_lang(Lang::Es), Lang::En);
+        let store = Store::open_in_memory().unwrap();
+        auto.save(&store).unwrap();
+        assert_eq!(Settings::load(&store).language, None);
     }
 
     #[test]
@@ -193,6 +235,7 @@ mod tests {
             prod_warning: false,
             vault_lock_on_suspend: false,
             files_overwrite: Overwrite::Skip,
+            language: Some(Lang::Es),
         };
         s.save(&store).unwrap();
         assert_eq!(Settings::load(&store), s);

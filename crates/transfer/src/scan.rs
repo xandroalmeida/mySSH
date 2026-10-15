@@ -73,9 +73,10 @@ impl ScanLimits {
             rel.split('/').count()
         };
         if depth > self.max_depth {
-            return Err(TransferError::ScanLimit(format!(
-                "profundidade máxima de {} níveis excedida",
-                self.max_depth
+            return Err(TransferError::ScanLimit(myssh_i18n::tr!(
+                format!("profundidade máxima de {} níveis excedida", self.max_depth),
+                format!("maximum depth of {} levels exceeded", self.max_depth),
+                format!("profundidad máxima de {} niveles excedida", self.max_depth)
             )));
         }
         Ok(())
@@ -84,9 +85,10 @@ impl ScanLimits {
     /// `seen` entradas examinadas até agora.
     pub fn check_entries(&self, seen: u64) -> Result<(), TransferError> {
         if seen > self.max_entries {
-            return Err(TransferError::ScanLimit(format!(
-                "mais de {} entradas",
-                self.max_entries
+            return Err(TransferError::ScanLimit(myssh_i18n::tr!(
+                format!("mais de {} entradas", self.max_entries),
+                format!("more than {} entries", self.max_entries),
+                format!("más de {} entradas", self.max_entries)
             )));
         }
         Ok(())

@@ -250,10 +250,10 @@ async fn run_inner(
             // devem ficar na memória durante toda a sessão.
             req.scrub_credentials();
             let conn = conn?;
-            let size = *pty.lock().map_err(|_| error::CONNECTION_LOST.to_string())?;
+            let size = *pty.lock().map_err(|_| error::CONNECTION_LOST().to_string())?;
             let shell = tokio::time::timeout(req.connect_timeout, conn.open_shell(size, &req.term))
                 .await
-                .map_err(|_| error::TIMEOUT.to_string())?;
+                .map_err(|_| error::TIMEOUT().to_string())?;
             match shell {
                 Ok(sh) => Ok((conn, sh)),
                 Err(e) => {
@@ -283,13 +283,13 @@ async fn run_inner(
             cmd = cmd_rx.recv() => match cmd {
                 Some(SessionCommand::Input(bytes)) => {
                     if channel.data(&bytes[..]).await.is_err() {
-                        result = End::Failed(error::CONNECTION_LOST.into());
+                        result = End::Failed(error::CONNECTION_LOST().into());
                         break 'io;
                     }
                 }
                 Some(SessionCommand::Resize(s)) => {
                     if channel.window_change(s).await.is_err() {
-                        result = End::Failed(error::CONNECTION_LOST.into());
+                        result = End::Failed(error::CONNECTION_LOST().into());
                         break 'io;
                     }
                 }
@@ -309,7 +309,7 @@ async fn run_inner(
                         }
                         None => {
                             if !remote_closed {
-                                result = End::Failed(error::CONNECTION_LOST.into());
+                                result = End::Failed(error::CONNECTION_LOST().into());
                             }
                             remote_closed = true;
                         }

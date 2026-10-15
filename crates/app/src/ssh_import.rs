@@ -14,7 +14,6 @@ use myssh_store::{Folder, Store};
 use crate::i18n;
 
 /// Nome da pasta de destino.
-pub const TARGET_FOLDER: &str = "Importados";
 
 #[derive(Debug, Clone)]
 pub struct Item {
@@ -192,11 +191,11 @@ pub fn save(store: &Store, profiles: Vec<Profile>) -> Result<SaveReport, String>
     let folders = store.list_folders().map_err(fail)?;
     let (folder, created_folder) = match folders
         .iter()
-        .find(|f| f.parent.is_none() && f.name.trim().eq_ignore_ascii_case(TARGET_FOLDER))
+        .find(|f| f.parent.is_none() && f.name.trim().eq_ignore_ascii_case(i18n::IMPORT_FOLDER()))
     {
         Some(f) => (f.id, false),
         None => {
-            let f = Folder::new(TARGET_FOLDER, None);
+            let f = Folder::new(i18n::IMPORT_FOLDER(), None);
             store.create_folder(&f).map_err(fail)?;
             (f.id, true)
         }
@@ -357,7 +356,7 @@ Host dup
         let web = saved.iter().find(|s| s.name == "web").unwrap();
         let bastion = saved.iter().find(|s| s.name == "bastion").unwrap();
         assert_eq!(web.jump, Some(bastion.id));
-        assert_eq!(store.list_folders().unwrap()[0].name, TARGET_FOLDER);
+        assert_eq!(store.list_folders().unwrap()[0].name, i18n::IMPORT_FOLDER());
         assert_eq!(
             std::fs::read(&cfg).unwrap(),
             before,

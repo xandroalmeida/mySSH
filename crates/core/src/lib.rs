@@ -167,15 +167,15 @@ impl Profile {
 
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum ProfileError {
-    #[error("O nome do perfil é obrigatório.")]
+    #[error("{}", myssh_i18n::tr!("O nome do perfil é obrigatório.", "The profile name is required.", "El nombre del perfil es obligatorio."))]
     EmptyName,
-    #[error("Host inválido.")]
+    #[error("{}", myssh_i18n::tr!("Host inválido.", "Invalid host.", "Host no válido."))]
     InvalidHost,
-    #[error("Porta inválida.")]
+    #[error("{}", myssh_i18n::tr!("Porta inválida.", "Invalid port.", "Puerto no válido."))]
     InvalidPort,
-    #[error("Usuário inválido.")]
+    #[error("{}", myssh_i18n::tr!("Usuário inválido.", "Invalid user.", "Usuario no válido."))]
     InvalidUser,
-    #[error("O perfil não pode usar a si mesmo como jump host.")]
+    #[error("{}", myssh_i18n::tr!("O perfil não pode usar a si mesmo como jump host.", "A profile cannot use itself as a jump host.", "Un perfil no puede usarse a sí mismo como jump host."))]
     JumpLoop,
 }
 
@@ -191,4 +191,19 @@ pub enum SessionState {
     Reconnecting,
     /// Mensagem já sanitizada (sem segredos), pt-BR.
     Error(String),
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    use super::*;
+
+    #[test]
+    fn erros_em_ingles_e_espanhol() {
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(ProfileError::InvalidPort.to_string(), "Invalid port.");
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(ProfileError::InvalidPort.to_string(), "Puerto no válido.");
+        });
+    }
 }

@@ -132,7 +132,10 @@ pub fn editor(ui: &mut egui::Ui, ov: &mut ThemeOverride, global_font: f32) {
         });
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(!is_inherited(ov), egui::Button::new(i18n::TH_RESET()).small())
+            .add_enabled(
+                !is_inherited(ov),
+                egui::Button::new(i18n::TH_RESET()).small(),
+            )
             .clicked()
         {
             *ov = ThemeOverride::default();

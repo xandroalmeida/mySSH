@@ -33,16 +33,16 @@ pub fn new_secret_ref() -> SecretRef {
 pub enum SecretError {
     /// Cofre do SO inexistente/inacessível. A UI pode oferecer uso temporário em memória
     /// (`MemoryStore`), mas isso exige ação explícita do usuário.
-    #[error("armazenamento seguro indisponível: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("armazenamento seguro indisponível: {}", .0), format!("secure storage unavailable: {}", .0), format!("almacenamiento seguro no disponible: {}", .0)))]
     Unavailable(String),
     /// Cofre bloqueado (do SO ou do `Vault`).
-    #[error("cofre bloqueado")]
+    #[error("{}", myssh_i18n::tr!("cofre bloqueado", "vault locked", "bóveda bloqueada"))]
     Locked,
-    #[error("segredo não encontrado")]
+    #[error("{}", myssh_i18n::tr!("segredo não encontrado", "secret not found", "secreto no encontrado"))]
     NotFound,
-    #[error("segredo grande demais (máximo {max} unidades UTF-16)")]
+    #[error("{}", myssh_i18n::tr!(format!("segredo grande demais (máximo {} unidades UTF-16)", .max), format!("secret too large (maximum {} UTF-16 units)", .max), format!("secreto demasiado grande (máximo {} unidades UTF-16)", .max)))]
     TooLong { max: usize },
-    #[error("falha no armazenamento seguro: {0}")]
+    #[error("{}", myssh_i18n::tr!(format!("falha no armazenamento seguro: {}", .0), format!("secure storage failure: {}", .0), format!("fallo en el almacenamiento seguro: {}", .0)))]
     Backend(String),
 }
 
@@ -556,5 +556,23 @@ mod tests {
         assert_eq!(v.get(&r).unwrap().expose_secret(), "via-vault");
         v.delete(&r).unwrap();
         assert_eq!(v.get(&r).unwrap_err(), SecretError::NotFound);
+    }
+}
+
+#[cfg(test)]
+mod i18n_tests {
+    use super::*;
+
+    #[test]
+    fn erros_traduzidos() {
+        myssh_i18n::with_lang(myssh_i18n::Lang::En, || {
+            assert_eq!(
+                SecretError::TooLong { max: 5 }.to_string(),
+                "secret too large (maximum 5 UTF-16 units)"
+            );
+        });
+        myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
+            assert_eq!(SecretError::Locked.to_string(), "bóveda bloqueada");
+        });
     }
 }
