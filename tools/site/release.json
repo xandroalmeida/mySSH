@@ -5,6 +5,11 @@
   "prerelease": true,
   "assets": [
     {
+      "name": "mySSH_0.2.0_aarch64.dmg",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/mySSH_0.2.0_aarch64.dmg",
+      "size": 12570063
+    },
+    {
       "name": "myssh_0.2.0_amd64.deb",
       "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_amd64.deb",
       "size": 15589038
