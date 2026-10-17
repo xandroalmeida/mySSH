@@ -325,12 +325,7 @@ pub fn show(ui: &mut Ui, sess: &mut TermSession, style: &TermStyle) -> TermRespo
                 color = theme.bg;
             }
         }
-        if let Some(bits) = braille_bits(&g.text) {
-            // As fontes embutidas não têm Braille (gráficos do btop etc.): desenha os pontos.
-            for dot in braille_dots(bits, Rect::from_min_size(g.pos, Vec2::new(cw, ch)), ppp) {
-                painter.rect_filled(dot, 0.0, color);
-            }
-        } else if !g.text.is_empty() {
+        if !g.text.is_empty() {
             painter.text(g.pos, Align2::LEFT_TOP, &g.text, font.clone(), color);
             if g.bold {
                 // Sem família monoespaçada bold embutida: dupla impressão desloca 0,5px.
@@ -387,41 +382,6 @@ pub fn show(ui: &mut Ui, sess: &mut TermSession, style: &TermStyle) -> TermRespo
         copied: out.copied,
         size: (cols, rows),
     }
-}
-
-/// Padrão de pontos de um caractere Braille (U+2800..=U+28FF) isolado, sem combinantes.
-fn braille_bits(text: &str) -> Option<u8> {
-    let mut it = text.chars();
-    let c = it.next()? as u32;
-    (it.next().is_none() && (0x2800..=0x28FF).contains(&c)).then(|| (c - 0x2800) as u8)
-}
-
-/// Retângulos dos pontos ligados de um padrão Braille numa célula, alinhados aos pixels.
-/// Grade 2x4; bits 0-2 e 6 na coluna esquerda (de cima para baixo), 3-5 e 7 na direita.
-fn braille_dots(bits: u8, cell: Rect, ppp: f32) -> Vec<Rect> {
-    const POS: [(usize, usize); 8] = [
-        (0, 0),
-        (0, 1),
-        (0, 2),
-        (1, 0),
-        (1, 1),
-        (1, 2),
-        (0, 3),
-        (1, 3),
-    ];
-    let snap = |v: f32| (v * ppp).round() / ppp;
-    let (sw, sh) = (cell.width() / 2.0, cell.height() / 4.0);
-    let side = (snap(sw.min(sh) * 0.6)).max(1.0 / ppp);
-    POS.iter()
-        .enumerate()
-        .filter(|(i, _)| bits & (1 << i) != 0)
-        .map(|(_, &(x, y))| {
-            let cx = cell.min.x + sw * (x as f32 + 0.5);
-            let cy = cell.min.y + sh * (y as f32 + 0.5);
-            let min = Pos2::new(snap(cx - side / 2.0), snap(cy - side / 2.0));
-            Rect::from_min_size(min, Vec2::splat(side))
-        })
-        .collect()
 }
 
 #[derive(Default)]
@@ -610,38 +570,5 @@ fn handle_input(
     }
     if sent {
         sess.term.scroll_display(Scroll::Bottom);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn braille_so_caractere_isolado_do_bloco() {
-        assert_eq!(braille_bits("\u{2800}"), Some(0));
-        assert_eq!(braille_bits("\u{28FF}"), Some(0xFF));
-        assert_eq!(braille_bits("\u{2847}"), Some(0x47));
-        assert_eq!(braille_bits("A"), None);
-        assert_eq!(braille_bits("\u{2801}\u{0301}"), None);
-        assert_eq!(braille_bits(""), None);
-    }
-
-    #[test]
-    fn braille_pontos_nas_posicoes_certas() {
-        let cell = Rect::from_min_size(Pos2::new(10.0, 20.0), Vec2::new(8.0, 16.0));
-        assert!(braille_dots(0, cell, 2.0).is_empty());
-        assert_eq!(braille_dots(0xFF, cell, 2.0).len(), 8);
-        // ponto 1 (bit 0): canto superior esquerdo; ponto 8 (bit 7): inferior direito
-        let a = braille_dots(0x01, cell, 2.0)[0];
-        let b = braille_dots(0x80, cell, 2.0)[0];
-        assert!(cell.contains_rect(a) && cell.contains_rect(b));
-        assert!(a.center().x < cell.center().x && a.center().y < cell.min.y + 4.0);
-        assert!(b.center().x > cell.center().x && b.center().y > cell.max.y - 4.0);
-        // ponto 7 (bit 6) fica abaixo do ponto 3 (bit 2), na coluna esquerda
-        let p3 = braille_dots(0x04, cell, 2.0)[0];
-        let p7 = braille_dots(0x40, cell, 2.0)[0];
-        assert_eq!(p3.min.x, p7.min.x);
-        assert!(p7.min.y > p3.max.y);
     }
 }
