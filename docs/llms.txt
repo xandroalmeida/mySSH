@@ -2,7 +2,7 @@
 
 > mySSH is a free, open-source desktop SSH client and session manager for macOS, Linux and Windows, written in Rust. It combines saved connection profiles, a tabbed terminal with split panes, an SFTP file panel and one-way folder sync in a single native app.
 
-Latest version: v0.2.0 (2026-10-15, pre-release). License: MIT or Apache-2.0. Author: Alexandro Almeida. Languages: English, Portuguese (Brazil), Spanish.
+Latest version: v0.2.1 (2026-10-17, pre-release). License: MIT or Apache-2.0. Author: Alexandro Almeida. Languages: English, Portuguese (Brazil), Spanish.
 
 ## Features
 
@@ -43,9 +43,7 @@ Yes. mySSH covers the same everyday work, terminal sessions, saved hosts and fil
 
 ## Download
 
-- [mySSH_0.2.0_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/mySSH_0.2.0_aarch64.dmg)
-- [myssh_0.2.0_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_amd64.deb)
-- [myssh_0.2.0_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.0/myssh_0.2.0_x86_64.AppImage)
+- [mySSH_0.2.1_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.1/mySSH_0.2.1_aarch64.dmg)
 - [All releases](https://github.com/xandroalmeida/mySSH/releases)
 
 ## Links
