@@ -1,5 +1,30 @@
 # Changelog
 
+## mySSH v0.2.1 — 2026-10-17
+
+### Destaques
+- O terminal agora exibe corretamente os gráficos de programas como o `btop`: os caracteres Braille, que antes apareciam como quadrados vazios, são desenhados normalmente.
+- Nova fonte do terminal: Cascadia Mono, que cobre bordas e caixas, blocos, formas geométricas, Braille, boa parte dos Symbols for Legacy Computing e os separadores do Powerline.
+
+### Correções
+- Caracteres usados por ferramentas de terminal (gráficos em Braille, sextantes, separadores Powerline) não aparecem mais como quadrados vazios. A fonte anterior continua como reserva para o que a nova não tiver.
+
+### Limitações conhecidas
+- O negrito continua simulado (o texto é desenhado duas vezes, levemente deslocado), sem uma variante bold da fonte.
+- Ícones de Nerd Fonts (usados por temas como os do starship ou do lsd) ainda não são exibidos.
+- A correção foi verificada só no macOS. Windows não foi validado. No Linux, só Ubuntu 24.04 com Wayland foi testado em versões anteriores.
+- Os pacotes não são assinados nem notarizados.
+- Dependência com alerta de segurança conhecido para chaves RSA (RUSTSEC-2023-0071): prefira chaves ed25519.
+
+### Licença de terceiros
+- A fonte Cascadia Mono (© Microsoft) é distribuída sob a SIL Open Font License 1.1.
+
+### Instalação (macOS)
+`make install-mac`, ou abra o .dmg anexado. O app não é assinado: na primeira abertura, clique com o botão direito e escolha Abrir.
+
+### Instalação (Linux)
+Baixe o AppImage anexado quando estiver disponível, marque-o como executável (`chmod +x`) e abra, ou instale o `.deb` (`sudo apt install ./myssh_0.2.1_amd64.deb`). Também dá para usar `make install-linux`.
+
 ## mySSH v0.2.0 — 2026-10-15
 
 ### Destaques
