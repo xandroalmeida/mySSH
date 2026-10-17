@@ -109,7 +109,8 @@ fn main() -> eframe::Result {
     let result = eframe::run_native(
         "myssh",
         options,
-        Box::new(move |_cc| {
+        Box::new(move |cc| {
+            myssh_term::fonts::install(&cc.egui_ctx);
             let mut app = App::new(rt, store, vault, mode, store_warning, demo);
             app.data_dir = Some(data_dir);
             Ok(Box::new(app))

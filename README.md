@@ -71,3 +71,5 @@ O workflow `.github/workflows/release.yml` faz isso nos três SOs. **Os artefato
 
 ## Licença
 MIT OR Apache-2.0, à sua escolha: [`LICENSE-MIT`](LICENSE-MIT) e [`LICENSE-APACHE`](LICENSE-APACHE).
+
+O terminal embute a fonte Cascadia Mono PL (© Microsoft, SIL Open Font License 1.1): [`crates/term/assets/fonts/CascadiaCode-LICENSE.txt`](crates/term/assets/fonts/CascadiaCode-LICENSE.txt).

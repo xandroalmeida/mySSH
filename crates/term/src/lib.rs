@@ -8,6 +8,7 @@
 //! exposto apenas como texto sanitizado e limitado.
 
 pub mod filter;
+pub mod fonts;
 pub mod keys;
 pub mod session;
 pub mod theme;

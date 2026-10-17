@@ -2989,6 +2989,7 @@ dependencies = [
  "russh",
  "secrecy",
  "tokio",
+ "ttf-parser",
 ]
 
 [[package]]
