@@ -19,14 +19,14 @@ Há dois modos. Cada máquina gera só o pacote da própria plataforma, então u
 
 1. Faça primeiro as verificações de repositório do passo 1 (árvore limpa, `main`, `git fetch --tags origin`, não atrás de `origin/main`; se estiver atrás, `git pull --ff-only`).
 2. Última tag: `T=$(git describe --tags --abbrev=0 --match 'v*')`.
-3. Arquivos alterados desde a tag, **ignorando os da página** (o passo 8 sempre faz um commit da página depois da tag):
+3. Arquivos alterados desde a tag, **ignorando os da página** (o passo 8 sempre faz um commit da página depois da tag) e este próprio procedimento (mudá-lo não altera o app):
    ```
-   git diff --name-only "$T" HEAD -- . ':(exclude)docs/index.html' ':(exclude)docs/pt-br/index.html' ':(exclude)docs/es/index.html' ':(exclude)docs/sitemap.xml' ':(exclude)docs/llms.txt' ':(exclude)tools/site/release.json'
+   git diff --name-only "$T" HEAD -- . ':(exclude)docs/index.html' ':(exclude)docs/pt-br/index.html' ':(exclude)docs/es/index.html' ':(exclude)docs/sitemap.xml' ':(exclude)docs/llms.txt' ':(exclude)tools/site/release.json' ':(exclude).claude/commands/release.md'
    ```
 4. Decida:
    - **Saída vazia e sem argumento** → **modo binários**: siga só a seção "Modo binários" no fim deste arquivo.
    - **Saída vazia, mas com argumento de versão** → não há nada novo para versionar: pergunte ao usuário se ele quer só anexar o pacote desta plataforma a `$T` ou criar mesmo uma versão nova.
-   - **Saída não vazia** → **modo release completa**: siga os passos 1 a 9.
+   - **Saída não vazia** → **modo release completa**: siga os passos 1 a 10.
    - Sem nenhuma tag → primeira release: modo release completa.
 
 ## 1. Pré-condições
@@ -96,8 +96,15 @@ A página (https://xandroalmeida.github.io/mySSH/, em inglês, pt-BR e espanhol)
 - Commit `docs(site): página atualizada para vX.Y.Z`, com a linha de coautoria exigida pelo ambiente, se houver. Depois `git push origin main`. O Pages publica sozinho em cerca de um minuto.
 - Se a release ganhar um tipo novo de binário (por exemplo, Windows), confira em `classify()` de `tools/site/build.py` se ele é reconhecido.
 
-## 9. Relatório final (curto)
-Informe a versão anterior e a nova, a tag, o link da release, o link da página atualizada, quais pacotes foram anexados e quais plataformas ainda faltam, o resultado de `make check` e de `make test-real` (ou que foi pulado) e as release notes em poucas linhas.
+## 9. Limpar artefatos de build
+Os artefatos de compilação (`target/`) passam de dezenas de GB. Depois que tudo foi publicado, apague-os para liberar disco.
+- Só limpe se todos os passos anteriores deram certo. Em qualquer falha, mantenha `target/` para diagnóstico ou para um novo upload.
+- Antes, confirme que cada arquivo do pacote está anexado à release com o mesmo tamanho do arquivo local (`gh release view vX.Y.Z --json assets --jq '.assets[] | "\(.name) \(.size)"'`), porque a limpeza apaga as cópias locais.
+- `du -sh target` (anote), depois `cargo clean` (o mesmo que `make clean`; funciona também no Windows, onde pode não haver `make`).
+- A próxima compilação recomeça do zero e leva alguns minutos a mais. Isso é esperado.
+
+## 10. Relatório final (curto)
+Informe a versão anterior e a nova, a tag, o link da release, o link da página atualizada, quais pacotes foram anexados e quais plataformas ainda faltam, o resultado de `make check` e de `make test-real` (ou que foi pulado), o espaço liberado pela limpeza (ou por que ela não foi feita) e as release notes em poucas linhas.
 
 ## Pacotes por plataforma
 Gere só o pacote da plataforma em que está rodando (`uname -s`; no Windows, Git Bash/MSYS informa `MINGW*`/`MSYS*`). Os alvos do Makefile já recusam um binário de release que contenha ganchos de demo.
@@ -122,4 +129,5 @@ Anexa o pacote desta plataforma à release que já existe, sem criar versão, co
 5. Se um arquivo com o mesmo nome já estiver anexado à release, pare e pergunte: o usuário pode querer manter o existente. Só substitua com `gh release upload --clobber` se ele pedir.
 6. `gh release upload "$T" <arquivos do pacote>`.
 7. Atualize a página (passo 8, com `vX.Y.Z` = `$T`), para que o novo download apareça nos três idiomas: regenere, faça o commit `docs(site): página atualizada para $T (pacote <plataforma>)` e `git push origin main`. Esse commit só mexe nos arquivos da página, então as outras máquinas continuam no modo binários.
-8. Relatório: tag, plataforma, arquivos anexados com tamanho, resultado de `make check`, link da release e da página, e as plataformas que ainda não têm pacote (pela lista de assets da release).
+8. Limpe os artefatos de build conforme o passo 9.
+9. Relatório: tag, plataforma, arquivos anexados com tamanho, resultado de `make check`, link da release e da página, espaço liberado pela limpeza (ou por que ela não foi feita) e as plataformas que ainda não têm pacote (pela lista de assets da release).
