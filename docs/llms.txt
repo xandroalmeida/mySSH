@@ -44,6 +44,8 @@ Yes. mySSH covers the same everyday work, terminal sessions, saved hosts and fil
 ## Download
 
 - [mySSH_0.2.1_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.1/mySSH_0.2.1_aarch64.dmg)
+- [myssh_0.2.1_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.1/myssh_0.2.1_amd64.deb)
+- [myssh_0.2.1_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.2.1/myssh_0.2.1_x86_64.AppImage)
 - [All releases](https://github.com/xandroalmeida/mySSH/releases)
 
 ## Links
