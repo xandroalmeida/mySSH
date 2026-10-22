@@ -27,7 +27,7 @@ RELEASE_JSON = HERE / "release.json"
 AUTHOR = "Alexandro Almeida"
 AUTHOR_URL = "https://github.com/xandroalmeida"
 SCREENSHOTS = ["dez-abas.png", "paineis-divididos.png", "arquivos-conflito.png", "sync-previa.png"]
-FAQ_KEYS = [(f"q{i}", f"a{i}") for i in range(1, 7)]
+FAQ_KEYS = [(f"q{i}", f"a{i}") for i in range(1, 8)]
 
 
 def fetch_release(tag: str) -> dict:

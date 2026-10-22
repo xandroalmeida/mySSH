@@ -5,7 +5,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>mySSH — cliente SSH de código aberto para macOS, Linux e Windows</title>
-<meta name="description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
+<meta name="description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP, sincronização e AWS SSM Session Manager, senhas no cofre do sistema.">
 <meta name="google-site-verification" content="e3klRiq9ykeSp1Q2XAEUIz1zbKla8LWiIjL87_-myPM">
 <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
 <meta name="author" content="Alexandro Almeida">
@@ -13,7 +13,7 @@
 <meta name="theme-color" content="#fbf9fe" media="(prefers-color-scheme: light)">
 <meta property="og:site_name" content="mySSH">
 <meta property="og:title" content="mySSH — cliente SSH de código aberto para macOS, Linux e Windows">
-<meta property="og:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
+<meta property="og:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP, sincronização e AWS SSM Session Manager, senhas no cofre do sistema.">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://xandroalmeida.github.io/mySSH/pt-br/">
 <meta property="og:locale" content="pt_BR">
@@ -25,7 +25,7 @@
 <meta property="og:image:alt" content="mySSH — Painéis divididos com tema por perfil">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="mySSH — cliente SSH de código aberto para macOS, Linux e Windows">
-<meta name="twitter:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.">
+<meta name="twitter:description" content="Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP, sincronização e AWS SSM Session Manager, senhas no cofre do sistema.">
 <meta name="twitter:image" content="https://xandroalmeida.github.io/mySSH/img/paineis-divididos.png">
 <meta name="twitter:image:alt" content="mySSH — Painéis divididos com tema por perfil">
 <link rel="icon" type="image/svg+xml" href="../assets/icon.svg">
@@ -67,9 +67,9 @@
       "image": "https://xandroalmeida.github.io/mySSH/assets/icon-256.png",
       "featureList": [
         "Perfis organizados: Pastas, tags, favoritos e ambientes DEV / HOMOLOGAÇÃO / PRODUÇÃO com faixa de aviso. Conexão rápida sem salvar nada.",
-        "Todas as formas de login: Senha, chave privada com ou sem passphrase, agente SSH e keyboard-interactive / MFA, inclusive por jump hosts.",
-        "Segredos no cofre do sistema: Keychain, Credential Manager ou Secret Service. Nada em texto puro no disco, em logs ou em argumentos de processo.",
-        "Host keys com rigor: Aceitar uma vez ou aceitar e salvar. Chave alterada bloqueia a conexão antes de qualquer envio.",
+        "Todas as formas de login: Senha, chave privada com ou sem passphrase, agente SSH, keyboard-interactive / MFA e chaves temporárias do EC2 Instance Connect, inclusive por jump hosts.",
+        "Segredos e host keys: Segredos no Keychain, Credential Manager ou Secret Service, nunca em texto puro. Host keys com rigor: chave alterada bloqueia a conexão antes de qualquer envio.",
+        "AWS EC2 via SSM: Acesse instâncias sem IP público nem porta 22 aberta pelo Session Manager, sem o AWS CLI. Perfis AWS ou login no IAM Identity Center pelo próprio app.",
         "Abas e painéis divididos: Terminal nativo (alacritty_terminal) com tema por perfil, seis paletas e confirmação de colagem com várias linhas.",
         "Painel de arquivos SFTP: Local e remoto lado a lado, fila de transferências, tratamento de conflitos, cancelamento e retomada de arquivos grandes.",
         "Sincronização com prévia: Sincronização unidirecional que mostra cada mudança antes de executar. Exclusões desligadas por padrão e modo espelho protegido.",
@@ -104,7 +104,7 @@
       "@id": "https://xandroalmeida.github.io/mySSH/pt-br/#page",
       "url": "https://xandroalmeida.github.io/mySSH/pt-br/",
       "name": "mySSH — cliente SSH de código aberto para macOS, Linux e Windows",
-      "description": "Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP e sincronização, senhas no cofre do sistema.",
+      "description": "Cliente SSH gratuito e de código aberto para macOS, Linux e Windows, em Rust: perfis, abas, painéis divididos, SFTP, sincronização e AWS SSM Session Manager, senhas no cofre do sistema.",
       "inLanguage": "pt-BR",
       "dateModified": "2026-10-22",
       "about": {
@@ -164,6 +164,14 @@
             "@type": "Answer",
             "text": "Sim. O mySSH cobre o mesmo trabalho do dia a dia, sessões de terminal, hosts salvos e transferência de arquivos, como um app nativo de código aberto que mantém todos os dados no seu computador, sem serviço em nuvem."
           }
+        },
+        {
+          "@type": "Question",
+          "name": "O mySSH conecta em instâncias AWS EC2 pelo SSM Session Manager?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Sim. O mySSH abre o túnel do Session Manager sozinho, sem o AWS CLI nem o session-manager-plugin, então a instância não precisa de IP público nem de porta 22 aberta. As credenciais vêm dos seus perfis AWS (~/.aws) ou do login no IAM Identity Center dentro do app, e com o EC2 Instance Connect uma chave temporária é gerada a cada conexão: nada precisa ser configurado no servidor."
+          }
         }
       ]
     },
@@ -221,7 +229,7 @@
   <div class="wrap hero-in">
     <div class="hero-text">
       <h1>O gerenciador de sessões SSH que guarda seus segredos no lugar certo.</h1>
-      <p class="lead">Perfis, abas, painéis divididos, SFTP e sincronização de pastas em um app nativo e rápido, escrito em Rust. Senhas vão para o cofre do sistema, host keys são verificadas com rigor e não há telemetria.</p>
+      <p class="lead">Perfis, abas, painéis divididos, SFTP, sincronização de pastas e acesso a instâncias AWS EC2 pelo SSM Session Manager em um app nativo e rápido, escrito em Rust. Senhas vão para o cofre do sistema, host keys são verificadas com rigor e não há telemetria.</p>
       <div class="cta">
         <a class="btn primary" href="#download">Baixar v0.3.0</a>
         <a class="btn" href="https://github.com/xandroalmeida/mySSH">Ver no GitHub</a>
@@ -240,9 +248,9 @@
     <h2>Recursos</h2>
     <div class="grid features">
       <article><h3>Perfis organizados</h3><p>Pastas, tags, favoritos e ambientes DEV / HOMOLOGAÇÃO / PRODUÇÃO com faixa de aviso. Conexão rápida sem salvar nada.</p></article>
-      <article><h3>Todas as formas de login</h3><p>Senha, chave privada com ou sem passphrase, agente SSH e keyboard-interactive / MFA, inclusive por jump hosts.</p></article>
-      <article><h3>Segredos no cofre do sistema</h3><p>Keychain, Credential Manager ou Secret Service. Nada em texto puro no disco, em logs ou em argumentos de processo.</p></article>
-      <article><h3>Host keys com rigor</h3><p>Aceitar uma vez ou aceitar e salvar. Chave alterada bloqueia a conexão antes de qualquer envio.</p></article>
+      <article><h3>Todas as formas de login</h3><p>Senha, chave privada com ou sem passphrase, agente SSH, keyboard-interactive / MFA e chaves temporárias do EC2 Instance Connect, inclusive por jump hosts.</p></article>
+      <article><h3>Segredos e host keys</h3><p>Segredos no Keychain, Credential Manager ou Secret Service, nunca em texto puro. Host keys com rigor: chave alterada bloqueia a conexão antes de qualquer envio.</p></article>
+      <article><h3>AWS EC2 via SSM</h3><p>Acesse instâncias sem IP público nem porta 22 aberta pelo Session Manager, sem o AWS CLI. Perfis AWS ou login no IAM Identity Center pelo próprio app.</p></article>
       <article><h3>Abas e painéis divididos</h3><p>Terminal nativo (alacritty_terminal) com tema por perfil, seis paletas e confirmação de colagem com várias linhas.</p></article>
       <article><h3>Painel de arquivos SFTP</h3><p>Local e remoto lado a lado, fila de transferências, tratamento de conflitos, cancelamento e retomada de arquivos grandes.</p></article>
       <article><h3>Sincronização com prévia</h3><p>Sincronização unidirecional que mostra cada mudança antes de executar. Exclusões desligadas por padrão e modo espelho protegido.</p></article>
@@ -317,6 +325,7 @@ cargo run -p myssh-app --release</code></pre>
       <details><summary>O mySSH suporta jump hosts, agente SSH e MFA?</summary><p>Sim. Ele autentica por senha, chave privada (com ou sem passphrase), agente SSH ou keyboard-interactive, inclusive códigos MFA de uso único, também através de jump hosts (bastions).</p></details>
       <details><summary>O mySSH coleta algum dado?</summary><p>Não. Não há telemetria, conta nem verificação automática de atualização. As únicas conexões de rede são as sessões SSH e SFTP que você abre.</p></details>
       <details><summary>O mySSH é uma alternativa ao PuTTY ou ao Termius?</summary><p>Sim. O mySSH cobre o mesmo trabalho do dia a dia, sessões de terminal, hosts salvos e transferência de arquivos, como um app nativo de código aberto que mantém todos os dados no seu computador, sem serviço em nuvem.</p></details>
+      <details><summary>O mySSH conecta em instâncias AWS EC2 pelo SSM Session Manager?</summary><p>Sim. O mySSH abre o túnel do Session Manager sozinho, sem o AWS CLI nem o session-manager-plugin, então a instância não precisa de IP público nem de porta 22 aberta. As credenciais vêm dos seus perfis AWS (~/.aws) ou do login no IAM Identity Center dentro do app, e com o EC2 Instance Connect uma chave temporária é gerada a cada conexão: nada precisa ser configurado no servidor.</p></details>
     </div>
   </div>
 </section>

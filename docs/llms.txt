@@ -7,9 +7,9 @@ Latest version: v0.3.0 (2026-10-22, pre-release). License: MIT or Apache-2.0. Au
 ## Features
 
 - **Organized profiles**: Folders, tags, favorites and DEV / STAGING / PRODUCTION environments with a warning stripe. Quick connect without saving anything.
-- **Every way to log in**: Password, private key with or without passphrase, SSH agent and keyboard-interactive / MFA, through jump hosts.
-- **Secrets in the system vault**: Keychain, Credential Manager or Secret Service. Nothing in plain text on disk, in logs or in process arguments.
-- **Strict host keys**: Accept once or accept and save. A changed key blocks the connection before anything is sent.
+- **Every way to log in**: Password, private key with or without passphrase, SSH agent, keyboard-interactive / MFA and EC2 Instance Connect temporary keys, through jump hosts.
+- **Secrets and host keys**: Secrets in Keychain, Credential Manager or Secret Service, never in plain text. Strict host keys: a changed key blocks the connection before anything is sent.
+- **AWS EC2 via SSM**: Reach instances with no public IP or open port 22 through Session Manager, without the AWS CLI. AWS profiles or in-app IAM Identity Center sign-in.
 - **Tabs and split panes**: A native terminal (alacritty_terminal) with per-profile themes, six palettes and confirmation for multi-line paste.
 - **SFTP file panel**: Local and remote side by side, transfer queue, conflict handling, cancellation and resume of large files.
 - **Folder sync with preview**: One-way sync that shows every change before it runs. Deletions are off by default and mirror mode is protected.
@@ -40,6 +40,10 @@ No. There is no telemetry, no account and no automatic update check. The only ne
 ### Is mySSH an alternative to PuTTY or Termius?
 
 Yes. mySSH covers the same everyday work, terminal sessions, saved hosts and file transfer, as a native open-source app that keeps all data on your computer, with no cloud service involved.
+
+### Can mySSH connect to AWS EC2 instances through SSM Session Manager?
+
+Yes. mySSH opens the Session Manager tunnel itself, without the AWS CLI or the session-manager-plugin, so the instance needs no public IP or open port 22. Credentials come from your AWS profiles (~/.aws) or from IAM Identity Center sign-in inside the app, and with EC2 Instance Connect a temporary key is generated on each connection, so nothing has to be set up on the server.
 
 ## Download
 
