@@ -24,6 +24,14 @@ Se o cofre do sistema estiver indisponível, o app só usa um cofre em memória 
 ## Jump host
 No perfil, escolha outro perfil como jump host (um salto). A autenticação do salto segue o perfil dele, inclusive a validação da host key do salto.
 
+## AWS SSM Session Manager
+Conecta a instâncias EC2 sem IP público nem porta 22 aberta, e sem AWS CLI ou session-manager-plugin: o SSH passa dentro de um túnel do AWS Systems Manager, e a host key continua sendo verificada. No perfil, **Conexão → AWS SSM Session Manager**; o botão **Como configurar?** abre a ajuda completa no app (pt-BR, inglês e espanhol).
+- **Host** vira o ID da instância (`i-…`); a host key fica registrada como `ID:porta`.
+- **Credenciais AWS**: *Perfil AWS* usa o que já existe em `~/.aws` (chaves, `aws login`, SSO do CLI, `credential_process`; em branco = cadeia padrão); *IAM Identity Center* faz o login pelo navegador dentro do app (URL de início, região do SSO, conta e role), com tokens só no cofre do sistema.
+- **Autenticação EC2 Instance Connect** (sugerida para perfis SSM): a cada conexão o app gera uma chave ed25519 só em memória e a publica por 60 s na instância pela API; nada é gravado no servidor.
+- **Requisitos**: SSM Agent online na instância (perfil IAM com `AmazonSSMManagedInstanceCore`), sshd ativo, pacote `ec2-instance-connect` para a chave temporária; para quem conecta, `ssm:StartSession` (instância e documento `AWS-StartSSHSession`) e `ec2-instance-connect:SendSSHPublicKey`.
+- Perfis SSM não usam jump host, mas podem ser o jump host de outros perfis. Sessões com criptografia KMS nas preferências do Session Manager ainda não são suportadas.
+
 ## MFA / keyboard-interactive
 Perfis com keyboard-interactive mostram os prompts do servidor em um diálogo ("Autenticação adicional"). As respostas (MFA/OTP) são pedidas a cada conexão e nunca salvas.
 

@@ -69,6 +69,10 @@ pub struct ProfileDialog {
     pub issue: Option<VaultIssue>,
     /// Perfis de `~/.aws` (para o transporte SSM), lidos ao abrir o diálogo.
     pub aws_profiles: Vec<String>,
+    /// Janela "Como configurar?" do AWS SSM aberta (sobre o formulário).
+    pub aws_help: bool,
+    /// A política IAM de exemplo foi copiada (feedback no botão).
+    pub aws_help_copied: bool,
 }
 
 impl ProfileDialog {
@@ -80,6 +84,8 @@ impl ProfileDialog {
             issue: None,
             // Dois arquivos pequenos de texto; só nomes de seção são lidos.
             aws_profiles: myssh_aws::list_profiles(),
+            aws_help: false,
+            aws_help_copied: false,
         }
     }
 }

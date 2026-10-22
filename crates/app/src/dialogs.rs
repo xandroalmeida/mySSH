@@ -308,6 +308,9 @@ impl App {
         {
             next = Next::Close;
         }
+        if d.aws_help {
+            aws_help_modal(ctx, d);
+        }
         next
     }
 
@@ -318,6 +321,7 @@ impl App {
         editing: bool,
         next: &mut Next,
     ) {
+        let mut open_help = false;
         let f = &mut d.form;
         let aws_profiles = &d.aws_profiles;
         let own_id = f.existing.as_ref().map(|p| p.id);
@@ -343,6 +347,13 @@ impl App {
                         && f.password_mode == SecretMode::Ask
                     {
                         f.auth = AuthKind::InstanceConnect;
+                    }
+                    if f.transport == TransportKind::AwsSsm
+                        && ui
+                            .button(format!("❓ {}", i18n::AWS_HELP_BUTTON()))
+                            .clicked()
+                    {
+                        open_help = true;
                     }
                 });
                 ui.end_row();
@@ -555,6 +566,10 @@ impl App {
             .id_salt("profile-theme")
             .default_open(!crate::theming::is_inherited(&f.theme))
             .show(ui, |ui| crate::theming::editor(ui, &mut f.theme, font));
+        if open_help {
+            d.aws_help = true;
+            d.aws_help_copied = false;
+        }
     }
 
     // ----------------------------------------------------------- configurações
@@ -972,4 +987,54 @@ fn help_text(ui: &mut egui::Ui, text: &str) {
         ui.set_max_width(HELP_WIDTH);
         ui.add(egui::Label::new(RichText::new(text).weak()).wrap());
     });
+}
+
+/// Ajuda "Como configurar?" do AWS SSM, sobre o formulário de perfil (Esc ou Fechar volta a ele).
+fn aws_help_modal(ctx: &egui::Context, d: &mut ProfileDialog) {
+    let max_h = (ctx.content_rect().height() - 160.0).max(240.0);
+    let mut close = false;
+    let resp = egui::Modal::new(egui::Id::new("aws-help")).show(ctx, |ui| {
+        ui.set_width(600.0);
+        ui.heading(i18n::AWS_HELP_TITLE());
+        ui.add_space(4.0);
+        egui::ScrollArea::vertical()
+            .max_height(max_h)
+            .auto_shrink([false, true])
+            .show(ui, |ui| {
+                for (i, (title, body)) in i18n::aws_help_sections().into_iter().enumerate() {
+                    ui.add_space(8.0);
+                    ui.label(RichText::new(title).strong());
+                    ui.add(egui::Label::new(body).wrap());
+                    // A seção de permissões traz a política de exemplo.
+                    if i == 4 {
+                        ui.add_space(4.0);
+                        egui::Frame::new()
+                            .fill(ui.visuals().extreme_bg_color)
+                            .inner_margin(egui::Margin::same(6))
+                            .show(ui, |ui| {
+                                ui.set_width(ui.available_width());
+                                ui.label(RichText::new(i18n::AWS_HELP_POLICY).monospace());
+                            });
+                        ui.horizontal(|ui| {
+                            if ui.button(i18n::AWS_HELP_COPY_POLICY()).clicked() {
+                                ctx.copy_text(i18n::AWS_HELP_POLICY.to_string());
+                                d.aws_help_copied = true;
+                            }
+                            if d.aws_help_copied {
+                                ui.weak(i18n::AWS_HELP_COPIED());
+                            }
+                        });
+                    }
+                }
+            });
+        ui.separator();
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui.button(i18n::CLOSE()).clicked() {
+                close = true;
+            }
+        });
+    });
+    if close || resp.should_close() {
+        d.aws_help = false;
+    }
 }

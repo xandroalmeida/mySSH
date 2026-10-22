@@ -3,6 +3,7 @@
 //! Renders: `MYSSH_DEMO_SHOTS=dir cargo test -p myssh-app aws_screenshots -- --ignored`
 
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use myssh_core::{AwsCredentials, AwsSsm, Profile, Transport};
 
 use crate::app::{App, Dialog};
@@ -30,6 +31,60 @@ fn form_mut(app: &mut App) -> &mut crate::form::ProfileForm {
         Dialog::Profile(d) => &mut d.form,
         _ => panic!("diálogo de perfil fechado"),
     }
+}
+
+#[test]
+fn ajuda_ssm_abre_pelo_botao_e_esc_volta_ao_formulario() {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1100.0, 900.0))
+        .build_eframe(|_| memory_app());
+    h.run_steps(2);
+    h.state_mut().new_profile_dialog();
+    h.run_steps(3);
+    let help_open = |a: &App| matches!(&a.dialog, Dialog::Profile(d) if d.aws_help);
+    click_until(
+        &mut h,
+        crate::i18n::CONN_SSM(),
+        |a| matches!(&a.dialog, Dialog::Profile(d) if d.form.transport == TransportKind::AwsSsm),
+    );
+    click_until(&mut h, crate::i18n::AWS_HELP_BUTTON(), help_open);
+    h.get_by_label(crate::i18n::AWS_HELP_TITLE());
+    h.get_by_label(crate::i18n::AWS_HELP_COPY_POLICY());
+    h.key_press(egui::Key::Escape);
+    h.run_steps(3);
+    // Esc fecha só a ajuda; o formulário continua aberto.
+    assert!(matches!(&h.state().dialog, Dialog::Profile(_)));
+    assert!(!help_open(h.state()));
+}
+
+/// Clica no widget cujo rótulo contém `label` até `done` valer (no máximo 3 vezes). O kittest
+/// move, pressiona e solta o ponteiro no mesmo frame, e o egui às vezes perde esse clique quando
+/// o ponteiro acabou de chegar ao widget; o usuário real sempre passa por cima antes.
+fn click_until(h: &mut Harness<'static, App>, label: &str, done: impl Fn(&App) -> bool) {
+    for _ in 0..3 {
+        h.get_by_label_contains(label).click();
+        h.run_steps(3);
+        if done(h.state()) {
+            return;
+        }
+    }
+    panic!("clique sem efeito: {label}");
+}
+
+#[test]
+fn ajuda_ssm_existe_nos_tres_idiomas() {
+    use myssh_i18n::{Lang, with_lang};
+    let pt = crate::i18n::aws_help_sections();
+    let en = with_lang(Lang::En, crate::i18n::aws_help_sections);
+    let es = with_lang(Lang::Es, crate::i18n::aws_help_sections);
+    for i in 0..pt.len() {
+        assert!(!pt[i].1.is_empty() && !en[i].1.is_empty() && !es[i].1.is_empty());
+        assert_ne!(pt[i].1, en[i].1, "seção {i} sem tradução para inglês");
+        assert_ne!(pt[i].1, es[i].1, "seção {i} sem tradução para espanhol");
+        assert_ne!(en[i].1, es[i].1, "seção {i}: espanhol igual ao inglês");
+    }
+    assert_eq!(en[0].0, "What it is");
+    assert_eq!(es[0].0, "Qué es");
 }
 
 /// Os textos de ajuda longos quebram linha: o diálogo cabe numa janela estreita.
@@ -137,6 +192,14 @@ fn aws_screenshots() {
         f.sso_role = "AdministratorAccess".into();
     }
     shot(&mut h, &dir, "aws-02-sso");
+    if let Dialog::Profile(d) = &mut h.state_mut().dialog {
+        d.aws_help = true;
+    }
+    shot(&mut h, &dir, "aws-04-ajuda");
+    // fim da ajuda (política IAM) numa janela alta
+    h.set_size(egui::vec2(900.0, 2400.0));
+    shot(&mut h, &dir, "aws-05-ajuda-politica");
+    h.set_size(egui::vec2(900.0, 900.0));
     h.state_mut().close_dialog();
 
     // 3. diálogo de login SSO na aba
