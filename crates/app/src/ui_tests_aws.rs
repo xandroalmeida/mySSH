@@ -32,6 +32,28 @@ fn form_mut(app: &mut App) -> &mut crate::form::ProfileForm {
     }
 }
 
+/// Os textos de ajuda longos quebram linha: o diálogo cabe numa janela estreita.
+#[test]
+fn dialogo_ssm_nao_alarga_alem_da_janela() {
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(700.0, 900.0))
+        .build_eframe(|_| memory_app());
+    h.run_steps(2);
+    h.state_mut().new_profile_dialog();
+    {
+        let f = form_mut(h.state_mut());
+        f.transport = TransportKind::AwsSsm;
+        f.auth = crate::form::AuthKind::InstanceConnect;
+    }
+    h.run_steps(4);
+    let rect = h
+        .ctx
+        .memory(|m| m.area_rect(egui::Id::new("profile-dialog")))
+        .expect("área do modal");
+    assert!(rect.width() < 640.0, "modal largo demais: {rect:?}");
+    assert!(rect.left() >= 0.0, "modal vaza à esquerda: {rect:?}");
+}
+
 #[test]
 fn salvar_perfil_ssm_pelo_dialogo_persiste_transporte() {
     let mut h = Harness::builder()
@@ -84,7 +106,7 @@ fn aws_screenshots() {
     };
     std::fs::create_dir_all(&dir).unwrap();
     let mut h = Harness::builder()
-        .with_size(egui::vec2(1200.0, 900.0))
+        .with_size(egui::vec2(900.0, 900.0))
         .with_pixels_per_point(1.5)
         .wgpu()
         .build_eframe(|_| memory_app());
@@ -99,6 +121,7 @@ fn aws_screenshots() {
         f.host = "i-0f934fb5955059e81".into();
         f.username = "ubuntu".into();
         f.transport = TransportKind::AwsSsm;
+        f.auth = crate::form::AuthKind::InstanceConnect;
         f.aws_profile = "prod".into();
     }
     shot(&mut h, &dir, "aws-01-perfil-aws");

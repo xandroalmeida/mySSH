@@ -455,17 +455,17 @@ impl App {
                     }
                     AuthKind::Agent => {
                         ui.label("");
-                        ui.weak(i18n::AGENT_HELP());
+                        help_text(ui, i18n::AGENT_HELP());
                         ui.end_row();
                     }
                     AuthKind::KeyboardInteractive => {
                         ui.label("");
-                        ui.weak(i18n::KI_HELP());
+                        help_text(ui, i18n::KI_HELP());
                         ui.end_row();
                     }
                     AuthKind::InstanceConnect => {
                         ui.label("");
-                        ui.weak(i18n::AUTH_EIC_HELP());
+                        help_text(ui, i18n::AUTH_EIC_HELP());
                         ui.end_row();
                     }
                 }
@@ -869,7 +869,7 @@ fn confirm(
 /// Linhas do transporte AWS SSM no formulário de perfil (dentro do grid de 2 colunas).
 fn aws_rows(ui: &mut egui::Ui, f: &mut ProfileForm, aws_profiles: &[String]) {
     ui.label("");
-    ui.weak(i18n::SSM_HELP());
+    help_text(ui, i18n::SSM_HELP());
     ui.end_row();
 
     ui.label(i18n::F_AWS_CREDS());
@@ -910,7 +910,7 @@ fn aws_rows(ui: &mut egui::Ui, f: &mut ProfileForm, aws_profiles: &[String]) {
             });
             ui.end_row();
             ui.label("");
-            ui.weak(i18n::AWS_PROFILE_HELP());
+            help_text(ui, i18n::AWS_PROFILE_HELP());
             ui.end_row();
         }
         AwsCredsKind::Sso => {
@@ -944,7 +944,7 @@ fn aws_rows(ui: &mut egui::Ui, f: &mut ProfileForm, aws_profiles: &[String]) {
             });
             ui.end_row();
             ui.label("");
-            ui.weak(i18n::SSO_HELP());
+            help_text(ui, i18n::SSO_HELP());
             ui.end_row();
         }
     }
@@ -960,4 +960,16 @@ fn aws_rows(ui: &mut egui::Ui, f: &mut ProfileForm, aws_profiles: &[String]) {
             .desired_width(120.0),
     );
     ui.end_row();
+}
+
+/// Largura máxima dos textos de ajuda na coluna de valores do formulário (o modal tem 540 px).
+const HELP_WIDTH: f32 = 360.0;
+
+/// Texto de ajuda discreto que quebra linha: no grid a célula não tem limite de largura, e um
+/// texto longo alargaria o modal além da janela.
+fn help_text(ui: &mut egui::Ui, text: &str) {
+    ui.vertical(|ui| {
+        ui.set_max_width(HELP_WIDTH);
+        ui.add(egui::Label::new(RichText::new(text).weak()).wrap());
+    });
 }
