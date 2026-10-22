@@ -46,6 +46,10 @@ fn env(k: &str) -> String {
 #[test]
 #[ignore = "precisa de AWS + instância com SSM (ver cabeçalho)"]
 fn shell_via_ssm_com_instance_connect() {
+    if std::env::var_os("MYSSH_TEST_SSM_TARGET").is_none() {
+        eprintln!("MYSSH_TEST_SSM_TARGET não definido: nada a fazer");
+        return;
+    }
     let rt = tokio::runtime::Runtime::new().unwrap();
     let target = env("MYSSH_TEST_SSM_TARGET");
     let ssm = AwsSsm {
