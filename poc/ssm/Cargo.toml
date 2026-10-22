@@ -16,7 +16,7 @@ path = "src/lib.rs"
 [dependencies]
 myssh-ssh = { path = "../../crates/ssh" }
 aws-config = { version = "1.13", features = ["behavior-version-latest", "credentials-login"] }
-aws-sdk-ssm = "1.130"
+aws-sdk-ssm = { version = "1.130", default-features = false, features = ["default-https-client", "rt-tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "io-std", "time", "sync", "fs"] }
 tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }

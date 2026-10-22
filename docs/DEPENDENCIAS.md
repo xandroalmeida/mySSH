@@ -28,6 +28,18 @@ Dependências diretas de crates do workspace (`myssh-*`) entre si não são list
 | thiserror | 2 | MIT OR Apache-2.0 | Tipos de erro |
 | uuid | 1 | Apache-2.0 OR MIT | Identificadores |
 
+## myssh-aws
+
+| Crate | Versão | Licença | Propósito |
+|---|---|---|---|
+| aws-config | 1.13 | Apache-2.0 | Credenciais AWS (perfis de `~/.aws`, `aws login`, SSO do CLI) |
+| aws-sdk-ssm / aws-sdk-ec2instanceconnect | 1 | Apache-2.0 | `StartSession` (túnel SSM) e `SendSSHPublicKey` (chave efêmera) |
+| aws-sdk-sso / aws-sdk-ssooidc | 1 | Apache-2.0 | Login IAM Identity Center (device authorization) e credenciais da role |
+| tokio-tungstenite (rustls, raízes do SO) | 0.30 | MIT | Websocket do data channel do SSM |
+| futures-util / serde / serde_json / sha2 / uuid / secrecy / zeroize / directories / anyhow | — | MIT OR Apache-2.0 | Protocolo do data channel, segredos, leitura de `~/.aws` |
+
+Os crates `aws-sdk-*` são usados **sem** as features padrão: a padrão `rustls` liga o cliente HTTP legado (hyper 0.14 / rustls 0.21, com alertas RUSTSEC-2026-0258/0346/0349 e outros); só o cliente novo (`default-https-client`) entra no binário.
+
 ## myssh-secrets
 
 | Crate | Versão | Licença | Propósito |
@@ -43,6 +55,7 @@ Dependências diretas de crates do workspace (`myssh-*`) entre si não são list
 | Crate | Versão | Licença | Propósito |
 |---|---|---|---|
 | russh | 0.64 | Apache-2.0 | Cliente SSH |
+| getrandom | 0.4 | MIT OR Apache-2.0 | Semente da chave efêmera ed25519 (EC2 Instance Connect) |
 | tokio | 1 | MIT | Runtime assíncrono |
 | secrecy / zeroize | 0.10 / 1 | Apache-2.0 OR MIT | Segredos |
 

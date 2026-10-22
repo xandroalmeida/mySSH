@@ -11,10 +11,10 @@ myssh-i18n = { path = "../i18n" }
 myssh-secrets = { path = "../secrets" }
 myssh-ssh = { path = "../ssh" }
 aws-config = { version = "1.13", features = ["behavior-version-latest", "credentials-login"] }
-aws-sdk-ssm = "1.130"
-aws-sdk-ec2instanceconnect = "1.117"
-aws-sdk-sso = "1.116"
-aws-sdk-ssooidc = "1.118"
+aws-sdk-ssm = { version = "1.130", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-ec2instanceconnect = { version = "1.117", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-sso = { version = "1.116", default-features = false, features = ["default-https-client", "rt-tokio"] }
+aws-sdk-ssooidc = { version = "1.118", default-features = false, features = ["default-https-client", "rt-tokio"] }
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "io-util", "time", "sync", "net"] }
 tokio-tungstenite = { version = "0.30", features = ["rustls-tls-native-roots"] }
 futures-util = { version = "0.3", default-features = false, features = ["sink", "std"] }
