@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/*", "poc/egui", "tools/icon"]
+members = ["crates/*", "poc/egui", "poc/ssm", "tools/icon"]
 
 [workspace.package]
 version = "0.2.1"
