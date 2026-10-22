@@ -60,6 +60,10 @@ pub(crate) const MIGRATIONS: &[&str] = &[
         value TEXT NOT NULL
     );
     "#,
+    // v2: transporte (direto ou AWS SSM), JSON de `myssh_core::Transport`.
+    r#"
+    ALTER TABLE profiles ADD COLUMN transport_json TEXT NOT NULL DEFAULT '"Direct"';
+    "#,
 ];
 
 pub(crate) fn migrate(conn: &mut Connection, migrations: &[&str]) -> Result<()> {

@@ -34,7 +34,7 @@ fn migracao_preserva_dados_e_versiona() {
         conn.execute("INSERT INTO settings (key, value) VALUES ('a', 'b')", [])
             .unwrap();
     }
-    // Reabre com migração extra (v2) por cima do banco existente.
+    // Reabre com as migrações atuais + uma extra por cima do banco existente.
     let mut conn = Connection::open(&path).unwrap();
     let mut all: Vec<&str> = MIGRATIONS.to_vec();
     all.push("ALTER TABLE settings ADD COLUMN nota TEXT;");
@@ -42,13 +42,62 @@ fn migracao_preserva_dados_e_versiona() {
     let v: i64 = conn
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(v, 2);
+    assert_eq!(v, all.len() as i64);
     let val: String = conn
         .query_row("SELECT value FROM settings WHERE key='a'", [], |r| r.get(0))
         .unwrap();
     assert_eq!(val, "b");
     // Reaplicar é no-op.
     migrate(&mut conn, &all).unwrap();
+}
+
+#[test]
+fn migracao_v2_perfis_antigos_ficam_diretos() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("db.sqlite");
+    let id = ProfileId::new();
+    {
+        let mut conn = Connection::open(&path).unwrap();
+        migrate(&mut conn, &MIGRATIONS[..1]).unwrap();
+        conn.execute(
+            "INSERT INTO profiles (id, name, host, port, username, auth_json, favorite, \
+             environment, theme_json, agent_forwarding, keepalive_secs, connect_timeout_secs) \
+             VALUES (?1, 'velho', 'h', 22, 'u', '\"Agent\"', 0, 'none', ?2, 0, 30, 15)",
+            params![
+                id.to_string(),
+                serde_json::to_string(&myssh_core::ThemeOverride::default()).unwrap()
+            ],
+        )
+        .unwrap();
+    }
+    let s = Store::open(&path).unwrap();
+    let p = s.get_profile(id).unwrap().unwrap();
+    assert_eq!(p.name, "velho");
+    assert_eq!(p.transport, myssh_core::Transport::Direct);
+}
+
+#[test]
+fn perfil_ssm_roundtrip() {
+    use myssh_core::{AwsCredentials, AwsSsm, Transport};
+    let s = store();
+    let mut p = prof("ec2", "i-0123456789abcdef0", "ubuntu");
+    p.transport = Transport::AwsSsm(AwsSsm {
+        region: "us-east-1".into(),
+        credentials: AwsCredentials::Sso {
+            start_url: "https://d-123.awsapps.com/start".into(),
+            sso_region: "us-east-1".into(),
+            account_id: "123456789012".into(),
+            role_name: "Admin".into(),
+        },
+    });
+    s.create_profile(&p).unwrap();
+    assert_eq!(s.get_profile(p.id).unwrap().unwrap(), p);
+    p.transport = Transport::AwsSsm(AwsSsm {
+        region: String::new(),
+        credentials: AwsCredentials::Profile { name: None },
+    });
+    s.update_profile(&p).unwrap();
+    assert_eq!(s.get_profile(p.id).unwrap().unwrap(), p);
 }
 
 #[test]
@@ -69,7 +118,7 @@ fn migracao_falha_e_reverte_em_transacao() {
     let v: i64 = conn
         .query_row("PRAGMA user_version", [], |r| r.get(0))
         .unwrap();
-    assert_eq!(v, 1);
+    assert_eq!(v, MIGRATIONS.len() as i64);
 }
 
 #[test]

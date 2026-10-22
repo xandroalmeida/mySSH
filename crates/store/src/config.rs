@@ -6,7 +6,7 @@
 use crate::Store;
 use crate::error::{Result, StoreError};
 use crate::repo::{self, WriteMode};
-use myssh_core::{AuthMethod, Environment, FolderId, Profile, ProfileId, ThemeOverride};
+use myssh_core::{AuthMethod, Environment, FolderId, Profile, ProfileId, ThemeOverride, Transport};
 use rusqlite::params;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
@@ -88,6 +88,9 @@ pub struct ExportProfile {
     pub agent_forwarding: bool,
     pub keepalive_secs: Option<u32>,
     pub connect_timeout_secs: u32,
+    /// Sem segredos (tokens SSO ficam no cofre). Ausente em exportações antigas.
+    #[serde(default)]
+    pub transport: Transport,
 }
 
 impl ExportProfile {
@@ -108,6 +111,7 @@ impl ExportProfile {
             agent_forwarding: p.agent_forwarding,
             keepalive_secs: p.keepalive_secs,
             connect_timeout_secs: p.connect_timeout_secs,
+            transport: p.transport.clone(),
         }
     }
 
@@ -128,6 +132,7 @@ impl ExportProfile {
             agent_forwarding: self.agent_forwarding,
             keepalive_secs: self.keepalive_secs,
             connect_timeout_secs: self.connect_timeout_secs,
+            transport: self.transport,
         }
     }
 }

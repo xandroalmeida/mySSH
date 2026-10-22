@@ -37,6 +37,8 @@ mod real_tests_m4b;
 #[cfg(test)]
 mod ui_tests;
 #[cfg(test)]
+mod ui_tests_aws;
+#[cfg(test)]
 mod ui_tests_m2b;
 #[cfg(test)]
 mod ui_tests_m2b_shots;

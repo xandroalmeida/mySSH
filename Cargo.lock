@@ -3652,6 +3652,7 @@ dependencies = [
  "eframe",
  "egui",
  "egui_kittest",
+ "myssh-aws",
  "myssh-core",
  "myssh-i18n",
  "myssh-secrets",
@@ -3672,11 +3673,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "myssh-aws"
+version = "0.2.1"
+dependencies = [
+ "anyhow",
+ "aws-config",
+ "aws-sdk-ssm",
+ "aws-sdk-sso",
+ "aws-sdk-ssooidc",
+ "directories",
+ "futures-util",
+ "myssh-core",
+ "myssh-i18n",
+ "myssh-secrets",
+ "myssh-ssh",
+ "secrecy",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "myssh-core"
 version = "0.2.1"
 dependencies = [
  "myssh-i18n",
  "serde",
+ "serde_json",
  "thiserror 2.0.21",
  "uuid",
 ]

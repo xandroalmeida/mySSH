@@ -27,6 +27,7 @@ myssh-transfer = { path = "../transfer" }
 myssh-syncrun = { path = "../syncrun" }
 tokio-util = { version = "0.7", default-features = false }
 myssh-sshconfig = { path = "../sshconfig" }
+myssh-aws = { path = "../aws" }
 eframe = "0.36"
 egui = "0.36"
 tokio = { version = "1", features = ["rt-multi-thread", "sync", "time", "macros", "net", "fs"] }

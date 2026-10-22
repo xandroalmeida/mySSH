@@ -8,18 +8,26 @@
 //!
 //! Jump host: a cadeia (`Profile::jump`, recursiva) é carregada do store e as credenciais de cada
 //! perfil (saltos e destino) são resolvidas em ordem, perguntando quando não salvas.
+//!
+//! AWS SSM: o primeiro perfil da cadeia pode usar o transporte SSM (túnel do `myssh-aws` no lugar
+//! do TCP). Com credenciais IAM Identity Center, a resolução confere a sessão SSO e, se preciso,
+//! passa por `AwsLogin` (código + navegador, por ação explícita do usuário) antes de conectar.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use egui::{Color32, FontId, Id, Key, RichText};
+use myssh_aws::AwsError;
 use myssh_core::trust::{HostEndpoint, HostTrustStore};
-use myssh_core::{AuthMethod, Credential, CredentialId, CredentialKind, Profile, SessionState};
+use myssh_core::{
+    AuthMethod, AwsCredentials, AwsSsm, Credential, CredentialId, CredentialKind, Profile,
+    SessionState, Transport,
+};
 use myssh_secrets::{SecretError, SecretString, Vault, new_secret_ref};
 use myssh_ssh::{
     AUTH_REJECTED, AuthMaterial, ConnectRequest, Hop, HostKeyDecision, KEY_DECODE, Notify, PtySize,
-    key_requires_passphrase, spawn,
+    Tunnel, key_requires_passphrase, spawn,
 };
 use myssh_store::Store;
 use myssh_term::{DEFAULT_PUMP_BUDGET, HostKeyAlert, TermSession, TermStyle, TermTheme};
@@ -88,7 +96,34 @@ enum Stop {
     VaultLocked {
         index: usize,
     },
+    /// Sessão IAM Identity Center ausente/vencida para o primeiro perfil da cadeia.
+    AwsLogin {
+        start_url: String,
+        sso_region: String,
+    },
     Failed(String),
+}
+
+/// Mensagens da tarefa de login SSO.
+enum LoginMsg {
+    Code { uri: String, code: String },
+    Done(Result<(), AwsError>),
+}
+
+/// Login IAM Identity Center em andamento. Soltar aborta a tarefa.
+struct AwsLogin {
+    rx: Receiver<LoginMsg>,
+    task: Option<tokio::task::JoinHandle<()>>,
+    /// (URL de verificação, código) quando a AWS já respondeu.
+    code: Option<(String, String)>,
+}
+
+impl Drop for AwsLogin {
+    fn drop(&mut self) {
+        if let Some(t) = &self.task {
+            t.abort();
+        }
+    }
 }
 
 /// Resultado da resolução da cadeia (jump hosts + destino). `mats[i]` = material já resolvido.
@@ -122,6 +157,7 @@ enum Phase {
         unlocking: Option<UnlockRx>,
     },
     Prompt(SecretPrompt),
+    AwsLogin(AwsLogin),
     Live,
     Failed(String),
 }
@@ -133,6 +169,7 @@ enum ModalKind {
     Vault,
     HostKey,
     AuthPrompt,
+    AwsLogin,
     Files,
 }
 
@@ -291,8 +328,51 @@ impl TerminalTab {
                     unlocking: None,
                 }
             }
+            Stop::AwsLogin {
+                start_url,
+                sso_region,
+            } => self.start_aws_login(env, start_url, sso_region),
             Stop::Failed(m) => self.phase = Phase::Failed(m),
         }
+    }
+
+    /// Inicia o login IAM Identity Center (em segundo plano): pede o código à AWS e espera a
+    /// confirmação no navegador. Ao concluir, retoma a resolução da cadeia.
+    fn start_aws_login(&mut self, env: &TabEnv, start_url: String, sso_region: String) {
+        let (tx, rx) = channel();
+        let (vault, ctx) = (env.vault.clone(), env.ctx.clone());
+        let task = env.rt.spawn(async move {
+            let res = match myssh_aws::sso::begin_login(&vault, &start_url, &sso_region).await {
+                Ok(login) => {
+                    let _ = tx.send(LoginMsg::Code {
+                        uri: login.verification_uri.clone(),
+                        code: login.user_code.clone(),
+                    });
+                    ctx.request_repaint();
+                    myssh_aws::sso::complete_login(&vault, login).await
+                }
+                Err(e) => Err(e),
+            };
+            let _ = tx.send(LoginMsg::Done(res));
+            ctx.request_repaint();
+        });
+        self.phase = Phase::AwsLogin(AwsLogin {
+            rx,
+            task: Some(task),
+            code: None,
+        });
+    }
+
+    /// Mostra o diálogo de login SSO com um código fixo (screenshots/testes de UI).
+    #[cfg(test)]
+    pub(crate) fn debug_aws_login(&mut self, uri: &str, code: &str) {
+        let (_tx, rx) = channel();
+        self.started = true;
+        self.phase = Phase::AwsLogin(AwsLogin {
+            rx,
+            task: None,
+            code: Some((uri.into(), code.into())),
+        });
     }
 
     fn launch(&mut self, env: &TabEnv) {
@@ -316,6 +396,17 @@ impl TerminalTab {
                 )),
             });
         }
+        // O primeiro servidor da cadeia pode estar atrás de um túnel AWS SSM.
+        let root = self.hops.first().unwrap_or(&self.profile);
+        let tunnel: Option<Arc<dyn Tunnel>> = match &root.transport {
+            Transport::Direct => None,
+            Transport::AwsSsm(ssm) => Some(Arc::new(myssh_aws::SsmTunnel::new(
+                root.host.clone(),
+                root.port,
+                ssm.clone(),
+                env.vault.clone(),
+            ))),
+        };
         let p = &self.profile;
         // Reconexão: o PTY nasce com o tamanho atual do terminal mantido.
         let (cols, rows) = self
@@ -341,6 +432,7 @@ impl TerminalTab {
                 .filter(|s| *s > 0)
                 .map(|s| std::time::Duration::from_secs(u64::from(s))),
             jumps,
+            tunnel,
         };
         let ctx = env.ctx.clone();
         let notify: Notify = Arc::new(move || ctx.request_repaint());
@@ -413,7 +505,10 @@ impl TerminalTab {
                     s.disconnect();
                 }
             }
-            Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. } => {
+            Phase::Resolving(_)
+            | Phase::Prompt(_)
+            | Phase::VaultLocked { .. }
+            | Phase::AwsLogin(_) => {
                 self.phase = Phase::Idle;
                 self.notice = Some(i18n::TAB_CANCELLED().into());
             }
@@ -446,7 +541,9 @@ impl TerminalTab {
         match &self.phase {
             Phase::Idle => b("○", i18n::ST_IDLE(), GRAY),
             Phase::Resolving(_) => b("⏳", i18n::ST_PREPARING(), AMBER),
-            Phase::VaultLocked { .. } | Phase::Prompt(_) => b("🔑", i18n::ST_NEEDS_INPUT(), AMBER),
+            Phase::VaultLocked { .. } | Phase::Prompt(_) | Phase::AwsLogin(_) => {
+                b("🔑", i18n::ST_NEEDS_INPUT(), AMBER)
+            }
             Phase::Failed(_) => b("✖", i18n::ST_ERROR(), RED),
             Phase::Live => match &self.sess {
                 None => b("○", i18n::ST_IDLE(), GRAY),
@@ -478,6 +575,7 @@ impl TerminalTab {
         match &self.phase {
             Phase::Prompt(_) => Some(ModalKind::Secret),
             Phase::VaultLocked { .. } => Some(ModalKind::Vault),
+            Phase::AwsLogin(_) => Some(ModalKind::AwsLogin),
             Phase::Live
                 if self
                     .sess
@@ -511,7 +609,7 @@ impl TerminalTab {
         let live = self.session_live();
         let connecting_pre = matches!(
             self.phase,
-            Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. }
+            Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. } | Phase::AwsLogin(_)
         );
         let can_reconnect = !live && !matches!(self.phase, Phase::Resolving(_));
         let label = if matches!(self.phase, Phase::Idle) && self.sess.is_none() {
@@ -531,6 +629,9 @@ impl TerminalTab {
                 .on_hover_text(tip);
             if let Some(j) = &self.jump_name {
                 ui.weak(format!("{}: {j}", i18n::JUMP_LABEL()));
+            }
+            if matches!(p.transport, Transport::AwsSsm(_)) {
+                ui.weak(i18n::SSM_LABEL());
             }
             ui.colored_label(badge.color, format!("{} {}", badge.icon, badge.text));
             if let Some(n) = &self.notice {
@@ -749,6 +850,8 @@ impl TerminalTab {
             return;
         };
         let (index, err, busy) = (*index, error.clone(), unlocking.is_some());
+        // Credencial já resolvida: o cofre foi pedido pela sessão AWS SSO, não há o que digitar.
+        let can_type = !self.mats.get(index).is_some_and(Option::is_some);
         let mut unlock = false;
         let mut type_now = false;
         let mut cancel = false;
@@ -770,9 +873,10 @@ impl TerminalTab {
                 if ui.add_enabled(!busy, egui::Button::new(label)).clicked() {
                     unlock = true;
                 }
-                if ui
-                    .add_enabled(!busy, egui::Button::new(i18n::TYPE_NOW()))
-                    .clicked()
+                if can_type
+                    && ui
+                        .add_enabled(!busy, egui::Button::new(i18n::TYPE_NOW()))
+                        .clicked()
                 {
                     type_now = true;
                 }
@@ -801,6 +905,61 @@ impl TerminalTab {
                 can_save: false,
                 note: None,
             });
+        }
+    }
+
+    fn aws_login_modal(&mut self, ctx: &egui::Context) {
+        let Phase::AwsLogin(l) = &self.phase else {
+            return;
+        };
+        let code = l.code.clone();
+        let mut cancel = false;
+        let resp = egui::Modal::new(Id::new(("tab-modal", self.uid))).show(ctx, |ui| {
+            ui.set_width(460.0);
+            ui.heading(i18n::SSO_LOGIN_TITLE());
+            ui.add_space(6.0);
+            match &code {
+                None => {
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.label(i18n::SSO_LOGIN_STARTING());
+                    });
+                }
+                Some((uri, code)) => {
+                    ui.label(i18n::SSO_LOGIN_BODY());
+                    ui.add_space(6.0);
+                    ui.vertical_centered(|ui| {
+                        ui.label(RichText::new(code).monospace().size(26.0).strong());
+                    });
+                    ui.add_space(6.0);
+                    ui.horizontal(|ui| {
+                        // Só por clique: nunca abrir URL sozinho.
+                        if ui.button(i18n::SSO_OPEN_BROWSER()).clicked() {
+                            ctx.open_url(egui::OpenUrl::new_tab(uri));
+                        }
+                        if ui.button(i18n::SSO_COPY_LINK()).clicked() {
+                            ctx.copy_text(uri.clone());
+                        }
+                    });
+                    ui.add_space(4.0);
+                    ui.horizontal(|ui| {
+                        ui.spinner();
+                        ui.weak(i18n::SSO_LOGIN_WAITING());
+                    });
+                }
+            }
+            ui.add_space(8.0);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if ui.button(i18n::CANCEL()).clicked() {
+                    cancel = true;
+                }
+            });
+        });
+        if resp.should_close() {
+            cancel = true;
+        }
+        if cancel {
+            self.disconnect();
         }
     }
 
@@ -1074,6 +1233,35 @@ impl TabBody for TerminalTab {
             None => {}
         }
 
+        // Login IAM Identity Center: código chegou / concluído?
+        let mut login_done = None;
+        if let Phase::AwsLogin(l) = &mut self.phase {
+            while let Ok(m) = l.rx.try_recv() {
+                match m {
+                    LoginMsg::Code { uri, code } => l.code = Some((uri, code)),
+                    LoginMsg::Done(r) => login_done = Some(r),
+                }
+            }
+        }
+        match login_done {
+            Some(Ok(())) => {
+                let (hops, mats) = (
+                    std::mem::take(&mut self.hops),
+                    std::mem::take(&mut self.mats),
+                );
+                self.start_resolve(env, hops, mats, None);
+            }
+            Some(Err(AwsError::VaultLocked)) => {
+                self.phase = Phase::VaultLocked {
+                    index: 0,
+                    error: None,
+                    unlocking: None,
+                }
+            }
+            Some(Err(e)) => self.phase = Phase::Failed(e.to_string()),
+            None => {}
+        }
+
         // Salvamento do segredo no cofre concluído?
         if let Some(rx) = &self.save_rx {
             match rx.try_recv() {
@@ -1134,7 +1322,7 @@ impl TabBody for TerminalTab {
                 self.message_panel(ui, msg, false);
             }
             Phase::Resolving(_) => self.message_panel(ui, i18n::TAB_PREPARING(), false),
-            Phase::VaultLocked { .. } | Phase::Prompt(_) => {
+            Phase::VaultLocked { .. } | Phase::Prompt(_) | Phase::AwsLogin(_) => {
                 self.message_panel(ui, i18n::TAB_WAITING_INPUT(), false)
             }
             Phase::Failed(m) => {
@@ -1168,6 +1356,7 @@ impl TabBody for TerminalTab {
             ModalKind::Vault => self.vault_modal(ctx, env),
             ModalKind::HostKey => self.host_key_modal(ctx, fresh),
             ModalKind::AuthPrompt => self.auth_prompt_modal(ctx, fresh),
+            ModalKind::AwsLogin => self.aws_login_modal(ctx),
             ModalKind::Files => {
                 if let Some(f) = self.files.as_mut() {
                     f.modal_ui(ctx);
@@ -1257,7 +1446,7 @@ impl TabBody for TerminalTab {
         self.ki = None;
         if matches!(
             self.phase,
-            Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. }
+            Phase::Resolving(_) | Phase::Prompt(_) | Phase::VaultLocked { .. } | Phase::AwsLogin(_)
         ) {
             self.phase = Phase::Idle;
         }
@@ -1459,10 +1648,35 @@ fn resolve_chain(
         };
         return ResolveOut { hops, mats, stop };
     }
-    ResolveOut {
-        hops,
-        mats,
-        stop: Stop::Done,
+    let root = hops.first().unwrap_or(target);
+    let stop = aws_sso_check(vault, root).unwrap_or(Stop::Done);
+    ResolveOut { hops, mats, stop }
+}
+
+/// Primeiro perfil da cadeia com SSM + IAM Identity Center: confere (e renova, se der) a sessão
+/// SSO. `None` = nada a fazer. Roda em `spawn_blocking` (cofre do SO e rede).
+fn aws_sso_check(vault: &Vault, root: &Profile) -> Option<Stop> {
+    let Transport::AwsSsm(AwsSsm {
+        credentials:
+            AwsCredentials::Sso {
+                start_url,
+                sso_region,
+                ..
+            },
+        ..
+    }) = &root.transport
+    else {
+        return None;
+    };
+    let rt = tokio::runtime::Handle::try_current().ok()?;
+    match rt.block_on(myssh_aws::sso::session_ready(vault, start_url, sso_region)) {
+        Ok(true) => None,
+        Ok(false) => Some(Stop::AwsLogin {
+            start_url: start_url.clone(),
+            sso_region: sso_region.clone(),
+        }),
+        Err(AwsError::VaultLocked) => Some(Stop::VaultLocked { index: 0 }),
+        Err(e) => Some(Stop::Failed(e.to_string())),
     }
 }
 

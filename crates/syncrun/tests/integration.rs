@@ -101,6 +101,7 @@ async fn connect() -> Arc<Connection> {
         connect_timeout: Duration::from_secs(10),
         keepalive: Some(Duration::from_secs(15)),
         jumps: vec![],
+        tunnel: None,
     };
     Connection::connect(&req, &trust, &sink())
         .await

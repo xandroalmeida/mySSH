@@ -6,7 +6,7 @@ use myssh_core::{Environment, ProfileId};
 
 use crate::app::{App, Dialog, ProfileDialog, QuickDialog, VaultIssue, VaultMode};
 use crate::env;
-use crate::form::{AuthKind, SecretMode};
+use crate::form::{AuthKind, AwsCredsKind, ProfileForm, SecretMode, TransportKind};
 use crate::i18n;
 use crate::logic::folder_path;
 use crate::settings::{FONT_MAX, FONT_MIN, LOCK_MAX_MINUTES, ThemePref};
@@ -319,7 +319,9 @@ impl App {
         next: &mut Next,
     ) {
         let f = &mut d.form;
+        let aws_profiles = &d.aws_profiles;
         let own_id = f.existing.as_ref().map(|p| p.id);
+        let ssm = f.transport == TransportKind::AwsSsm;
         egui::Grid::new("profile-grid")
             .num_columns(2)
             .spacing([10.0, 8.0])
@@ -328,9 +330,24 @@ impl App {
                 ui.add(egui::TextEdit::singleline(&mut f.name).desired_width(f32::INFINITY));
                 ui.end_row();
 
-                ui.label(i18n::F_HOST());
+                ui.label(i18n::F_CONNECTION());
+                ui.horizontal_wrapped(|ui| {
+                    ui.radio_value(&mut f.transport, TransportKind::Direct, i18n::CONN_DIRECT());
+                    ui.radio_value(&mut f.transport, TransportKind::AwsSsm, i18n::CONN_SSM());
+                });
+                ui.end_row();
+
+                ui.label(if ssm {
+                    i18n::F_INSTANCE()
+                } else {
+                    i18n::F_HOST()
+                });
                 ui.horizontal(|ui| {
-                    ui.add(egui::TextEdit::singleline(&mut f.host).desired_width(250.0));
+                    ui.add(
+                        egui::TextEdit::singleline(&mut f.host)
+                            .hint_text(if ssm { "i-0123456789abcdef0" } else { "" })
+                            .desired_width(250.0),
+                    );
                     ui.label(i18n::F_PORT());
                     ui.add(egui::TextEdit::singleline(&mut f.port).desired_width(60.0));
                 });
@@ -339,6 +356,10 @@ impl App {
                 ui.label(i18n::F_USER());
                 ui.add(egui::TextEdit::singleline(&mut f.username).desired_width(250.0));
                 ui.end_row();
+
+                if ssm {
+                    aws_rows(ui, f, aws_profiles);
+                }
 
                 ui.label(i18n::F_AUTH());
                 ui.horizontal_wrapped(|ui| {
@@ -480,20 +501,23 @@ impl App {
                 });
                 ui.end_row();
 
-                ui.label(i18n::F_JUMP());
-                let cur = f
-                    .jump
-                    .and_then(|j| self.profile(j))
-                    .map_or_else(|| i18n::NO_JUMP().to_string(), |p| p.name.clone());
-                egui::ComboBox::from_id_salt("form-jump")
-                    .selected_text(cur)
-                    .show_ui(ui, |ui| {
-                        ui.selectable_value(&mut f.jump, None, i18n::NO_JUMP());
-                        for p in self.profiles.iter().filter(|p| Some(p.id) != own_id) {
-                            ui.selectable_value(&mut f.jump, Some(p.id), &p.name);
-                        }
-                    });
-                ui.end_row();
+                // SSM é sempre o primeiro salto: sem jump host.
+                if !ssm {
+                    ui.label(i18n::F_JUMP());
+                    let cur = f
+                        .jump
+                        .and_then(|j| self.profile(j))
+                        .map_or_else(|| i18n::NO_JUMP().to_string(), |p| p.name.clone());
+                    egui::ComboBox::from_id_salt("form-jump")
+                        .selected_text(cur)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(&mut f.jump, None, i18n::NO_JUMP());
+                            for p in self.profiles.iter().filter(|p| Some(p.id) != own_id) {
+                                ui.selectable_value(&mut f.jump, Some(p.id), &p.name);
+                            }
+                        });
+                    ui.end_row();
+                }
 
                 ui.label(i18n::F_KEEPALIVE());
                 ui.horizontal(|ui| {
@@ -822,4 +846,100 @@ fn confirm(
         result = Next::Close;
     }
     result
+}
+
+/// Linhas do transporte AWS SSM no formulário de perfil (dentro do grid de 2 colunas).
+fn aws_rows(ui: &mut egui::Ui, f: &mut ProfileForm, aws_profiles: &[String]) {
+    ui.label("");
+    ui.weak(i18n::SSM_HELP());
+    ui.end_row();
+
+    ui.label(i18n::F_AWS_CREDS());
+    ui.horizontal_wrapped(|ui| {
+        ui.radio_value(
+            &mut f.aws_creds,
+            AwsCredsKind::Profile,
+            i18n::AWS_CREDS_PROFILE(),
+        );
+        ui.radio_value(&mut f.aws_creds, AwsCredsKind::Sso, i18n::AWS_CREDS_SSO());
+    });
+    ui.end_row();
+
+    match f.aws_creds {
+        AwsCredsKind::Profile => {
+            ui.label(i18n::F_AWS_PROFILE());
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut f.aws_profile)
+                        .hint_text(i18n::AWS_PROFILE_DEFAULT())
+                        .desired_width(180.0),
+                );
+                if !aws_profiles.is_empty() {
+                    egui::ComboBox::from_id_salt("form-aws-profile")
+                        .selected_text("")
+                        .width(24.0)
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut f.aws_profile,
+                                String::new(),
+                                i18n::AWS_PROFILE_DEFAULT(),
+                            );
+                            for p in aws_profiles {
+                                ui.selectable_value(&mut f.aws_profile, p.clone(), p);
+                            }
+                        });
+                }
+            });
+            ui.end_row();
+            ui.label("");
+            ui.weak(i18n::AWS_PROFILE_HELP());
+            ui.end_row();
+        }
+        AwsCredsKind::Sso => {
+            ui.label(i18n::F_SSO_START_URL());
+            ui.add(
+                egui::TextEdit::singleline(&mut f.sso_start_url)
+                    .hint_text("https://d-1234567890.awsapps.com/start")
+                    .desired_width(f32::INFINITY),
+            );
+            ui.end_row();
+            ui.label(i18n::F_SSO_REGION());
+            ui.add(
+                egui::TextEdit::singleline(&mut f.sso_region)
+                    .hint_text("us-east-1")
+                    .desired_width(120.0),
+            );
+            ui.end_row();
+            ui.label(i18n::F_SSO_ACCOUNT());
+            ui.horizontal(|ui| {
+                ui.add(
+                    egui::TextEdit::singleline(&mut f.sso_account)
+                        .hint_text("123456789012")
+                        .desired_width(130.0),
+                );
+                ui.label(i18n::F_SSO_ROLE());
+                ui.add(
+                    egui::TextEdit::singleline(&mut f.sso_role)
+                        .hint_text("AdministratorAccess")
+                        .desired_width(160.0),
+                );
+            });
+            ui.end_row();
+            ui.label("");
+            ui.weak(i18n::SSO_HELP());
+            ui.end_row();
+        }
+    }
+
+    ui.label(i18n::F_AWS_REGION());
+    let hint = match f.aws_creds {
+        AwsCredsKind::Profile => i18n::AWS_REGION_FROM_PROFILE(),
+        AwsCredsKind::Sso => "us-east-1",
+    };
+    ui.add(
+        egui::TextEdit::singleline(&mut f.aws_region)
+            .hint_text(hint)
+            .desired_width(120.0),
+    );
+    ui.end_row();
 }

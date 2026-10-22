@@ -1,8 +1,8 @@
 //! Formulário de perfil ↔ `Profile` (sem UI) e regras de criação de credenciais.
 
 use myssh_core::{
-    AuthMethod, Credential, CredentialId, CredentialKind, Environment, FolderId, Profile,
-    ProfileError, ProfileId, ThemeOverride,
+    AuthMethod, AwsCredentials, AwsSsm, Credential, CredentialId, CredentialKind, Environment,
+    FolderId, Profile, ProfileError, ProfileId, ThemeOverride, Transport,
 };
 use myssh_secrets::{SecretString, new_secret_ref};
 use myssh_store::Folder;
@@ -17,6 +17,22 @@ pub enum AuthKind {
     Key,
     Agent,
     KeyboardInteractive,
+}
+
+/// Como chegar ao servidor.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TransportKind {
+    Direct,
+    AwsSsm,
+}
+
+/// Origem das credenciais AWS (transporte SSM).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AwsCredsKind {
+    /// Perfil de `~/.aws` (vazio = cadeia padrão).
+    Profile,
+    /// IAM Identity Center com login pelo app.
+    Sso,
 }
 
 /// Onde fica o segredo (senha/passphrase).
@@ -108,6 +124,16 @@ pub struct ProfileForm {
     pub theme: ThemeOverride,
     pub keepalive: String,
     pub timeout: String,
+    pub transport: TransportKind,
+    /// Região da instância (vazia = a do perfil AWS).
+    pub aws_region: String,
+    pub aws_creds: AwsCredsKind,
+    /// Perfil AWS (vazio = cadeia padrão).
+    pub aws_profile: String,
+    pub sso_start_url: String,
+    pub sso_region: String,
+    pub sso_account: String,
+    pub sso_role: String,
 }
 
 impl std::fmt::Debug for ProfileForm {
@@ -154,6 +180,14 @@ impl ProfileForm {
             theme: ThemeOverride::default(),
             keepalive: d.keepalive_secs.map(|k| k.to_string()).unwrap_or_default(),
             timeout: d.connect_timeout_secs.to_string(),
+            transport: TransportKind::Direct,
+            aws_region: String::new(),
+            aws_creds: AwsCredsKind::Profile,
+            aws_profile: String::new(),
+            sso_start_url: String::new(),
+            sso_region: String::new(),
+            sso_account: String::new(),
+            sso_role: String::new(),
         }
     }
 
@@ -189,7 +223,49 @@ impl ProfileForm {
         f.theme = p.theme.clone();
         f.keepalive = p.keepalive_secs.map(|k| k.to_string()).unwrap_or_default();
         f.timeout = p.connect_timeout_secs.to_string();
+        if let Transport::AwsSsm(ssm) = &p.transport {
+            f.transport = TransportKind::AwsSsm;
+            f.aws_region = ssm.region.clone();
+            match &ssm.credentials {
+                AwsCredentials::Profile { name } => {
+                    f.aws_creds = AwsCredsKind::Profile;
+                    f.aws_profile = name.clone().unwrap_or_default();
+                }
+                AwsCredentials::Sso {
+                    start_url,
+                    sso_region,
+                    account_id,
+                    role_name,
+                } => {
+                    f.aws_creds = AwsCredsKind::Sso;
+                    f.sso_start_url = start_url.clone();
+                    f.sso_region = sso_region.clone();
+                    f.sso_account = account_id.clone();
+                    f.sso_role = role_name.clone();
+                }
+            }
+        }
         f
+    }
+
+    fn build_transport(&self) -> Transport {
+        match self.transport {
+            TransportKind::Direct => Transport::Direct,
+            TransportKind::AwsSsm => Transport::AwsSsm(AwsSsm {
+                region: self.aws_region.trim().to_string(),
+                credentials: match self.aws_creds {
+                    AwsCredsKind::Profile => AwsCredentials::Profile {
+                        name: Some(self.aws_profile.trim().to_string()).filter(|n| !n.is_empty()),
+                    },
+                    AwsCredsKind::Sso => AwsCredentials::Sso {
+                        start_url: self.sso_start_url.trim().to_string(),
+                        sso_region: self.sso_region.trim().to_string(),
+                        account_id: self.sso_account.trim().to_string(),
+                        role_name: self.sso_role.trim().to_string(),
+                    },
+                },
+            }),
+        }
     }
 
     /// Zera os buffers de segredo (chamado ao fechar o diálogo e no `Drop`).
@@ -270,7 +346,12 @@ impl ProfileForm {
         profile.tags = parse_tags(&self.tags);
         profile.favorite = self.favorite;
         profile.environment = self.environment;
-        profile.jump = self.jump;
+        profile.transport = self.build_transport();
+        // SSM é sempre o primeiro salto: a linha de jump host fica oculta e não vale.
+        profile.jump = match self.transport {
+            TransportKind::Direct => self.jump,
+            TransportKind::AwsSsm => None,
+        };
         profile.theme = self.theme.clone();
         profile.keepalive_secs = keepalive;
         profile.connect_timeout_secs = timeout;
@@ -538,6 +619,56 @@ mod tests {
         p.agent_forwarding = true;
         let d = ProfileForm::from_profile(&p).build(&[]).unwrap();
         assert_eq!(d.profile, p);
+    }
+
+    #[test]
+    fn ssm_perfil_aws_e_sso_ida_e_volta() {
+        let mut f = filled();
+        f.host = "i-0123456789abcdef0".into();
+        f.jump = Some(ProfileId::new());
+        f.transport = TransportKind::AwsSsm;
+        f.aws_profile = " prod ".into();
+        let d = f.build(&[]).unwrap();
+        assert_eq!(d.profile.jump, None);
+        assert_eq!(
+            d.profile.transport,
+            Transport::AwsSsm(AwsSsm {
+                region: String::new(),
+                credentials: AwsCredentials::Profile {
+                    name: Some("prod".into())
+                },
+            })
+        );
+        assert_eq!(
+            ProfileForm::from_profile(&d.profile)
+                .build(&[])
+                .unwrap()
+                .profile,
+            d.profile
+        );
+
+        f.aws_creds = AwsCredsKind::Sso;
+        f.aws_region = "sa-east-1".into();
+        f.sso_start_url = "https://d-1.awsapps.com/start".into();
+        f.sso_region = "us-east-1".into();
+        f.sso_account = "123456789012".into();
+        f.sso_role = "Admin".into();
+        let d = f.build(&[]).unwrap();
+        assert_eq!(
+            ProfileForm::from_profile(&d.profile)
+                .build(&[])
+                .unwrap()
+                .profile,
+            d.profile
+        );
+        f.sso_account = "12".into();
+        assert_eq!(
+            f.build(&[]).unwrap_err(),
+            FormError::Profile(ProfileError::InvalidAwsAccount)
+        );
+        // voltar para direto mantém o jump escolhido
+        f.transport = TransportKind::Direct;
+        assert!(f.build(&[]).unwrap().profile.jump.is_some());
     }
 
     #[test]

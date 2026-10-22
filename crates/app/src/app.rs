@@ -67,6 +67,8 @@ pub struct ProfileDialog {
     pub error: Option<String>,
     pub saving: bool,
     pub issue: Option<VaultIssue>,
+    /// Perfis de `~/.aws` (para o transporte SSM), lidos ao abrir o diálogo.
+    pub aws_profiles: Vec<String>,
 }
 
 impl ProfileDialog {
@@ -76,6 +78,8 @@ impl ProfileDialog {
             error: None,
             saving: false,
             issue: None,
+            // Dois arquivos pequenos de texto; só nomes de seção são lidos.
+            aws_profiles: myssh_aws::list_profiles(),
         }
     }
 }

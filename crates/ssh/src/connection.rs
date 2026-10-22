@@ -101,8 +101,30 @@ pub struct Hop {
     pub connect_timeout: Duration,
 }
 
+/// Stream bidirecional devolvido por um [`Tunnel`].
+pub trait TunnelIo: AsyncRead + AsyncWrite + Unpin + Send {}
+impl<T: AsyncRead + AsyncWrite + Unpin + Send> TunnelIo for T {}
+
+/// Futuro devolvido por [`Tunnel::open`].
+pub type TunnelOpen<'a> =
+    std::pin::Pin<Box<dyn Future<Output = Result<Box<dyn TunnelIo>, String>> + Send + 'a>>;
+
+/// Transporte do **primeiro** servidor da cadeia no lugar do TCP direto (ex.: túnel AWS SSM).
+/// O SSH roda por dentro, ponta a ponta: host key e autenticação seguem iguais. Chamado de novo a
+/// cada conexão (inclusive reconexão). Erros são mensagens já sanitizadas e traduzidas.
+pub trait Tunnel: Send + Sync {
+    fn open(&self) -> TunnelOpen<'_>;
+}
+
+impl std::fmt::Debug for dyn Tunnel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("Tunnel")
+    }
+}
+
 /// O que [`Connection::connect`] usa de um [`crate::ConnectRequest`]: `endpoint`, `username`, `auth`,
-/// `connect_timeout`, `keepalive` e `jumps`. (`pty`/`term` só valem em [`Connection::open_shell`].)
+/// `connect_timeout`, `keepalive`, `jumps` e `tunnel`. (`pty`/`term` só valem em
+/// [`Connection::open_shell`].)
 pub(crate) struct Target<'a> {
     pub endpoint: &'a HostEndpoint,
     pub username: &'a str,
@@ -110,6 +132,7 @@ pub(crate) struct Target<'a> {
     pub connect_timeout: Duration,
     pub keepalive: Option<Duration>,
     pub jumps: &'a [Hop],
+    pub tunnel: Option<&'a Arc<dyn Tunnel>>,
 }
 
 /// Destino dos eventos de uma conexão/sessão (canal limitado: backpressure).
@@ -742,6 +765,7 @@ impl Connection {
                 connect_timeout: req.connect_timeout,
                 keepalive: req.keepalive,
                 jumps: &req.jumps,
+                tunnel: req.tunnel.as_ref(),
             },
             trust,
             emit,
@@ -796,6 +820,25 @@ impl Connection {
             let nopause = AtomicBool::new(false);
             let timeout = || error::at_hop(hop, error::TIMEOUT().to_string());
             let handle = match chain.last() {
+                None if t.tunnel.is_some() => {
+                    let tunnel = t.tunnel.expect("checado acima");
+                    let stream = with_budget(tunnel.open(), &mut budget, &nopause)
+                        .await
+                        .map_err(|_| timeout())?
+                        .map_err(|m| error::at_hop(hop, m))?;
+                    handshake_and_auth(
+                        stream,
+                        endpoint,
+                        hop,
+                        username,
+                        auth,
+                        t.keepalive,
+                        &mut budget,
+                        trust,
+                        emit,
+                    )
+                    .await?
+                }
                 None => {
                     let stream = with_budget(
                         TcpStream::connect((endpoint.host.as_str(), endpoint.port)),
@@ -1101,6 +1144,7 @@ mod tests {
                 auth: AuthMaterial::Password(SecretString::from("b".to_string())),
                 connect_timeout: Duration::from_secs(1),
             }],
+            tunnel: None,
         };
         req.scrub_credentials();
         assert!(!req.auth.holds_secret() && !req.jumps[0].auth.holds_secret());
@@ -1218,6 +1262,7 @@ mod tests {
                 connect_timeout: Duration::from_secs(1),
                 keepalive: None,
                 jumps: &jumps,
+                tunnel: None,
             },
             &trust,
             &emit,

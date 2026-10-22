@@ -111,6 +111,7 @@ fn request(ep: HostEndpoint, auth: AuthMaterial) -> ConnectRequest {
         connect_timeout: Duration::from_secs(10),
         keepalive: Some(Duration::from_secs(15)),
         jumps: vec![],
+        tunnel: None,
     }
 }
 

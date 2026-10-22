@@ -10,7 +10,7 @@ use russh::ChannelMsg;
 use secrecy::SecretString;
 use tokio::sync::{mpsc, oneshot};
 
-use crate::connection::{AuthMaterial, Connection, EventSink, Hop};
+use crate::connection::{AuthMaterial, Connection, EventSink, Hop, Tunnel};
 use crate::error;
 use crate::{CMD_CHANNEL_CAP, EVENT_CHANNEL_CAP, MAX_DATA_BATCH};
 
@@ -37,6 +37,9 @@ pub struct ConnectRequest {
     /// Jump hosts em ordem (o primeiro é alcançado direto; cada um alcança o seguinte; o último
     /// alcança o destino). Vazio = conexão direta. Cada salto tem timeout, host key e credenciais próprios.
     pub jumps: Vec<Hop>,
+    /// Transporte do primeiro servidor da cadeia (o primeiro jump host, ou o destino sem jumps) no
+    /// lugar do TCP direto. `None` = TCP.
+    pub tunnel: Option<Arc<dyn Tunnel>>,
 }
 
 impl ConnectRequest {

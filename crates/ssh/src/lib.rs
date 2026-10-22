@@ -29,7 +29,8 @@ mod session;
 mod trust;
 
 pub use connection::{
-    AuthMaterial, Connection, EventSink, Hop, Sftp, ShellChannel, key_requires_passphrase,
+    AuthMaterial, Connection, EventSink, Hop, Sftp, ShellChannel, Tunnel, TunnelIo, TunnelOpen,
+    key_requires_passphrase,
 };
 pub use error::{AUTH_CANCELLED, AUTH_REJECTED, KEY_DECODE, is_connection_lost_message};
 pub use sanitize::sanitize_text;

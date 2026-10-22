@@ -81,6 +81,7 @@ fn start(rt: &tokio::runtime::Runtime, trust: Arc<Store>) -> TermSession {
         connect_timeout: Duration::from_secs(10),
         keepalive: Some(Duration::from_secs(15)),
         jumps: vec![],
+        tunnel: None,
     };
     let handle = spawn(rt.handle(), req, trust, Arc::new(|| {}));
     TermSession::new(handle, 80, 24)

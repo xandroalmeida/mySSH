@@ -100,6 +100,7 @@ impl App {
             connect_timeout: Duration::from_secs(15),
             keepalive: Some(Duration::from_secs(30)),
             jumps: vec![],
+            tunnel: None,
         };
         let handle = spawn(
             rt.handle(),

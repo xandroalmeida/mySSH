@@ -3,7 +3,7 @@
 use crate::error::{Result, StoreError};
 use myssh_core::{
     AuthMethod, Credential, CredentialId, CredentialKind, Environment, FolderId, Profile,
-    ProfileId, SecretRef, ThemeOverride,
+    ProfileId, SecretRef, ThemeOverride, Transport,
 };
 use rusqlite::{Connection, OptionalExtension, Row, params};
 use std::collections::HashSet;
@@ -109,6 +109,7 @@ pub(crate) fn save_profile(conn: &Connection, p: &Profile, mode: WriteMode) -> R
     let (cred, pass) = auth_refs(&p.auth);
     let auth_json = serde_json::to_string(&p.auth)?;
     let theme_json = serde_json::to_string(&p.theme)?;
+    let transport_json = serde_json::to_string(&p.transport)?;
     let args = params![
         p.id.to_string(),
         p.name.trim(),
@@ -126,14 +127,15 @@ pub(crate) fn save_profile(conn: &Connection, p: &Profile, mode: WriteMode) -> R
         p.agent_forwarding,
         p.keepalive_secs,
         p.connect_timeout_secs,
+        transport_json,
     ];
     match mode {
         WriteMode::Insert => {
             conn.execute(
                 "INSERT INTO profiles (id, name, host, port, username, auth_json, credential_id, \
                  passphrase_id, folder_id, favorite, environment, theme_json, jump_id, \
-                 agent_forwarding, keepalive_secs, connect_timeout_secs) \
-                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                 agent_forwarding, keepalive_secs, connect_timeout_secs, transport_json) \
+                 VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17)",
                 args,
             )?;
         }
@@ -142,7 +144,7 @@ pub(crate) fn save_profile(conn: &Connection, p: &Profile, mode: WriteMode) -> R
                 "UPDATE profiles SET name=?2, host=?3, port=?4, username=?5, auth_json=?6, \
                  credential_id=?7, passphrase_id=?8, folder_id=?9, favorite=?10, environment=?11, \
                  theme_json=?12, jump_id=?13, agent_forwarding=?14, keepalive_secs=?15, \
-                 connect_timeout_secs=?16 WHERE id=?1",
+                 connect_timeout_secs=?16, transport_json=?17 WHERE id=?1",
                 args,
             )?;
             if n == 0 {
@@ -164,7 +166,8 @@ pub(crate) fn save_profile(conn: &Connection, p: &Profile, mode: WriteMode) -> R
 }
 
 const PROFILE_COLS: &str = "id, name, host, port, username, auth_json, folder_id, favorite, \
-     environment, theme_json, jump_id, agent_forwarding, keepalive_secs, connect_timeout_secs";
+     environment, theme_json, jump_id, agent_forwarding, keepalive_secs, connect_timeout_secs, \
+     transport_json";
 
 struct RawProfile {
     id: String,
@@ -181,6 +184,7 @@ struct RawProfile {
     agent_forwarding: bool,
     keepalive_secs: Option<u32>,
     connect_timeout_secs: u32,
+    transport_json: String,
 }
 
 fn raw_profile(r: &Row<'_>) -> rusqlite::Result<RawProfile> {
@@ -199,6 +203,7 @@ fn raw_profile(r: &Row<'_>) -> rusqlite::Result<RawProfile> {
         agent_forwarding: r.get(11)?,
         keepalive_secs: r.get(12)?,
         connect_timeout_secs: r.get(13)?,
+        transport_json: r.get(14)?,
     })
 }
 
@@ -235,6 +240,7 @@ fn build_profile(conn: &Connection, raw: RawProfile) -> Result<Profile> {
         agent_forwarding: raw.agent_forwarding,
         keepalive_secs: raw.keepalive_secs,
         connect_timeout_secs: raw.connect_timeout_secs,
+        transport: serde_json::from_str::<Transport>(&raw.transport_json)?,
     })
 }
 
