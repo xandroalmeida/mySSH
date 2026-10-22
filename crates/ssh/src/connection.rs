@@ -52,9 +52,33 @@ pub enum AuthMaterial {
     /// keyboard-interactive (MFA): cada pedido do servidor vira um [`SessionEvent::AuthPrompt`].
     /// As respostas nunca são persistidas nem registradas.
     KeyboardInteractive,
+    /// Chave efêmera só em memória (ver [`AuthMaterial::ephemeral`]); zerada ao cair.
+    EphemeralKey(Arc<russh::keys::PrivateKey>),
 }
 
 impl AuthMaterial {
+    /// Gera uma chave ed25519 nova, só em memória. Devolve o material e a chave pública no formato
+    /// OpenSSH (para publicar no servidor, ex.: EC2 Instance Connect).
+    pub fn ephemeral() -> Result<(Self, String), String> {
+        let mut seed = Zeroizing::new([0u8; 32]);
+        getrandom::fill(&mut seed[..]).map_err(|_| error::KEYGEN().to_string())?;
+        let pair = russh::keys::ssh_key::private::Ed25519Keypair::from_seed(&seed);
+        let key = russh::keys::PrivateKey::from(pair);
+        let public = key
+            .public_key()
+            .to_openssh()
+            .map_err(|_| error::KEYGEN().to_string())?;
+        Ok((AuthMaterial::EphemeralKey(Arc::new(key)), public))
+    }
+
+    /// Chave pública OpenSSH de um [`AuthMaterial::EphemeralKey`].
+    pub fn ephemeral_public(&self) -> Option<String> {
+        match self {
+            AuthMaterial::EphemeralKey(k) => k.public_key().to_openssh().ok(),
+            _ => None,
+        }
+    }
+
     /// Descarta a credencial (os `SecretString` se zeram ao cair) e deixa `Agent`, que não carrega
     /// segredo. Usado logo depois de a autenticação concluir.
     pub(crate) fn scrub(&mut self) {
@@ -67,6 +91,7 @@ impl AuthMaterial {
         matches!(
             self,
             AuthMaterial::Password(_)
+                | AuthMaterial::EphemeralKey(_)
                 | AuthMaterial::KeyFile {
                     passphrase: Some(_),
                     ..
@@ -86,6 +111,7 @@ impl std::fmt::Debug for AuthMaterial {
                 .finish(),
             AuthMaterial::Agent => f.write_str("Agent"),
             AuthMaterial::KeyboardInteractive => f.write_str("KeyboardInteractive"),
+            AuthMaterial::EphemeralKey(_) => f.write_str("EphemeralKey([REDACTED])"),
         }
     }
 }
@@ -622,6 +648,16 @@ async fn authenticate(
                 .await
                 .map_err(to_err)?
         }
+        AuthMaterial::EphemeralKey(key) => {
+            let hash = rsa_hash(session, &key.algorithm()).await;
+            session
+                .authenticate_publickey(
+                    user.to_string(),
+                    PrivateKeyWithHashAlg::new(key.clone(), hash),
+                )
+                .await
+                .map_err(to_err)?
+        }
         AuthMaterial::Agent => authenticate_agent(session, user).await?,
         AuthMaterial::KeyboardInteractive => {
             return match keyboard_interactive(session, user, ctx, KiMode::Interactive).await? {
@@ -1148,6 +1184,19 @@ mod tests {
         };
         req.scrub_credentials();
         assert!(!req.auth.holds_secret() && !req.jumps[0].auth.holds_secret());
+    }
+
+    #[test]
+    fn chave_efemera_nova_a_cada_vez_e_sem_vazar_no_debug() {
+        let (mut a, pa) = AuthMaterial::ephemeral().unwrap();
+        let (_, pb) = AuthMaterial::ephemeral().unwrap();
+        assert!(pa.starts_with("ssh-ed25519 "));
+        assert_ne!(pa, pb);
+        assert_eq!(a.ephemeral_public().as_deref(), Some(pa.as_str()));
+        assert_eq!(format!("{a:?}"), "EphemeralKey([REDACTED])");
+        assert!(a.holds_secret());
+        a.scrub();
+        assert!(!a.holds_secret() && a.ephemeral_public().is_none());
     }
 
     #[test]

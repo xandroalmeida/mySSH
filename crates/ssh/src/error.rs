@@ -7,6 +7,13 @@ use std::io;
 
 use myssh_i18n::tr;
 
+pub(crate) fn KEYGEN() -> &'static str {
+    tr!(
+        "Falha ao gerar a chave temporária.",
+        "Failed to generate the temporary key.",
+        "No se pudo generar la clave temporal."
+    )
+}
 pub(crate) fn TIMEOUT() -> &'static str {
     tr!(
         "Tempo esgotado ao conectar.",

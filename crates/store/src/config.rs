@@ -43,6 +43,7 @@ pub enum ExportAuth {
     },
     Agent,
     KeyboardInteractive,
+    Ec2InstanceConnect,
 }
 
 impl From<&AuthMethod> for ExportAuth {
@@ -52,6 +53,7 @@ impl From<&AuthMethod> for ExportAuth {
             AuthMethod::KeyFile { path, .. } => ExportAuth::KeyFile { path: path.clone() },
             AuthMethod::Agent => ExportAuth::Agent,
             AuthMethod::KeyboardInteractive => ExportAuth::KeyboardInteractive,
+            AuthMethod::Ec2InstanceConnect => ExportAuth::Ec2InstanceConnect,
         }
     }
 }
@@ -66,6 +68,7 @@ impl From<ExportAuth> for AuthMethod {
             },
             ExportAuth::Agent => AuthMethod::Agent,
             ExportAuth::KeyboardInteractive => AuthMethod::KeyboardInteractive,
+            ExportAuth::Ec2InstanceConnect => AuthMethod::Ec2InstanceConnect,
         }
     }
 }

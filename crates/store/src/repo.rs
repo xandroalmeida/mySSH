@@ -65,7 +65,9 @@ fn auth_refs(auth: &AuthMethod) -> (Option<CredentialId>, Option<CredentialId>) 
     match auth {
         AuthMethod::Password { credential } => (*credential, None),
         AuthMethod::KeyFile { passphrase, .. } => (None, *passphrase),
-        AuthMethod::Agent | AuthMethod::KeyboardInteractive => (None, None),
+        AuthMethod::Agent | AuthMethod::KeyboardInteractive | AuthMethod::Ec2InstanceConnect => {
+            (None, None)
+        }
     }
 }
 

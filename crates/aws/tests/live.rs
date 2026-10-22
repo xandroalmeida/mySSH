@@ -1,9 +1,10 @@
 //! Testes contra a AWS de verdade (ignorados por padrão).
 //!
-//! SSM: `MYSSH_TEST_SSM_TARGET` (instância), `MYSSH_TEST_SSM_REGION`, `MYSSH_TEST_SSM_USER`,
-//! `MYSSH_TEST_SSM_KEY` (chave privada sem passphrase, ex.: enviada pelo EC2 Instance Connect) e
-//! `MYSSH_TEST_SSM_HOSTKEY` (fingerprint SHA256 esperado, obtido por outro canal). Opcional:
-//! `MYSSH_TEST_SSM_PROFILE` (perfil AWS). Credenciais pela cadeia padrão do `aws-config`.
+//! SSM: `MYSSH_TEST_SSM_TARGET` (instância EC2 `i-…` com SSM Agent e ec2-instance-connect),
+//! `MYSSH_TEST_SSM_REGION`, `MYSSH_TEST_SSM_USER` e `MYSSH_TEST_SSM_HOSTKEY` (fingerprint SHA256
+//! esperado, obtido por outro canal). Autentica com chave efêmera pelo EC2 Instance Connect: nada
+//! a preparar no servidor. Opcional: `MYSSH_TEST_SSM_PROFILE` (perfil AWS). Credenciais pela
+//! cadeia padrão do `aws-config`.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,7 +45,7 @@ fn env(k: &str) -> String {
 
 #[test]
 #[ignore = "precisa de AWS + instância com SSM (ver cabeçalho)"]
-fn shell_via_ssm_com_perfil_aws() {
+fn shell_via_ssm_com_instance_connect() {
     let rt = tokio::runtime::Runtime::new().unwrap();
     let target = env("MYSSH_TEST_SSM_TARGET");
     let ssm = AwsSsm {
@@ -54,14 +55,16 @@ fn shell_via_ssm_com_perfil_aws() {
         },
     };
     let vault = Arc::new(Vault::new(Arc::new(MemoryStore::new())));
-    let tunnel = Arc::new(myssh_aws::SsmTunnel::new(&target, 22, ssm, vault));
+    let user = env("MYSSH_TEST_SSM_USER");
+    let (auth, public) = AuthMaterial::ephemeral().unwrap();
+    let tunnel = Arc::new(
+        myssh_aws::SsmTunnel::new(&target, 22, ssm, vault)
+            .with_instance_connect(user.clone(), public),
+    );
     let req = ConnectRequest {
         endpoint: HostEndpoint::new(&target, 22),
-        username: env("MYSSH_TEST_SSM_USER"),
-        auth: AuthMaterial::KeyFile {
-            path: env("MYSSH_TEST_SSM_KEY").into(),
-            passphrase: None,
-        },
+        username: user,
+        auth,
         pty: PtySize {
             cols: 80,
             rows: 24,

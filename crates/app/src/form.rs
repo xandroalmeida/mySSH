@@ -17,6 +17,8 @@ pub enum AuthKind {
     Key,
     Agent,
     KeyboardInteractive,
+    /// Chave efêmera publicada pelo EC2 Instance Connect (só com AWS SSM).
+    InstanceConnect,
 }
 
 /// Como chegar ao servidor.
@@ -214,6 +216,7 @@ impl ProfileForm {
             }
             AuthMethod::Agent => f.auth = AuthKind::Agent,
             AuthMethod::KeyboardInteractive => f.auth = AuthKind::KeyboardInteractive,
+            AuthMethod::Ec2InstanceConnect => f.auth = AuthKind::InstanceConnect,
         }
         f.folder = p.folder;
         f.tags = p.tags.join(", ");
@@ -332,6 +335,7 @@ impl ProfileForm {
             }
             AuthKind::Agent => AuthMethod::Agent,
             AuthKind::KeyboardInteractive => AuthMethod::KeyboardInteractive,
+            AuthKind::InstanceConnect => AuthMethod::Ec2InstanceConnect,
         };
 
         let mut profile = match &self.existing {
@@ -669,6 +673,29 @@ mod tests {
         // voltar para direto mantém o jump escolhido
         f.transport = TransportKind::Direct;
         assert!(f.build(&[]).unwrap().profile.jump.is_some());
+    }
+
+    #[test]
+    fn instance_connect_ida_e_volta_e_exige_ssm() {
+        let mut f = filled();
+        f.host = "i-0123456789abcdef0".into();
+        f.transport = TransportKind::AwsSsm;
+        f.auth = AuthKind::InstanceConnect;
+        let d = f.build(&[]).unwrap();
+        assert_eq!(d.profile.auth, AuthMethod::Ec2InstanceConnect);
+        assert!(d.new_secret.is_none());
+        assert_eq!(
+            ProfileForm::from_profile(&d.profile)
+                .build(&[])
+                .unwrap()
+                .profile,
+            d.profile
+        );
+        f.transport = TransportKind::Direct;
+        assert_eq!(
+            f.build(&[]).unwrap_err(),
+            FormError::Profile(ProfileError::InstanceConnectNeedsSsm)
+        );
     }
 
     #[test]

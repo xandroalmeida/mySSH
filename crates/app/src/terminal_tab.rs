@@ -381,6 +381,11 @@ impl TerminalTab {
             self.phase = Phase::Failed(i18n::ERR_INTERNAL().into());
             return;
         };
+        // Chave efêmera do primeiro servidor da cadeia (o destino, se não há jump hosts).
+        let root_key = match mats.first() {
+            Some(m) => m.as_ref().and_then(AuthMaterial::ephemeral_public),
+            None => auth.ephemeral_public(),
+        };
         let mut jumps = Vec::with_capacity(self.hops.len());
         for (h, m) in self.hops.iter().zip(mats) {
             let Some(auth) = m else {
@@ -396,16 +401,23 @@ impl TerminalTab {
                 )),
             });
         }
-        // O primeiro servidor da cadeia pode estar atrás de um túnel AWS SSM.
+        // O primeiro servidor da cadeia pode estar atrás de um túnel AWS SSM (que também publica a
+        // chave efêmera do EC2 Instance Connect antes do SSH).
         let root = self.hops.first().unwrap_or(&self.profile);
         let tunnel: Option<Arc<dyn Tunnel>> = match &root.transport {
             Transport::Direct => None,
-            Transport::AwsSsm(ssm) => Some(Arc::new(myssh_aws::SsmTunnel::new(
-                root.host.clone(),
-                root.port,
-                ssm.clone(),
-                env.vault.clone(),
-            ))),
+            Transport::AwsSsm(ssm) => {
+                let mut t = myssh_aws::SsmTunnel::new(
+                    root.host.clone(),
+                    root.port,
+                    ssm.clone(),
+                    env.vault.clone(),
+                );
+                if let Some(pk) = root_key {
+                    t = t.with_instance_connect(root.username.clone(), pk);
+                }
+                Some(Arc::new(t))
+            }
         };
         let p = &self.profile;
         // Reconexão: o PTY nasce com o tamanho atual do terminal mantido.
@@ -1504,6 +1516,7 @@ fn auth_text(a: &AuthMethod) -> &'static str {
         AuthMethod::KeyFile { .. } => i18n::AUTH_SUMMARY_KEY(),
         AuthMethod::Agent => i18n::AUTH_SUMMARY_AGENT(),
         AuthMethod::KeyboardInteractive => i18n::AUTH_SUMMARY_KI(),
+        AuthMethod::Ec2InstanceConnect => i18n::AUTH_SUMMARY_EIC(),
     }
 }
 
@@ -1725,6 +1738,11 @@ fn resolve(store: &Store, vault: &Vault, auth: &AuthMethod, force: bool) -> Reso
         }
         AuthMethod::Agent => Resolved::Ready(AuthMaterial::Agent),
         AuthMethod::KeyboardInteractive => Resolved::Ready(AuthMaterial::KeyboardInteractive),
+        // Chave nova a cada conexão; a pública é publicada pelo túnel SSM (EC2 Instance Connect).
+        AuthMethod::Ec2InstanceConnect => match AuthMaterial::ephemeral() {
+            Ok((m, _)) => Resolved::Ready(m),
+            Err(e) => Resolved::Failed(e),
+        },
     }
 }
 

@@ -333,7 +333,17 @@ impl App {
                 ui.label(i18n::F_CONNECTION());
                 ui.horizontal_wrapped(|ui| {
                     ui.radio_value(&mut f.transport, TransportKind::Direct, i18n::CONN_DIRECT());
-                    ui.radio_value(&mut f.transport, TransportKind::AwsSsm, i18n::CONN_SSM());
+                    let to_ssm = ui
+                        .radio_value(&mut f.transport, TransportKind::AwsSsm, i18n::CONN_SSM())
+                        .clicked();
+                    // Perfil novo ainda com a autenticação padrão: sugere a chave efêmera.
+                    if to_ssm
+                        && f.existing.is_none()
+                        && f.auth == AuthKind::Password
+                        && f.password_mode == SecretMode::Ask
+                    {
+                        f.auth = AuthKind::InstanceConnect;
+                    }
                 });
                 ui.end_row();
 
@@ -367,6 +377,9 @@ impl App {
                     ui.radio_value(&mut f.auth, AuthKind::Key, i18n::AUTH_KEY());
                     ui.radio_value(&mut f.auth, AuthKind::Agent, i18n::AUTH_AGENT());
                     ui.radio_value(&mut f.auth, AuthKind::KeyboardInteractive, i18n::AUTH_KI());
+                    if ssm || f.auth == AuthKind::InstanceConnect {
+                        ui.radio_value(&mut f.auth, AuthKind::InstanceConnect, i18n::AUTH_EIC());
+                    }
                 });
                 ui.end_row();
 
@@ -448,6 +461,11 @@ impl App {
                     AuthKind::KeyboardInteractive => {
                         ui.label("");
                         ui.weak(i18n::KI_HELP());
+                        ui.end_row();
+                    }
+                    AuthKind::InstanceConnect => {
+                        ui.label("");
+                        ui.weak(i18n::AUTH_EIC_HELP());
                         ui.end_row();
                     }
                 }

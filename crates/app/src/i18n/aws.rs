@@ -117,3 +117,20 @@ pub fn SSO_COPY_LINK() -> &'static str {
 pub fn SSM_LABEL() -> &'static str {
     "AWS SSM"
 }
+pub fn AUTH_EIC() -> &'static str {
+    "EC2 Instance Connect"
+}
+pub fn AUTH_EIC_HELP() -> &'static str {
+    tr!(
+        "A cada conexão o app gera uma chave temporária em memória e a publica na instância por 60 s pela API da AWS. Nada é gravado no servidor. Requer ec2-instance-connect na instância (Ubuntu e Amazon Linux já trazem) e a permissão ec2-instance-connect:SendSSHPublicKey.",
+        "On each connection the app generates a temporary in-memory key and publishes it to the instance for 60 s through the AWS API. Nothing is written on the server. Requires ec2-instance-connect on the instance (Ubuntu and Amazon Linux include it) and the ec2-instance-connect:SendSSHPublicKey permission.",
+        "En cada conexión la app genera una clave temporal en memoria y la publica en la instancia por 60 s mediante la API de AWS. No se escribe nada en el servidor. Requiere ec2-instance-connect en la instancia (Ubuntu y Amazon Linux lo incluyen) y el permiso ec2-instance-connect:SendSSHPublicKey."
+    )
+}
+pub fn AUTH_SUMMARY_EIC() -> &'static str {
+    tr!(
+        "EC2 Instance Connect (chave temporária)",
+        "EC2 Instance Connect (temporary key)",
+        "EC2 Instance Connect (clave temporal)"
+    )
+}

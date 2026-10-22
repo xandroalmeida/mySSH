@@ -66,6 +66,10 @@ pub enum AuthMethod {
     Agent,
     /// keyboard-interactive (MFA); respostas nunca persistidas.
     KeyboardInteractive,
+    /// Chave ed25519 efêmera gerada em memória a cada conexão e publicada por 60 s na instância
+    /// pela API EC2 Instance Connect (nada é gravado no servidor). Só com [`Transport::AwsSsm`]
+    /// em instância EC2 (`i-…`).
+    Ec2InstanceConnect,
 }
 
 /// Credencial reutilizável entre perfis. Metadados apenas.
@@ -196,6 +200,11 @@ impl Profile {
         if self.jump == Some(self.id) {
             return Err(ProfileError::JumpLoop);
         }
+        if self.auth == AuthMethod::Ec2InstanceConnect
+            && !(matches!(self.transport, Transport::AwsSsm(_)) && self.host.starts_with("i-"))
+        {
+            return Err(ProfileError::InstanceConnectNeedsSsm);
+        }
         if let Transport::AwsSsm(ssm) = &self.transport {
             if self.jump.is_some() {
                 return Err(ProfileError::SsmWithJump);
@@ -277,6 +286,8 @@ pub enum ProfileError {
     InvalidAwsAccount,
     #[error("{}", myssh_i18n::tr!("Nome de role inválido.", "Invalid role name.", "Nombre de rol no válido."))]
     InvalidAwsRole,
+    #[error("{}", myssh_i18n::tr!("EC2 Instance Connect exige conexão AWS SSM com uma instância EC2 (i-…).", "EC2 Instance Connect requires an AWS SSM connection to an EC2 instance (i-…).", "EC2 Instance Connect requiere conexión AWS SSM con una instancia EC2 (i-…)."))]
+    InstanceConnectNeedsSsm,
 }
 
 /// Estados explícitos de uma sessão.
@@ -362,6 +373,18 @@ mod transport_tests {
             *start_url = "http://x".into();
         }
         assert_eq!(p.validate(), Err(ProfileError::InvalidSsoUrl));
+    }
+
+    #[test]
+    fn instance_connect_so_com_ssm_em_ec2() {
+        let mut p = ssm(AwsCredentials::Profile { name: None }, "");
+        p.auth = AuthMethod::Ec2InstanceConnect;
+        assert_eq!(p.validate(), Ok(()));
+        p.host = "mi-0123456789abcdef0".into();
+        assert_eq!(p.validate(), Err(ProfileError::InstanceConnectNeedsSsm));
+        let mut d = Profile::new("a", "i-0123456789abcdef0", "u");
+        d.auth = AuthMethod::Ec2InstanceConnect;
+        assert_eq!(d.validate(), Err(ProfileError::InstanceConnectNeedsSsm));
     }
 
     #[test]

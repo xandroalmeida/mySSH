@@ -246,7 +246,9 @@ pub fn credential_ids(auth: &AuthMethod) -> Vec<CredentialId> {
     match auth {
         AuthMethod::Password { credential } => credential.iter().copied().collect(),
         AuthMethod::KeyFile { passphrase, .. } => passphrase.iter().copied().collect(),
-        AuthMethod::Agent | AuthMethod::KeyboardInteractive => Vec::new(),
+        AuthMethod::Agent | AuthMethod::KeyboardInteractive | AuthMethod::Ec2InstanceConnect => {
+            Vec::new()
+        }
     }
 }
 

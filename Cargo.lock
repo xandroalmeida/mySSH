@@ -625,6 +625,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-ec2instanceconnect"
+version = "1.117.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7613b3df1480da9d9b2294a6e0baf0e36fe129aec492a3fb556542c1799afb4"
+dependencies = [
+ "arc-swap",
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-observability",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-schema",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 1.5.0",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-signin"
 version = "1.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3678,6 +3703,7 @@ version = "0.2.1"
 dependencies = [
  "anyhow",
  "aws-config",
+ "aws-sdk-ec2instanceconnect",
  "aws-sdk-ssm",
  "aws-sdk-sso",
  "aws-sdk-ssooidc",
@@ -3740,6 +3766,7 @@ dependencies = [
 name = "myssh-ssh"
 version = "0.2.1"
 dependencies = [
+ "getrandom 0.4.3",
  "myssh-core",
  "myssh-i18n",
  "myssh-store",

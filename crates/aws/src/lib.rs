@@ -4,7 +4,8 @@
 //! [`SsmTunnel`] implementa [`myssh_ssh::Tunnel`]: `StartSession` com o documento
 //! `AWS-StartSSHSession` e o protocolo do data channel sobre websocket (ack, ordem,
 //! retransmissão, handshake com o agente). O SSH roda por dentro, ponta a ponta: a host key é
-//! verificada normalmente.
+//! verificada normalmente. Opcionalmente publica antes uma chave efêmera pelo EC2 Instance
+//! Connect (válida por 60 s, nada gravado no servidor).
 //!
 //! Credenciais: perfil de `~/.aws` (cadeia do `aws-config`, inclusive `aws login`/SSO do CLI) ou
 //! SSO do app ([`sso`]), com tokens no cofre do SO. Nenhum token/credencial vai para log, erro ou
@@ -63,8 +64,8 @@ where
     myssh_ssh::sanitize_text(&raw, 300, false)
 }
 
-/// Cliente SSM com as credenciais do perfil.
-async fn ssm_client(ssm: &AwsSsm, vault: &Vault) -> Result<aws_sdk_ssm::Client, AwsError> {
+/// Configuração do SDK com a região e as credenciais do perfil.
+async fn sdk_config(ssm: &AwsSsm, vault: &Vault) -> Result<aws_config::SdkConfig, AwsError> {
     let mut loader = aws_config::defaults(BehaviorVersion::latest());
     if !ssm.region.is_empty() {
         loader = loader.region(aws_config::Region::new(ssm.region.clone()));
@@ -90,7 +91,7 @@ async fn ssm_client(ssm: &AwsSsm, vault: &Vault) -> Result<aws_sdk_ssm::Client, 
     if cfg.region().is_none() {
         return Err(AwsError::Failed(text::NO_REGION().into()));
     }
-    Ok(aws_sdk_ssm::Client::new(&cfg))
+    Ok(cfg)
 }
 
 /// Túnel SSM até `port` da instância `target` (`i-…`/`mi-…`).
@@ -99,6 +100,8 @@ pub struct SsmTunnel {
     port: u16,
     ssm: AwsSsm,
     vault: Arc<Vault>,
+    /// (usuário do SO, chave pública OpenSSH) a publicar pelo EC2 Instance Connect.
+    instance_connect: Option<(String, String)>,
 }
 
 impl SsmTunnel {
@@ -108,14 +111,31 @@ impl SsmTunnel {
             port,
             ssm,
             vault,
+            instance_connect: None,
         }
     }
 
+    /// Antes de cada abertura, publica `public_key` para `os_user` na instância (60 s).
+    pub fn with_instance_connect(mut self, os_user: String, public_key: String) -> Self {
+        self.instance_connect = Some((os_user, public_key));
+        self
+    }
+
     async fn open_stream(&self) -> Result<Box<dyn TunnelIo>, String> {
-        let client = ssm_client(&self.ssm, &self.vault)
+        let cfg = sdk_config(&self.ssm, &self.vault)
             .await
             .map_err(|e| e.to_string())?;
-        let out = client
+        if let Some((user, key)) = &self.instance_connect {
+            aws_sdk_ec2instanceconnect::Client::new(&cfg)
+                .send_ssh_public_key()
+                .instance_id(&self.target)
+                .instance_os_user(user)
+                .ssh_public_key(key)
+                .send()
+                .await
+                .map_err(|e| text::aws_error("SendSSHPublicKey", &sdk_detail(&e)))?;
+        }
+        let out = aws_sdk_ssm::Client::new(&cfg)
             .start_session()
             .target(&self.target)
             .document_name("AWS-StartSSHSession")
