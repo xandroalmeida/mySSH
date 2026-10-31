@@ -2,3 +2,4 @@ target/
 .DS_Store
 .claude/*
 !.claude/commands/
+tools/win11-vm/oem/authorized_keys
