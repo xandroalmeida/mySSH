@@ -48,6 +48,8 @@ Yes. mySSH opens the Session Manager tunnel itself, without the AWS CLI or the s
 ## Download
 
 - [mySSH_0.3.0_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/mySSH_0.3.0_aarch64.dmg)
+- [myssh_0.3.0_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_amd64.deb)
+- [myssh_0.3.0_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_x86_64.AppImage)
 - [All releases](https://github.com/xandroalmeida/mySSH/releases)
 
 ## Links
