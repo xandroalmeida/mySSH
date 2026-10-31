@@ -96,11 +96,12 @@ mod tests {
 
     #[test]
     fn origem_diferente_invalida() {
-        let s = Sidecar::new("a.bin", ".a.bin.myssh-part-xyz", 100, t(5, 7));
-        assert!(!s.matches("a.bin", 101, t(5, 7)));
-        assert!(!s.matches("a.bin", 100, t(6, 7)));
-        assert!(!s.matches("a.bin", 100, t(5, 8)));
-        assert!(!s.matches("b.bin", 100, t(5, 7)));
+        // Nanos em múltiplos de 100: o SystemTime do Windows tem resolução de 100 ns.
+        let s = Sidecar::new("a.bin", ".a.bin.myssh-part-xyz", 100, t(5, 700));
+        assert!(!s.matches("a.bin", 101, t(5, 700)));
+        assert!(!s.matches("a.bin", 100, t(6, 700)));
+        assert!(!s.matches("a.bin", 100, t(5, 800)));
+        assert!(!s.matches("b.bin", 100, t(5, 700)));
     }
 
     #[test]
