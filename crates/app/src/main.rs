@@ -1,5 +1,9 @@
 //! mySSH: casca da aplicação desktop (perfis, abas, configurações).
 
+// Windows: no release, sem a janela de console ao lado do app (o debug mantém o console
+// para ver logs). Sem efeito nas outras plataformas.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod about;
 mod app;
 mod config_io;
