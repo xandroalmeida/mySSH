@@ -107,7 +107,10 @@ mod tests {
         v.sort_by(|a, b| a.name.cmp(&b.name));
         let names: Vec<_> = v.iter().map(|e| e.name.as_str()).collect();
         #[cfg(unix)]
-        assert_eq!(names, [".oculto", "a.txt", "ln", "sub"]);
+        let esperado = [".oculto", "a.txt", "ln", "sub"].as_slice();
+        #[cfg(not(unix))]
+        let esperado = [".oculto", "a.txt", "sub"].as_slice();
+        assert_eq!(names, esperado);
         let a = v.iter().find(|e| e.name == "a.txt").unwrap();
         assert_eq!((a.kind, a.size), (Kind::File, 5));
         assert!(a.mtime.is_some());
