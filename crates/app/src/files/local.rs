@@ -145,9 +145,11 @@ mod tests {
     fn pai_e_juncao() {
         assert_eq!(parent("/a/b").as_deref(), Some("/a"));
         assert_eq!(parent("/").as_deref(), None);
+        // `Path::join` preserva o separador já presente em `dir` e usa o nativo só na
+        // junção: no Windows o resultado é `/a\b c`.
         assert_eq!(
             join("/a", "b c"),
-            "/a/b c".replace('/', std::path::MAIN_SEPARATOR_STR)
+            format!("/a{}b c", std::path::MAIN_SEPARATOR)
         );
     }
 }
