@@ -2,7 +2,7 @@
 
 > mySSH is a free, open-source desktop SSH client and session manager for macOS, Linux and Windows, written in Rust. It combines saved connection profiles, a tabbed terminal with split panes, an SFTP file panel and one-way folder sync in a single native app.
 
-Latest version: v0.3.0 (2026-10-22, pre-release). License: MIT or Apache-2.0. Author: Alexandro Almeida. Languages: English, Portuguese (Brazil), Spanish.
+Latest version: v0.3.1 (2026-11-01, pre-release). License: MIT or Apache-2.0. Author: Alexandro Almeida. Languages: English, Portuguese (Brazil), Spanish.
 
 ## Features
 
@@ -47,9 +47,9 @@ Yes. mySSH opens the Session Manager tunnel itself, without the AWS CLI or the s
 
 ## Download
 
-- [mySSH_0.3.0_aarch64.dmg](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/mySSH_0.3.0_aarch64.dmg)
-- [myssh_0.3.0_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_amd64.deb)
-- [myssh_0.3.0_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_x86_64.AppImage)
+- [myssh_0.3.1_amd64.deb](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_amd64.deb)
+- [myssh_0.3.1_x64-setup.exe](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_x64-setup.exe)
+- [myssh_0.3.1_x86_64.AppImage](https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_x86_64.AppImage)
 - [All releases](https://github.com/xandroalmeida/mySSH/releases)
 
 ## Links

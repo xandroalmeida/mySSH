@@ -1,23 +1,23 @@
 {
-  "tag": "v0.3.0",
-  "version": "0.3.0",
-  "date": "2026-10-22",
+  "tag": "v0.3.1",
+  "version": "0.3.1",
+  "date": "2026-11-01",
   "prerelease": true,
   "assets": [
     {
-      "name": "mySSH_0.3.0_aarch64.dmg",
-      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/mySSH_0.3.0_aarch64.dmg",
-      "size": 18173589
+      "name": "myssh_0.3.1_amd64.deb",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_amd64.deb",
+      "size": 22295504
     },
     {
-      "name": "myssh_0.3.0_amd64.deb",
-      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_amd64.deb",
-      "size": 22295536
+      "name": "myssh_0.3.1_x64-setup.exe",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_x64-setup.exe",
+      "size": 12627954
     },
     {
-      "name": "myssh_0.3.0_x86_64.AppImage",
-      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.0/myssh_0.3.0_x86_64.AppImage",
-      "size": 21031416
+      "name": "myssh_0.3.1_x86_64.AppImage",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.3.1/myssh_0.3.1_x86_64.AppImage",
+      "size": 21002744
     }
   ]
 }
