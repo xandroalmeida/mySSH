@@ -328,6 +328,43 @@ mod tests {
     }
 
     #[test]
+    fn icones_do_console_existem_na_fonte_da_interface() {
+        let mut console = LocalConsole::new("Local".into(), Shell::from_path(test_shell()));
+        let (cmd_tx, _cmd_rx) = tokio::sync::mpsc::channel(4);
+        let (evt_tx, evt_rx) = tokio::sync::mpsc::channel(4);
+        console.sess = Some(TermSession::new(
+            myssh_ssh::SessionHandle::new(cmd_tx, evt_rx),
+            80,
+            24,
+        ));
+        let mut icons = vec![console.status().unwrap().icon];
+        evt_tx
+            .try_send(myssh_ssh::SessionEvent::State(
+                myssh_core::SessionState::Connected,
+            ))
+            .unwrap();
+        console.drain();
+        icons.push(console.status().unwrap().icon);
+        evt_tx
+            .try_send(myssh_ssh::SessionEvent::Closed { error: None })
+            .unwrap();
+        console.drain();
+        icons.push(console.status().unwrap().icon);
+        let ctx = egui::Context::default();
+        myssh_term::fonts::install(&ctx);
+        let mut out = ctx.run_ui(Default::default(), |ui| {
+            let font = egui::TextStyle::Button.resolve(ui.style());
+            for icon in &icons {
+                assert!(
+                    ui.fonts_mut(|f| f.has_glyphs(&font, icon)),
+                    "ícone sem glifo na fonte da interface: {icon}"
+                );
+            }
+        });
+        out.textures_delta.clear();
+    }
+
+    #[test]
     fn console_e_criado_editado_duplicado_e_aberto_como_perfil() {
         let mut h = harness(memory_app());
         h.run_steps(2);

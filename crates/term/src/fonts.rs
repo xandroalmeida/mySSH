@@ -11,14 +11,21 @@ pub const MONO_FONT: &str = "cascadia-mono-pl";
 const MONO_TTF: &[u8] = include_bytes!("../assets/fonts/CascadiaMonoPL-Regular.ttf");
 
 /// Põe a fonte do terminal na frente da família monoespaçada do contexto.
+/// Também cobre símbolos ausentes nas fontes da interface, como os indicadores das abas.
 pub fn install(ctx: &egui::Context) {
     ctx.add_font(FontInsert::new(
         MONO_FONT,
         FontData::from_static(MONO_TTF),
-        vec![InsertFontFamily {
-            family: FontFamily::Monospace,
-            priority: FontPriority::Highest,
-        }],
+        vec![
+            InsertFontFamily {
+                family: FontFamily::Monospace,
+                priority: FontPriority::Highest,
+            },
+            InsertFontFamily {
+                family: FontFamily::Proportional,
+                priority: FontPriority::Lowest,
+            },
+        ],
     ));
 }
 
