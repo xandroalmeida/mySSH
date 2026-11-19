@@ -107,7 +107,10 @@ mod tests {
         v.sort_by(|a, b| a.name.cmp(&b.name));
         let names: Vec<_> = v.iter().map(|e| e.name.as_str()).collect();
         #[cfg(unix)]
-        assert_eq!(names, [".oculto", "a.txt", "ln", "sub"]);
+        let esperado = [".oculto", "a.txt", "ln", "sub"].as_slice();
+        #[cfg(not(unix))]
+        let esperado = [".oculto", "a.txt", "sub"].as_slice();
+        assert_eq!(names, esperado);
         let a = v.iter().find(|e| e.name == "a.txt").unwrap();
         assert_eq!((a.kind, a.size), (Kind::File, 5));
         assert!(a.mtime.is_some());
@@ -145,9 +148,11 @@ mod tests {
     fn pai_e_juncao() {
         assert_eq!(parent("/a/b").as_deref(), Some("/a"));
         assert_eq!(parent("/").as_deref(), None);
+        // `Path::join` preserva o separador já presente em `dir` e usa o nativo só na
+        // junção: no Windows o resultado é `/a\b c`.
         assert_eq!(
             join("/a", "b c"),
-            "/a/b c".replace('/', std::path::MAIN_SEPARATOR_STR)
+            format!("/a{}b c", std::path::MAIN_SEPARATOR)
         );
     }
 }

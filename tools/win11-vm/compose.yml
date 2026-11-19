@@ -1,0 +1,38 @@
+# VM Windows 11 para compilar e testar o mySSH (só desenvolvimento).
+# Use ./up.sh e ./down.sh; detalhes em README.md.
+name: myssh-win11
+
+services:
+  windows:
+    image: dockurr/windows
+    container_name: myssh-win11
+    environment:
+      VERSION: "11l" # Windows 11 LTSC: ISO menor, sem Store/bloatware
+      RAM_SIZE: "${MYSSH_WIN11_RAM:-4G}"
+      CPU_CORES: "${MYSSH_WIN11_CPUS:-4}"
+      DISK_SIZE: "${MYSSH_WIN11_DISK:-40G}"
+    devices:
+      - /dev/kvm
+      - /dev/net/tun
+    cap_add:
+      - NET_ADMIN
+    ports:
+      - 127.0.0.1:8006:8006 # tela pelo navegador
+      - 127.0.0.1:3389:3389/tcp # RDP
+      - 127.0.0.1:3389:3389/udp
+      - 127.0.0.1:2223:22 # SSH (OpenSSH do Windows), ver ssh.sh
+    volumes:
+      # Disco virtual e ISO: fora do repositório (dezenas de GB).
+      - ${MYSSH_WIN11_DIR:-${HOME}/vms/myssh-win11}:/storage
+      # Repositório em somente leitura: aparece como Z: / "Shared" no Windows.
+      - ../..:/shared:ro
+      # Copiado para C:\OEM; install.bat roda no fim da instalação.
+      - ./oem:/oem:ro
+    networks:
+      - myssh-testnet # alcança myssh-testsshd:22 e myssh-testsshd-target:22
+    restart: "no"
+    stop_grace_period: 2m
+
+networks:
+  myssh-testnet:
+    external: true

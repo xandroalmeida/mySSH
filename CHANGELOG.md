@@ -1,5 +1,29 @@
 # Changelog
 
+## mySSH v0.3.1 — 2026-10-31
+
+### Destaques
+- **Primeiro instalador para Windows**: o mySSH agora tem um instalador `.exe` para Windows 10/11 (x64), que não precisa de nenhum componente extra.
+- No Windows, o app abre sem a janela de console preta que aparecia ao lado.
+
+### Correções
+- Windows: o app não abre mais uma janela de console junto com a janela principal.
+- Testes automáticos que falhavam só no Windows (junção de caminhos e precisão de horário de arquivos) foram corrigidos; o comportamento do app não mudou.
+
+### Limitações conhecidas
+- Windows: verificado numa máquina virtual Windows 11 (compilação, testes automáticos e abertura do app). Conexões SSH reais, painel de arquivos, cofre do Windows (Credential Manager) e o agente SSH do sistema ainda não foram validados no Windows; o agente do sistema ainda não é suportado lá.
+- Os pacotes não são assinados nem notarizados. No Windows, o SmartScreen avisa na primeira execução.
+- Dependência com alerta de segurança conhecido para chaves RSA (RUSTSEC-2023-0071): prefira chaves ed25519.
+
+### Instalação (Windows)
+Baixe o instalador `.exe` anexado e execute. Como ele não é assinado, o SmartScreen mostra "O Windows protegeu o computador": clique em "Mais informações" e depois em "Executar assim mesmo".
+
+### Instalação (macOS)
+`make install-mac`, ou abra o .dmg anexado quando estiver disponível. O app não é assinado: na primeira abertura, clique com o botão direito e escolha Abrir.
+
+### Instalação (Linux)
+Baixe o AppImage anexado, marque-o como executável (`chmod +x`) e abra, ou instale o `.deb` (`sudo apt install ./myssh_0.3.1_amd64.deb`). Também dá para usar `make install-linux`.
+
 ## mySSH v0.3.0 — 2026-10-22
 
 ### Destaques
