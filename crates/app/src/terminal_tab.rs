@@ -1550,7 +1550,10 @@ pub(crate) fn paste_preview(text: &str) -> (String, usize) {
         }
     }
     if total > PREVIEW_MAX_LINES {
-        out.push_str(&format!("\n… (+{} linhas)", total - PREVIEW_MAX_LINES));
+        out.push_str(&format!(
+            "\n… ({})",
+            i18n::paste_more_lines(total - PREVIEW_MAX_LINES)
+        ));
     }
     (out, total)
 }

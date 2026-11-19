@@ -12,12 +12,14 @@ mod about;
 mod aws;
 mod files;
 mod lang;
+mod local;
 mod m2b;
 mod sync;
 pub use about::*;
 pub use aws::*;
 pub use files::*;
 pub use lang::*;
+pub use local::*;
 pub use m2b::*;
 pub use sync::*;
 

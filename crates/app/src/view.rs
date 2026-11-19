@@ -86,6 +86,12 @@ impl App {
                         error: None,
                     });
                 }
+                if ui.button(i18n::LOCAL_CONSOLE()).clicked() {
+                    self.dialog = Dialog::Local(crate::local_console::ConsoleDialog::load(
+                        self.rt.handle(),
+                        ui.ctx(),
+                    ));
+                }
                 ui.add_enabled_ui(can_split, |ui| {
                     ui.menu_button(i18n::SPLIT(), |ui| self.split_menu(ui, splitting));
                 });
@@ -489,7 +495,7 @@ impl App {
                             Some(format!("{}@{}", profile.username, profile.host)),
                             profile.environment,
                         ),
-                        TabKind::Welcome => (None, Environment::None),
+                        TabKind::Welcome | TabKind::Local { .. } => (None, Environment::None),
                     };
                     let st = env::style(environment)
                         .filter(|_| environment != Environment::Production || prod_warning);
@@ -565,7 +571,7 @@ fn tab_accent(kind: &TabKind) -> Option<Color32> {
             .theme
             .accent
             .map(|[r, g, b]| Color32::from_rgb(r, g, b)),
-        TabKind::Welcome => None,
+        TabKind::Welcome | TabKind::Local { .. } => None,
     }
 }
 

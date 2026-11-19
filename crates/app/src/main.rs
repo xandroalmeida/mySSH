@@ -15,6 +15,8 @@ mod files;
 mod form;
 mod i18n;
 mod icon;
+mod local_console;
+mod local_shell;
 mod logic;
 mod paths;
 mod settings;

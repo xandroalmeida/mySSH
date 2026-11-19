@@ -49,6 +49,7 @@ pub const THIRD_PARTY: &[(&str, &str)] = &[
     ("globset", "Unlicense OR MIT"),
     ("keyring", "MIT OR Apache-2.0"),
     ("png", "MIT OR Apache-2.0"),
+    ("portable-pty", "MIT"),
     ("rfd", "MIT"),
     ("rusqlite", "MIT"),
     ("russh", "Apache-2.0"),

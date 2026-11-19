@@ -16,6 +16,7 @@ Dependências diretas de crates do workspace (`myssh-*`) entre si não são list
 | secrecy | 0.10 | Apache-2.0 OR MIT | Tipos para segredos |
 | zeroize | 1 | Apache-2.0 OR MIT | Limpeza de memória de segredos |
 | png | 0.18 | MIT OR Apache-2.0 | Decodificar o ícone da janela |
+| portable-pty | 0.9 | MIT | PTY local (Unix) e ConPTY (Windows) para o console do sistema |
 | winresource (build, Windows) | 0.1 | MIT | Ícone/metadados do .exe |
 | egui_kittest (dev) | 0.36 | MIT OR Apache-2.0 | Testes de UI |
 | tempfile (dev) | 3 | MIT OR Apache-2.0 | Arquivos temporários em testes |

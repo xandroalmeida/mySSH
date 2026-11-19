@@ -100,6 +100,7 @@ pub enum Dialog {
     Profile(Box<ProfileDialog>),
     Settings,
     Quick(QuickDialog),
+    Local(crate::local_console::ConsoleDialog),
     ConfirmDelete(ProfileId),
     ConfirmCloseTab(u64),
     ConfirmQuit,
@@ -582,7 +583,7 @@ impl App {
                 .jump
                 .and_then(|j| self.profile(j))
                 .map(|j| j.name.clone()),
-            TabKind::Welcome => None,
+            TabKind::Welcome | TabKind::Local { .. } => None,
         };
         make_body(kind, jump_name)
     }

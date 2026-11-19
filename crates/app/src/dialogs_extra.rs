@@ -205,7 +205,7 @@ impl App {
         let mut next = Next::Keep;
         let base = self.focused_kind().and_then(|k| match k {
             TabKind::Terminal { profile, .. } => Some(profile.name.clone()),
-            TabKind::Welcome => None,
+            TabKind::Welcome | TabKind::Local { .. } => None,
         });
         let title = match d.dir {
             Dir::Vertical => i18n::SPLIT_PICK_TITLE_SIDE(),

@@ -15,6 +15,7 @@ use crate::terminal_tab::TerminalTab;
 #[derive(Debug, Clone)]
 pub enum TabKind {
     Terminal { profile: Box<Profile>, saved: bool },
+    Local { shell: crate::local_shell::Shell },
     Welcome,
 }
 
@@ -22,7 +23,7 @@ impl TabKind {
     pub fn environment(&self) -> Environment {
         match self {
             Self::Terminal { profile, .. } => profile.environment,
-            Self::Welcome => Environment::None,
+            Self::Welcome | Self::Local { .. } => Environment::None,
         }
     }
 }
@@ -183,6 +184,9 @@ pub fn make_body(kind: &TabKind, jump_name: Option<String>) -> Box<dyn TabBody> 
     match kind {
         TabKind::Terminal { profile, saved } => {
             Box::new(TerminalTab::new((**profile).clone(), *saved, jump_name))
+        }
+        TabKind::Local { shell } => {
+            Box::new(crate::local_console::LocalConsole::new(shell.clone()))
         }
         TabKind::Welcome => Box::new(WelcomeBody),
     }

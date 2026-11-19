@@ -519,7 +519,7 @@ impl SplitBody {
                 Some(format!("{}@{}", profile.username, profile.host)),
                 theming::resolve(&profile.theme, env.dark, env.font_size).accent,
             ),
-            TabKind::Welcome => (Environment::None, None, None),
+            TabKind::Welcome | TabKind::Local { .. } => (Environment::None, None, None),
         };
         let est = env::style(environment)
             .filter(|_| environment != Environment::Production || env.prod_warning);

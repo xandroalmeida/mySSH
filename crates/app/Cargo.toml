@@ -37,6 +37,7 @@ rfd = "0.17"
 secrecy = "0.10"
 zeroize = "1"
 png = "0.18"
+portable-pty = "0.9"
 
 [dev-dependencies]
 tempfile = "3"

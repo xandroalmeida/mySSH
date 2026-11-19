@@ -24,6 +24,7 @@ pub(crate) enum Next {
     ConfirmCloseTab(u64),
     ConfirmQuit,
     Quick(String),
+    Local(crate::local_shell::Shell),
     /// Volta às Configurações (após cancelar o "esquecer host").
     OpenSettings,
     AskForget(HostEndpoint),
@@ -63,6 +64,10 @@ impl App {
             Dialog::Settings => {
                 let next = self.settings_dialog(ctx);
                 (Dialog::Settings, next)
+            }
+            Dialog::Local(mut d) => {
+                let next = d.ui(ctx);
+                (Dialog::Local(d), next)
             }
             Dialog::Quick(mut q) => {
                 let next = quick_dialog(ctx, &mut q);
@@ -193,6 +198,10 @@ impl App {
         };
         self.dialog = dialog;
         match next {
+            Next::Local(shell) => {
+                self.close_dialog();
+                self.open_tab(crate::tabs::TabKind::Local { shell });
+            }
             Next::Keep => {}
             Next::Close => self.close_dialog(),
             Next::Save => self.submit_profile_dialog(ctx),
