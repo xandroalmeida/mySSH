@@ -13,7 +13,7 @@ Gerenciador desktop de sessões SSH escrito em Rust (macOS, Windows e Linux), co
 - Validação estrita de host key (aceitar uma vez, aceitar e salvar; chave alterada bloqueia a conexão).
 - Jump host, abas, painéis divididos e tema por perfil (6 paletas de terminal).
 - Terminal próprio (alacritty_terminal) com colagem multilinha confirmada.
-- Console local como perfil: em **Novo perfil → Conexão → Console local**, escolha o shell instalado no Linux/macOS ou cmd/PowerShell disponível no Windows; salve e abra pela lista de conexões.
+- Console local como perfil: em **Novo perfil → Conexão → Console local**, escolha o shell instalado no Linux/macOS ou cmd/PowerShell disponível no Windows e, opcionalmente, o diretório inicial; salve e abra pela lista de conexões.
 - Painel de arquivos SFTP (local e remoto, fila, conflitos, cancelamento, retomada de arquivos grandes).
 - Sincronização unidirecional de pastas com prévia, exclusões desligadas por padrão e modo espelho protegido.
 - Importação limitada de `~/.ssh/config` e exportação/importação da configuração em JSON (sem segredos).

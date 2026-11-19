@@ -122,6 +122,7 @@ pub fn discover() -> Vec<Shell> {
 pub fn spawn(
     rt: &tokio::runtime::Handle,
     shell: Shell,
+    working_directory: Option<PathBuf>,
     notify: Arc<dyn Fn() + Send + Sync>,
 ) -> SessionHandle {
     let (cmd_tx, mut cmd_rx) = mpsc::channel(64);
@@ -132,6 +133,12 @@ pub fn spawn(
             notify();
             sent
         };
+        if working_directory.as_ref().is_some_and(|dir| !dir.is_dir()) {
+            emit(SessionEvent::Closed {
+                error: Some(i18n::LOCAL_DIRECTORY_ERROR().into()),
+            });
+            return;
+        }
         // Nunca expõe erros do SO: podem conter caminhos/ambiente do usuário.
         let setup = || {
             let pair = native_pty_system()
@@ -148,7 +155,9 @@ pub fn spawn(
             #[cfg(unix)]
             command.arg("-i");
             command.env("TERM", "xterm-256color");
-            if let Some(home) = directories::UserDirs::new() {
+            if let Some(dir) = &working_directory {
+                command.cwd(dir);
+            } else if let Some(home) = directories::UserDirs::new() {
                 command.cwd(home.home_dir());
             }
             let child = pair.slave.spawn_command(command).ok()?;
@@ -319,6 +328,7 @@ mod tests {
                 path: dir.path().join("private-shell-does-not-exist"),
                 name: "test".into(),
             },
+            None,
             Arc::new(|| {}),
         );
         let SessionEvent::Closed { error: Some(error) } = event(&mut handle).await else {
@@ -326,6 +336,26 @@ mod tests {
         };
         assert_eq!(error, i18n::LOCAL_START_ERROR());
         assert!(!error.contains("private-shell"));
+    }
+
+    #[tokio::test]
+    async fn diretorio_inexistente_ou_arquivo_gera_erro_sem_fallback_ou_caminhos() {
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("not-a-directory");
+        std::fs::write(&file, "").unwrap();
+        for path in [dir.path().join("private-missing-directory"), file] {
+            let mut handle = spawn(
+                &tokio::runtime::Handle::current(),
+                Shell::from_path(std::env::current_exe().unwrap()),
+                Some(path),
+                Arc::new(|| {}),
+            );
+            let SessionEvent::Closed { error: Some(error) } = event(&mut handle).await else {
+                panic!("erro de diretório esperado");
+            };
+            assert_eq!(error, i18n::LOCAL_DIRECTORY_ERROR());
+            assert!(!error.contains("private-missing-directory"));
+        }
     }
 
     #[cfg(unix)]
@@ -339,7 +369,12 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn console_real_recebe_comandos_redimensiona_e_preserva_saida_antes_do_exit() {
-        let mut handle = spawn(&tokio::runtime::Handle::current(), sh(), Arc::new(|| {}));
+        let mut handle = spawn(
+            &tokio::runtime::Handle::current(),
+            sh(),
+            None,
+            Arc::new(|| {}),
+        );
         assert!(matches!(
             event(&mut handle).await,
             SessionEvent::State(SessionState::Connected)
@@ -380,7 +415,12 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn desconectar_nao_espera_shell_que_parou_de_ler_entrada() {
-        let mut handle = spawn(&tokio::runtime::Handle::current(), sh(), Arc::new(|| {}));
+        let mut handle = spawn(
+            &tokio::runtime::Handle::current(),
+            sh(),
+            None,
+            Arc::new(|| {}),
+        );
         assert!(matches!(
             event(&mut handle).await,
             SessionEvent::State(SessionState::Connected)
@@ -418,7 +458,12 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn soltar_handle_encerra_console_ativo() {
-        let mut handle = spawn(&tokio::runtime::Handle::current(), sh(), Arc::new(|| {}));
+        let mut handle = spawn(
+            &tokio::runtime::Handle::current(),
+            sh(),
+            None,
+            Arc::new(|| {}),
+        );
         assert!(matches!(
             event(&mut handle).await,
             SessionEvent::State(SessionState::Connected)

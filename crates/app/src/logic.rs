@@ -9,7 +9,7 @@ use crate::i18n;
 /// Destino do perfil mostrado nas listas e faixas de ambiente.
 pub fn profile_target(p: &Profile) -> String {
     match &p.transport {
-        myssh_core::Transport::Local { shell } => {
+        myssh_core::Transport::Local { shell, .. } => {
             format!("{} · {}", i18n::LOCAL_CONSOLE(), shell.display())
         }
         _ => format!("{}@{}", p.username, p.host),

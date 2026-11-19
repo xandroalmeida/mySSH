@@ -74,6 +74,7 @@ pub struct ProfileDialog {
     /// A política IAM de exemplo foi copiada (feedback no botão).
     pub aws_help_copied: bool,
     pub local_shells: crate::local_console::ShellPicker,
+    pub local_directory_picker: crate::local_console::DirectoryPicker,
 }
 
 impl ProfileDialog {
@@ -88,6 +89,7 @@ impl ProfileDialog {
             aws_help: false,
             aws_help_copied: false,
             local_shells: crate::local_console::ShellPicker::default(),
+            local_directory_picker: crate::local_console::DirectoryPicker::default(),
         }
     }
 }

@@ -50,3 +50,39 @@ pub fn paste_more_lines(n: usize) -> String {
         format!("+{n} líneas")
     )
 }
+
+pub fn LOCAL_DIRECTORY() -> &'static str {
+    tr!(
+        "Diretório inicial",
+        "Starting directory",
+        "Directorio inicial"
+    )
+}
+pub fn LOCAL_DIRECTORY_DEFAULT() -> &'static str {
+    tr!(
+        "Pasta pessoal (padrão)",
+        "Home folder (default)",
+        "Carpeta personal (predeterminada)"
+    )
+}
+pub fn LOCAL_DIRECTORY_HELP() -> &'static str {
+    tr!(
+        "Vazio: pasta pessoal. Use um caminho absoluto ou selecione uma pasta.",
+        "Leave empty for your home folder. Enter an absolute path or select a folder.",
+        "Vacío: carpeta personal. Escribe una ruta absoluta o selecciona una carpeta."
+    )
+}
+pub fn LOCAL_PICK_DIRECTORY() -> &'static str {
+    tr!(
+        "Selecionar diretório inicial",
+        "Select starting directory",
+        "Seleccionar directorio inicial"
+    )
+}
+pub fn LOCAL_DIRECTORY_ERROR() -> &'static str {
+    tr!(
+        "O diretório inicial do console local não está disponível.",
+        "The local console's starting directory is not available.",
+        "El directorio inicial de la consola local no está disponible."
+    )
+}

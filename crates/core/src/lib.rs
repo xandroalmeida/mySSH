@@ -97,7 +97,12 @@ pub enum Transport {
     /// Só no início da cadeia: um perfil SSM não tem jump host (mas pode ser o jump de outro).
     AwsSsm(AwsSsm),
     /// Console do sistema operacional, sem conexão de rede ou autenticação SSH.
-    Local { shell: std::path::PathBuf },
+    Local {
+        shell: std::path::PathBuf,
+        /// Diretório inicial; ausente = pasta pessoal do usuário.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        working_directory: Option<std::path::PathBuf>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -185,9 +190,18 @@ impl Profile {
         if self.name.trim().is_empty() {
             return Err(ProfileError::EmptyName);
         }
-        if let Transport::Local { shell } = &self.transport {
+        if let Transport::Local {
+            shell,
+            working_directory,
+        } = &self.transport
+        {
             if !shell.is_absolute() || shell.to_string_lossy().chars().any(char::is_control) {
                 return Err(ProfileError::InvalidLocalShell);
+            }
+            if working_directory.as_ref().is_some_and(|dir| {
+                !dir.is_absolute() || dir.to_string_lossy().chars().any(char::is_control)
+            }) {
+                return Err(ProfileError::InvalidLocalDirectory);
             }
             if self.jump.is_some() || self.agent_forwarding || self.auth != AuthMethod::Agent {
                 return Err(ProfileError::LocalSshSettings);
@@ -279,6 +293,8 @@ pub enum ProfileError {
     EmptyName,
     #[error("{}", myssh_i18n::tr!("Selecione um terminal local válido.", "Select a valid local shell.", "Selecciona un terminal local válido."))]
     InvalidLocalShell,
+    #[error("{}", myssh_i18n::tr!("O diretório inicial deve ser um caminho absoluto válido.", "The starting directory must be a valid absolute path.", "El directorio inicial debe ser una ruta absoluta válida."))]
+    InvalidLocalDirectory,
     #[error("{}", myssh_i18n::tr!("Um console local não pode participar de uma cadeia SSH nem usar credenciais SSH ou encaminhamento de agente.", "A local console cannot be part of an SSH chain or use SSH credentials or agent forwarding.", "Una consola local no puede formar parte de una cadena SSH ni usar credenciales SSH o reenvío de agente."))]
     LocalSshSettings,
     #[error("{}", myssh_i18n::tr!("Host inválido.", "Invalid host.", "Host no válido."))]
@@ -435,6 +451,7 @@ mod local_profile_tests {
         let mut p = Profile::new("Local console", "", "");
         p.transport = Transport::Local {
             shell: std::env::current_exe().unwrap(),
+            working_directory: None,
         };
         p.auth = AuthMethod::Agent;
         p
@@ -449,9 +466,40 @@ mod local_profile_tests {
     }
 
     #[test]
+    fn diretorio_inicial_opcional_preserva_perfis_antigos_e_rejeita_caminhos_relativos() {
+        let mut p = local();
+        let mut json = serde_json::to_value(&p).unwrap();
+        // Perfis antigos têm somente o shell no transporte local.
+        json["transport"]["Local"]
+            .as_object_mut()
+            .unwrap()
+            .remove("working_directory");
+        assert_eq!(serde_json::from_value::<Profile>(json).unwrap(), p);
+        let Transport::Local {
+            working_directory, ..
+        } = &mut p.transport
+        else {
+            unreachable!()
+        };
+        *working_directory = Some("relative/path".into());
+        assert_eq!(p.validate(), Err(ProfileError::InvalidLocalDirectory));
+        let Transport::Local {
+            working_directory, ..
+        } = &mut p.transport
+        else {
+            unreachable!()
+        };
+        *working_directory = Some(std::env::temp_dir().join("directory with spaces"));
+        assert_eq!(p.validate(), Ok(()));
+    }
+
+    #[test]
     fn perfil_local_rejeita_shell_invalido_e_configuracao_ssh() {
         let mut p = local();
-        p.transport = Transport::Local { shell: "sh".into() };
+        p.transport = Transport::Local {
+            shell: "sh".into(),
+            working_directory: None,
+        };
         assert_eq!(p.validate(), Err(ProfileError::InvalidLocalShell));
         let mut p = local();
         p.jump = Some(ProfileId::new());

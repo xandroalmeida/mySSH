@@ -778,6 +778,7 @@ fn local_profile(name: &str) -> Profile {
     let mut p = prof(name, "", "");
     p.transport = myssh_core::Transport::Local {
         shell: std::env::current_exe().unwrap(),
+        working_directory: None,
     };
     p.auth = AuthMethod::Agent;
     p
@@ -788,6 +789,13 @@ fn perfil_local_persiste_ao_reabrir_e_exportar_importar() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("local.sqlite");
     let mut p = local_profile("My console");
+    let myssh_core::Transport::Local {
+        working_directory, ..
+    } = &mut p.transport
+    else {
+        unreachable!()
+    };
+    *working_directory = Some(dir.path().join("starting directory with spaces"));
     p.favorite = true;
     p.tags = vec!["local".into()];
     {

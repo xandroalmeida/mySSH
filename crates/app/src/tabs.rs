@@ -182,12 +182,14 @@ pub struct Tab {
 pub fn make_body(kind: &TabKind, jump_name: Option<String>) -> Box<dyn TabBody> {
     match kind {
         TabKind::Terminal { profile, saved } => match &profile.transport {
-            myssh_core::Transport::Local { shell } => {
-                Box::new(crate::local_console::LocalConsole::new(
-                    profile.name.clone(),
-                    crate::local_shell::Shell::from_path(shell.clone()),
-                ))
-            }
+            myssh_core::Transport::Local {
+                shell,
+                working_directory,
+            } => Box::new(crate::local_console::LocalConsole::new(
+                profile.name.clone(),
+                crate::local_shell::Shell::from_path(shell.clone()),
+                working_directory.clone(),
+            )),
             _ => Box::new(TerminalTab::new((**profile).clone(), *saved, jump_name)),
         },
         TabKind::Welcome => Box::new(WelcomeBody),

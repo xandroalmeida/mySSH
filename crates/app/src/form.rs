@@ -129,6 +129,7 @@ pub struct ProfileForm {
     pub timeout: String,
     pub transport: TransportKind,
     pub local_shell: std::path::PathBuf,
+    pub local_directory: String,
     /// Região da instância (vazia = a do perfil AWS).
     pub aws_region: String,
     pub aws_creds: AwsCredsKind,
@@ -186,6 +187,7 @@ impl ProfileForm {
             timeout: d.connect_timeout_secs.to_string(),
             transport: TransportKind::Direct,
             local_shell: std::path::PathBuf::new(),
+            local_directory: String::new(),
             aws_region: String::new(),
             aws_creds: AwsCredsKind::Profile,
             aws_profile: String::new(),
@@ -229,9 +231,17 @@ impl ProfileForm {
         f.theme = p.theme.clone();
         f.keepalive = p.keepalive_secs.map(|k| k.to_string()).unwrap_or_default();
         f.timeout = p.connect_timeout_secs.to_string();
-        if let Transport::Local { shell } = &p.transport {
+        if let Transport::Local {
+            shell,
+            working_directory,
+        } = &p.transport
+        {
             f.transport = TransportKind::Local;
             f.local_shell = shell.clone();
+            f.local_directory = working_directory
+                .as_ref()
+                .map(|p| p.to_string_lossy().into_owned())
+                .unwrap_or_default();
         }
         if let Transport::AwsSsm(ssm) = &p.transport {
             f.transport = TransportKind::AwsSsm;
@@ -262,6 +272,8 @@ impl ProfileForm {
         match self.transport {
             TransportKind::Local => Transport::Local {
                 shell: self.local_shell.clone(),
+                working_directory: (!self.local_directory.is_empty())
+                    .then(|| self.local_directory.clone().into()),
             },
             TransportKind::Direct => Transport::Direct,
             TransportKind::AwsSsm => Transport::AwsSsm(AwsSsm {

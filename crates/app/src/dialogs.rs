@@ -248,6 +248,7 @@ impl App {
     // ------------------------------------------------------------------ perfil
 
     fn profile_dialog(&self, ctx: &egui::Context, d: &mut ProfileDialog) -> Next {
+        d.local_directory_picker.poll(&mut d.form.local_directory);
         let mut next = Next::Keep;
         let editing = d.form.existing.is_some();
         let max_h = (ctx.content_rect().height() - 190.0).max(240.0);
@@ -290,7 +291,10 @@ impl App {
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui
-                        .add_enabled(!d.saving, egui::Button::new(i18n::SAVE()))
+                        .add_enabled(
+                            !d.saving && !d.local_directory_picker.is_open(),
+                            egui::Button::new(i18n::SAVE()),
+                        )
                         .clicked()
                     {
                         next = Next::Save;
@@ -367,6 +371,31 @@ impl App {
                 if local {
                     ui.label(i18n::LOCAL_SHELL());
                     ui.vertical(|ui| d.local_shells.ui(ui, self.rt.handle(), &mut f.local_shell));
+                    ui.end_row();
+                    ui.label(i18n::LOCAL_DIRECTORY());
+                    ui.vertical(|ui| {
+                        ui.horizontal(|ui| {
+                            ui.add(
+                                egui::TextEdit::singleline(&mut f.local_directory)
+                                    .hint_text(i18n::LOCAL_DIRECTORY_DEFAULT())
+                                    .desired_width(250.0),
+                            );
+                            if ui
+                                .add_enabled(
+                                    !d.local_directory_picker.is_open(),
+                                    egui::Button::new(i18n::BROWSE()),
+                                )
+                                .clicked()
+                            {
+                                d.local_directory_picker.open(
+                                    self.rt.handle(),
+                                    ui.ctx(),
+                                    f.local_directory.clone(),
+                                );
+                            }
+                        });
+                        ui.weak(i18n::LOCAL_DIRECTORY_HELP());
+                    });
                     ui.end_row();
                 } else {
                     ui.label(if ssm {

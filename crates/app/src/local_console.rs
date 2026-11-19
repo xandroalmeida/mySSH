@@ -84,9 +84,56 @@ impl ShellPicker {
     }
 }
 
+/// Seleção nativa em segundo plano; o resultado pertence somente a este formulário.
+#[derive(Default)]
+pub struct DirectoryPicker {
+    rx: Option<mpsc::Receiver<Option<std::path::PathBuf>>>,
+}
+
+impl DirectoryPicker {
+    pub fn is_open(&self) -> bool {
+        self.rx.is_some()
+    }
+
+    pub fn poll(&mut self, directory: &mut String) {
+        let Some(rx) = &self.rx else { return };
+        match rx.try_recv() {
+            Ok(result) => {
+                if let Some(path) = result {
+                    *directory = path.to_string_lossy().into_owned();
+                }
+                self.rx = None;
+            }
+            Err(mpsc::TryRecvError::Disconnected) => self.rx = None,
+            Err(mpsc::TryRecvError::Empty) => {}
+        }
+    }
+
+    pub fn open(&mut self, rt: &tokio::runtime::Handle, ctx: &egui::Context, directory: String) {
+        if self.is_open() {
+            return;
+        }
+        let (tx, rx) = mpsc::channel();
+        self.rx = Some(rx);
+        let ctx = ctx.clone();
+        rt.spawn(async move {
+            let mut picker = rfd::AsyncFileDialog::new().set_title(i18n::LOCAL_PICK_DIRECTORY());
+            if !directory.is_empty() {
+                picker = picker.set_directory(directory);
+            } else if let Some(home) = directories::UserDirs::new() {
+                picker = picker.set_directory(home.home_dir());
+            }
+            let result = picker.pick_folder().await.map(|f| f.path().to_path_buf());
+            let _ = tx.send(result);
+            ctx.request_repaint();
+        });
+    }
+}
+
 pub struct LocalConsole {
     name: String,
     shell: Shell,
+    working_directory: Option<std::path::PathBuf>,
     sess: Option<TermSession>,
     paste: Option<Zeroizing<String>>,
     paste_fresh: bool,
@@ -95,10 +142,11 @@ pub struct LocalConsole {
 }
 
 impl LocalConsole {
-    pub fn new(name: String, shell: Shell) -> Self {
+    pub fn new(name: String, shell: Shell, working_directory: Option<std::path::PathBuf>) -> Self {
         Self {
             name,
             shell,
+            working_directory,
             sess: None,
             paste: None,
             paste_fresh: false,
@@ -112,6 +160,7 @@ impl LocalConsole {
         let handle = local_shell::spawn(
             env.rt,
             self.shell.clone(),
+            self.working_directory.clone(),
             Arc::new(move || ctx.request_repaint()),
         );
         if let Some(sess) = &mut self.sess {
@@ -329,7 +378,7 @@ mod tests {
 
     #[test]
     fn icones_do_console_existem_na_fonte_da_interface() {
-        let mut console = LocalConsole::new("Local".into(), Shell::from_path(test_shell()));
+        let mut console = LocalConsole::new("Local".into(), Shell::from_path(test_shell()), None);
         let (cmd_tx, _cmd_rx) = tokio::sync::mpsc::channel(4);
         let (evt_tx, evt_rx) = tokio::sync::mpsc::channel(4);
         console.sess = Some(TermSession::new(
@@ -388,15 +437,21 @@ mod tests {
         assert!(h.query_by_label(i18n::F_HOST()).is_none());
         assert!(h.query_by_label(i18n::F_AUTH()).is_none());
         assert!(h.query_by_label(i18n::F_JUMP()).is_none());
-        // O shell escolhido fica no próprio perfil, não em uma preferência separada.
+        h.get_by_label(i18n::LOCAL_DIRECTORY());
+        let directory = tempfile::tempdir().unwrap();
+        let initial_directory = directory.path().join("starting directory with spaces");
+        // Shell e diretório ficam no próprio perfil.
         form_mut(h.state_mut()).local_shell = test_shell();
+        form_mut(h.state_mut()).local_directory = initial_directory.to_string_lossy().into_owned();
         h.get_by_label(i18n::SAVE()).click();
         h.run_steps(3);
         wait_until(&mut h, "perfil local salvo", |a| {
             a.profiles.len() == 1 && matches!(a.dialog, Dialog::None)
         });
         let profile = h.state().profiles[0].clone();
-        assert!(matches!(&profile.transport, Transport::Local { shell } if *shell == test_shell()));
+        assert!(
+            matches!(&profile.transport, Transport::Local { shell, .. } if *shell == test_shell())
+        );
         assert!(h.state().store.list_credentials().unwrap().is_empty());
         h.state_mut().open_profile(profile.id);
         h.run_steps(3);
@@ -426,6 +481,10 @@ mod tests {
         h.state_mut().edit_profile_dialog(profile.id);
         h.run_steps(3);
         assert_eq!(form_mut(h.state_mut()).local_shell, test_shell());
+        assert_eq!(
+            form_mut(h.state_mut()).local_directory,
+            initial_directory.to_string_lossy()
+        );
         form_mut(h.state_mut()).name = "Renamed shell".into();
         h.get_by_label(i18n::SAVE()).click();
         h.run_steps(3);
@@ -449,6 +508,10 @@ mod tests {
         f.transport = TransportKind::Local;
         f.local_shell = test_shell();
         f.name = "Saved shell".into();
+        let directory = tempfile::tempdir().unwrap();
+        let initial_directory = directory.path().join("working directory with spaces");
+        std::fs::create_dir(&initial_directory).unwrap();
+        f.local_directory = initial_directory.to_string_lossy().into_owned();
         let p = f.build(&[]).unwrap().profile;
         app.store.create_profile(&p).unwrap();
         app.reload();
@@ -463,24 +526,39 @@ mod tests {
                 .status()
                 .is_some_and(|b| b.text == i18n::ST_CONNECTED())
         });
-        h.state()
-            .tabs
-            .last()
-            .unwrap()
-            .body
-            .debug_send(b"printf '__MYSSH_%s__\\n' PROFILE_LOCAL\r");
+        h.state().tabs.last().unwrap().body.debug_send(
+            b"printf '__MYSSH_%s__\\n' PROFILE_LOCAL; printf '__MYSSH_%s__\\n' \"${PWD##*/}\"\r",
+        );
         wait_until(&mut h, "saída do shell escolhido", |a| {
             a.tabs
                 .last()
                 .unwrap()
                 .body
                 .debug_screen()
-                .contains("__MYSSH_PROFILE_LOCAL__")
+                .contains("__MYSSH_working directory with spaces__")
         });
         h.state().tabs.last().unwrap().body.debug_send(b"exit\r");
         wait_until(&mut h, "shell encerrado", |a| {
             a.tabs.last().unwrap().body.is_closed()
         });
+    }
+
+    #[test]
+    fn cancelar_selecao_de_diretorio_preserva_o_campo() {
+        let (tx, rx) = mpsc::channel();
+        let mut picker = DirectoryPicker { rx: Some(rx) };
+        let mut directory = "existing directory".to_owned();
+        assert!(picker.is_open());
+        tx.send(None).unwrap();
+        picker.poll(&mut directory);
+        assert_eq!(directory, "existing directory");
+        assert!(!picker.is_open());
+        let (tx, rx) = mpsc::channel();
+        picker.rx = Some(rx);
+        let chosen = std::env::temp_dir().join("selected directory");
+        tx.send(Some(chosen.clone())).unwrap();
+        picker.poll(&mut directory);
+        assert_eq!(directory, chosen.to_string_lossy());
     }
 
     #[test]
