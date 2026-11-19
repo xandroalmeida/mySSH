@@ -951,6 +951,14 @@ impl App {
 
     fn run_action(&mut self, a: Action) {
         match a {
+            Action::NextTab => {
+                let next = self
+                    .tabs
+                    .iter()
+                    .position(|t| Some(t.id) == self.active)
+                    .map_or(0, |i| (i + 1) % self.tabs.len());
+                self.active = self.tabs.get(next).map(|t| t.id);
+            }
             Action::NewTab => {
                 if let Some(id) = self.selected {
                     self.open_profile(id);

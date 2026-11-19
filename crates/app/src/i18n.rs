@@ -246,6 +246,7 @@ pub fn close_tab_body(title: &str) -> String {
 
 pub fn shortcut_name(a: Action) -> &'static str {
     match a {
+        Action::NextTab => tr!("próxima aba", "next tab", "siguiente pestaña"),
         Action::NewTab => tr!(
             "nova aba do perfil selecionado",
             "new tab for the selected profile",

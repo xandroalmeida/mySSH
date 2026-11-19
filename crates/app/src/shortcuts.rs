@@ -8,6 +8,8 @@
 //!   `Ctrl+N` e `Ctrl+F` pertencem ao programa remoto (readline, vim, tmux...) e passam
 //!   direto para a sessão.
 //!
+//! `Ctrl+Tab` avança pelas abas em círculo em qualquer plataforma, mesmo com o terminal focado.
+//!
 //! Teclas: `T` nova aba do perfil selecionado, `W` fechar aba, `N` novo perfil,
 //! `F` foco na busca. Atalhos ficam desativados enquanto há um diálogo modal aberto.
 //!
@@ -27,6 +29,7 @@ use egui::{Key, Modifiers};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
+    NextTab,
     NewTab,
     CloseTab,
     NewProfile,
@@ -39,12 +42,13 @@ pub enum Action {
 }
 
 /// Ordem de consulta: os que exigem `Shift` vêm primeiro (ver nota no topo do módulo).
-pub const ACTIONS: [Action; 9] = [
+pub const ACTIONS: [Action; 10] = [
     Action::SplitSide,
     Action::SplitStack,
     Action::ClosePane,
     Action::NextPane,
     Action::ToggleFiles,
+    Action::NextTab,
     Action::NewTab,
     Action::CloseTab,
     Action::NewProfile,
@@ -65,6 +69,7 @@ pub fn needs_shift(a: Action) -> bool {
 
 pub fn key(a: Action) -> Key {
     match a {
+        Action::NextTab => Key::Tab,
         Action::NewTab => Key::T,
         Action::CloseTab => Key::W,
         Action::NewProfile => Key::N,
@@ -79,7 +84,9 @@ pub fn key(a: Action) -> Key {
 
 /// Modificadores exigidos (ver regra no topo do módulo). `COMMAND` é Cmd no macOS e Ctrl nos demais.
 pub fn required_modifiers(a: Action, terminal_focused: bool, is_mac: bool) -> Modifiers {
-    if needs_shift(a) || (!is_mac && terminal_focused) {
+    if a == Action::NextTab {
+        Modifiers::CTRL
+    } else if needs_shift(a) || (!is_mac && terminal_focused) {
         Modifiers::COMMAND | Modifiers::SHIFT
     } else {
         Modifiers::COMMAND
@@ -99,6 +106,9 @@ pub fn poll(ctx: &egui::Context, terminal_focused: bool) -> Vec<Action> {
 
 /// Texto do atalho para exibir na UI (ex.: "Cmd+T" / "Ctrl+T").
 pub fn label(a: Action) -> String {
+    if a == Action::NextTab {
+        return "Ctrl+Tab".into();
+    }
     let m = if cfg!(target_os = "macos") {
         "Cmd"
     } else {
@@ -111,6 +121,35 @@ pub fn label(a: Action) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ctrl_tab_e_consumido_mesmo_com_terminal_focado() {
+        for focused in [false, true] {
+            for mac in [false, true] {
+                assert_eq!(
+                    required_modifiers(Action::NextTab, focused, mac),
+                    Modifiers::CTRL
+                );
+            }
+            let ctx = egui::Context::default();
+            let input = egui::RawInput {
+                events: vec![egui::Event::Key {
+                    key: Key::Tab,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: Modifiers::CTRL,
+                }],
+                ..Default::default()
+            };
+            let mut out = ctx.run_ui(input, |ui| {
+                assert_eq!(poll(ui.ctx(), focused), vec![Action::NextTab]);
+                assert!(!ui.input(|i| i.key_pressed(Key::Tab)));
+            });
+            out.textures_delta.clear();
+        }
+        assert_eq!(label(Action::NextTab), "Ctrl+Tab");
+    }
 
     #[test]
     fn mac_sempre_cmd() {

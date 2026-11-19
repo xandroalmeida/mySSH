@@ -285,3 +285,38 @@ fn headless_screenshots() {
         eprintln!("screenshot: {}", path.display());
     }
 }
+
+#[test]
+fn ctrl_tab_avanca_em_circulo_e_respeita_dialogo() {
+    let mut h = harness(memory_app());
+    h.state_mut().open_tab(crate::tabs::TabKind::Welcome);
+    h.state_mut().open_tab(crate::tabs::TabKind::Welcome);
+    h.run_steps(2);
+    let ids: Vec<_> = h.state().tabs.iter().map(|t| t.id).collect();
+    for expected in [ids[0], ids[1], ids[2], ids[0]] {
+        h.key_press_modifiers(Modifiers::CTRL, Key::Tab);
+        h.run_steps(2);
+        assert_eq!(h.state().active, Some(expected));
+    }
+    h.state_mut().dialog = Dialog::Settings;
+    h.run_steps(2);
+    h.key_press_modifiers(Modifiers::CTRL, Key::Tab);
+    h.run_steps(2);
+    assert_eq!(h.state().active, Some(ids[0]));
+}
+
+#[test]
+fn ctrl_tab_com_uma_aba_ou_sem_abas() {
+    let mut h = harness(memory_app());
+    h.run_steps(2);
+    let active = h.state().active;
+    h.key_press_modifiers(Modifiers::CTRL, Key::Tab);
+    h.run_steps(2);
+    assert_eq!(h.state().active, active);
+    h.state_mut().tabs.clear();
+    h.state_mut().active = None;
+    h.run_steps(2);
+    h.key_press_modifiers(Modifiers::CTRL, Key::Tab);
+    h.run_steps(2);
+    assert_eq!(h.state().active, None);
+}
