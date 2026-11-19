@@ -3598,7 +3598,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-app"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "chrono",
  "directories",
@@ -3628,7 +3628,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-aws"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "anyhow",
  "aws-config",
@@ -3655,7 +3655,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-core"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "myssh-i18n",
  "serde",
@@ -3666,21 +3666,21 @@ dependencies = [
 
 [[package]]
 name = "myssh-i18n"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "sys-locale",
 ]
 
 [[package]]
 name = "myssh-icon-tool"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "resvg",
 ]
 
 [[package]]
 name = "myssh-secrets"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "keyring",
  "myssh-core",
@@ -3693,7 +3693,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-ssh"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "getrandom 0.4.3",
  "myssh-core",
@@ -3708,7 +3708,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-sshconfig"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "myssh-core",
  "myssh-i18n",
@@ -3716,7 +3716,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-store"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "myssh-core",
  "myssh-i18n",
@@ -3730,7 +3730,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-sync"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "globset",
  "myssh-i18n",
@@ -3744,7 +3744,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-syncrun"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "filetime",
  "myssh-core",
@@ -3767,7 +3767,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-term"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "alacritty_terminal",
  "eframe",
@@ -3783,7 +3783,7 @@ dependencies = [
 
 [[package]]
 name = "myssh-transfer"
-version = "0.3.1"
+version = "0.4.0"
 dependencies = [
  "filetime",
  "libc",
