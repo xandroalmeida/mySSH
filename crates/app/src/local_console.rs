@@ -286,12 +286,6 @@ impl TabBody for LocalConsole {
             .as_ref()
             .map_or_else(String::new, TermSession::screen_text)
     }
-    #[cfg(test)]
-    fn debug_send(&self, bytes: &[u8]) {
-        if let Some(sess) = &self.sess {
-            sess.send_input(bytes.to_vec());
-        }
-    }
 
     fn fills_space(&self) -> bool {
         true
@@ -526,9 +520,13 @@ mod tests {
                 .status()
                 .is_some_and(|b| b.text == i18n::ST_CONNECTED())
         });
-        h.state().tabs.last().unwrap().body.debug_send(
-            b"printf '__MYSSH_%s__\\n' PROFILE_LOCAL; printf '__MYSSH_%s__\\n' \"${PWD##*/}\"\r",
-        );
+        wait_until(&mut h, "foco no terminal local", |a| {
+            a.tabs.last().unwrap().body.has_terminal_focus()
+        });
+        h.event(egui::Event::Text(
+            "printf '__MYSSH_%s__\\n' \"${PWD##*/}\"".into(),
+        ));
+        h.key_press(egui::Key::Enter);
         wait_until(&mut h, "saída do shell escolhido", |a| {
             a.tabs
                 .last()
@@ -537,7 +535,8 @@ mod tests {
                 .debug_screen()
                 .contains("__MYSSH_working directory with spaces__")
         });
-        h.state().tabs.last().unwrap().body.debug_send(b"exit\r");
+        h.event(egui::Event::Text("exit".into()));
+        h.key_press(egui::Key::Enter);
         wait_until(&mut h, "shell encerrado", |a| {
             a.tabs.last().unwrap().body.is_closed()
         });

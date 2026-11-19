@@ -51,13 +51,15 @@ fn add(shells: &mut Vec<Shell>, path: PathBuf, name: Option<&str>) {
     if !path.is_absolute() || !executable(&path) || shells.iter().any(|s| s.path == path) {
         return;
     }
-    let name = name.map(str::to_owned).unwrap_or_else(|| {
-        path.file_name()
-            .unwrap_or_default()
-            .to_string_lossy()
-            .into_owned()
-    });
-    shells.push(Shell { path, name });
+    let mut shell = Shell::from_path(path);
+    #[cfg(unix)]
+    if matches!(shell.name.as_str(), "false" | "nologin") {
+        return;
+    }
+    if let Some(name) = name {
+        shell.name = name.to_owned();
+    }
+    shells.push(shell);
 }
 
 pub fn discover() -> Vec<Shell> {
@@ -153,7 +155,10 @@ pub fn spawn(
             let writer = pair.master.take_writer().ok()?;
             let mut command = CommandBuilder::new(&shell.path);
             #[cfg(unix)]
-            command.arg("-i");
+            {
+                command.arg("-i");
+                command.env("SHELL", &shell.path);
+            }
             command.env("TERM", "xterm-256color");
             if let Some(dir) = &working_directory {
                 command.cwd(dir);
@@ -295,7 +300,7 @@ mod tests {
     }
 
     #[test]
-    fn descoberta_rejeita_pastas_caminhos_relativos_e_arquivos_sem_execucao() {
+    fn descoberta_rejeita_entradas_que_nao_sao_shells_utilizaveis() {
         let dir = tempfile::tempdir().unwrap();
         let mut shells = Vec::new();
         add(&mut shells, dir.path().to_owned(), None);
@@ -308,6 +313,12 @@ mod tests {
             std::fs::write(&path, "").unwrap();
             std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
             add(&mut shells, path, None);
+            for name in ["false", "nologin"] {
+                let path = dir.path().join(name);
+                std::os::unix::fs::symlink("/bin/sh", &path).unwrap();
+                assert!(executable(&path));
+                add(&mut shells, path, None);
+            }
         }
         assert!(shells.is_empty());
     }
@@ -392,7 +403,8 @@ mod tests {
         handle
             .cmd_tx
             .send(SessionCommand::Input(
-                b"stty size; printf '__MYSSH_%s__\\n' LOCAL_OK; exit\r".to_vec(),
+                b"stty size; printf '__SHELL_%s__\\n' \"$SHELL\"; printf '__MYSSH_%s__\\n' LOCAL_OK; exit\r"
+                    .to_vec(),
             ))
             .await
             .unwrap();
@@ -409,6 +421,10 @@ mod tests {
         }
         let output = String::from_utf8_lossy(&output);
         assert!(output.contains("37 101"), "resize do PTY não foi aplicado");
+        assert!(
+            output.contains("__SHELL_/bin/sh__"),
+            "SHELL difere do perfil"
+        );
         assert!(output.contains("__MYSSH_LOCAL_OK__"), "saída final ausente");
     }
 
