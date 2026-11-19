@@ -773,3 +773,88 @@ fn importacao_valida_schema_e_campos_e_e_atomica() {
         1
     );
 }
+
+fn local_profile(name: &str) -> Profile {
+    let mut p = prof(name, "", "");
+    p.transport = myssh_core::Transport::Local {
+        shell: std::env::current_exe().unwrap(),
+    };
+    p.auth = AuthMethod::Agent;
+    p
+}
+
+#[test]
+fn perfil_local_persiste_ao_reabrir_e_exportar_importar() {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join("local.sqlite");
+    let mut p = local_profile("My console");
+    p.favorite = true;
+    p.tags = vec!["local".into()];
+    {
+        let s = Store::open(&path).unwrap();
+        let folder = Folder::new("Consoles", None);
+        s.create_folder(&folder).unwrap();
+        p.folder = Some(folder.id);
+        s.create_profile(&p).unwrap();
+    }
+    let s = Store::open(&path).unwrap();
+    assert_eq!(s.get_profile(p.id).unwrap().unwrap(), p);
+    let other = store();
+    let report = other
+        .import_config_json(&s.export_config_json().unwrap())
+        .unwrap();
+    assert_eq!(report.profiles, 1);
+    assert_eq!(other.get_profile(p.id).unwrap().unwrap(), p);
+    assert!(other.list_credentials().unwrap().is_empty());
+    p.name = "Renamed console".into();
+    s.update_profile(&p).unwrap();
+    assert_eq!(s.get_profile(p.id).unwrap().unwrap(), p);
+    s.delete_profile(p.id).unwrap();
+    assert!(s.get_profile(p.id).unwrap().is_none());
+}
+
+#[test]
+fn console_local_nao_pode_ser_jump_ou_substituir_jump_em_uso() {
+    use myssh_core::{ProfileError, Transport};
+    let s = store();
+    let local = local_profile("Local");
+    s.create_profile(&local).unwrap();
+    let mut ssh = prof("SSH", "host", "user");
+    ssh.jump = Some(local.id);
+    assert!(matches!(
+        s.create_profile(&ssh),
+        Err(StoreError::InvalidProfile(ProfileError::LocalSshSettings))
+    ));
+    let jump = prof("Bastion", "bastion", "user");
+    s.create_profile(&jump).unwrap();
+    ssh.jump = Some(jump.id);
+    s.create_profile(&ssh).unwrap();
+    let mut converted = jump.clone();
+    converted.transport = local.transport.clone();
+    converted.auth = AuthMethod::Agent;
+    assert!(matches!(
+        s.update_profile(&converted),
+        Err(StoreError::InvalidProfile(ProfileError::LocalSshSettings))
+    ));
+    assert_eq!(
+        s.get_profile(jump.id).unwrap().unwrap().transport,
+        Transport::Direct
+    );
+    let mut cfg = s.export_config().unwrap();
+    cfg.profiles
+        .iter_mut()
+        .find(|p| p.id == ssh.id)
+        .unwrap()
+        .jump = Some(local.id);
+    let other = store();
+    assert!(matches!(
+        other.import_config(cfg),
+        Err(StoreError::InvalidProfile(ProfileError::LocalSshSettings))
+    ));
+    assert!(
+        other
+            .list_profiles(&ProfileFilter::default())
+            .unwrap()
+            .is_empty()
+    );
+}

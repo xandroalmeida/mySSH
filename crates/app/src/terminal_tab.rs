@@ -405,6 +405,10 @@ impl TerminalTab {
         // chave efêmera do EC2 Instance Connect antes do SSH).
         let root = self.hops.first().unwrap_or(&self.profile);
         let tunnel: Option<Arc<dyn Tunnel>> = match &root.transport {
+            Transport::Local { .. } => {
+                self.phase = Phase::Failed(myssh_core::ProfileError::LocalSshSettings.to_string());
+                return;
+            }
             Transport::Direct => None,
             Transport::AwsSsm(ssm) => {
                 let mut t = myssh_aws::SsmTunnel::new(
@@ -1623,6 +1627,13 @@ fn resolve_chain(
         mats,
         stop: Stop::Failed(m.to_string()),
     };
+    if matches!(target.transport, Transport::Local { .. }) {
+        return fail(
+            hops,
+            mats,
+            &myssh_core::ProfileError::LocalSshSettings.to_string(),
+        );
+    }
     if mats.is_empty() {
         let mut seen = vec![target.id];
         let mut chain = Vec::new();
@@ -1634,6 +1645,13 @@ fn resolve_chain(
             seen.push(id);
             match store.get_profile(id) {
                 Ok(Some(p)) => {
+                    if matches!(p.transport, Transport::Local { .. }) {
+                        return fail(
+                            hops,
+                            mats,
+                            &myssh_core::ProfileError::LocalSshSettings.to_string(),
+                        );
+                    }
                     cur = p.jump;
                     chain.push(p);
                 }

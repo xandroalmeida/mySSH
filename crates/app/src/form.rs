@@ -24,6 +24,7 @@ pub enum AuthKind {
 /// Como chegar ao servidor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TransportKind {
+    Local,
     Direct,
     AwsSsm,
 }
@@ -127,6 +128,7 @@ pub struct ProfileForm {
     pub keepalive: String,
     pub timeout: String,
     pub transport: TransportKind,
+    pub local_shell: std::path::PathBuf,
     /// Região da instância (vazia = a do perfil AWS).
     pub aws_region: String,
     pub aws_creds: AwsCredsKind,
@@ -183,6 +185,7 @@ impl ProfileForm {
             keepalive: d.keepalive_secs.map(|k| k.to_string()).unwrap_or_default(),
             timeout: d.connect_timeout_secs.to_string(),
             transport: TransportKind::Direct,
+            local_shell: std::path::PathBuf::new(),
             aws_region: String::new(),
             aws_creds: AwsCredsKind::Profile,
             aws_profile: String::new(),
@@ -226,6 +229,10 @@ impl ProfileForm {
         f.theme = p.theme.clone();
         f.keepalive = p.keepalive_secs.map(|k| k.to_string()).unwrap_or_default();
         f.timeout = p.connect_timeout_secs.to_string();
+        if let Transport::Local { shell } = &p.transport {
+            f.transport = TransportKind::Local;
+            f.local_shell = shell.clone();
+        }
         if let Transport::AwsSsm(ssm) = &p.transport {
             f.transport = TransportKind::AwsSsm;
             f.aws_region = ssm.region.clone();
@@ -253,6 +260,9 @@ impl ProfileForm {
 
     fn build_transport(&self) -> Transport {
         match self.transport {
+            TransportKind::Local => Transport::Local {
+                shell: self.local_shell.clone(),
+            },
             TransportKind::Direct => Transport::Direct,
             TransportKind::AwsSsm => Transport::AwsSsm(AwsSsm {
                 region: self.aws_region.trim().to_string(),
@@ -293,49 +303,56 @@ impl ProfileForm {
     /// Valida e converte em [`Draft`]. `folders` serve para reaproveitar/criar a pasta
     /// digitada em "nova pasta".
     pub fn build(&self, folders: &[Folder]) -> Result<Draft, FormError> {
-        let port: u16 = self.port.trim().parse().map_err(|_| FormError::Port)?;
-        let keepalive = match self.keepalive.trim() {
+        let local = self.transport == TransportKind::Local;
+        let port: u16 = if local {
+            22
+        } else {
+            self.port.trim().parse().map_err(|_| FormError::Port)?
+        };
+        let keepalive = match if local { "" } else { self.keepalive.trim() } {
             "" => None,
             s => Some(s.parse::<u32>().map_err(|_| FormError::Keepalive)?),
         };
-        let timeout: u32 = self
-            .timeout
-            .trim()
+        let timeout: u32 = if local { "15" } else { self.timeout.trim() }
             .parse()
             .ok()
             .filter(|t| *t > 0)
             .ok_or(FormError::Timeout)?;
 
         let mut new_secret = None;
-        let auth = match self.auth {
-            AuthKind::Password => {
-                let credential = self.plan_secret(
-                    self.password_mode,
-                    &self.password,
-                    CredentialKind::Password,
-                    &mut new_secret,
-                )?;
-                AuthMethod::Password { credential }
-            }
-            AuthKind::Key => {
-                let path = self.key_path.trim();
-                if path.is_empty() {
-                    return Err(FormError::KeyPath);
+        let auth = if local {
+            AuthMethod::Agent
+        } else {
+            match self.auth {
+                AuthKind::Password => {
+                    let credential = self.plan_secret(
+                        self.password_mode,
+                        &self.password,
+                        CredentialKind::Password,
+                        &mut new_secret,
+                    )?;
+                    AuthMethod::Password { credential }
                 }
-                let passphrase = self.plan_secret(
-                    self.passphrase_mode,
-                    &self.passphrase,
-                    CredentialKind::KeyPassphrase,
-                    &mut new_secret,
-                )?;
-                AuthMethod::KeyFile {
-                    path: path.into(),
-                    passphrase,
+                AuthKind::Key => {
+                    let path = self.key_path.trim();
+                    if path.is_empty() {
+                        return Err(FormError::KeyPath);
+                    }
+                    let passphrase = self.plan_secret(
+                        self.passphrase_mode,
+                        &self.passphrase,
+                        CredentialKind::KeyPassphrase,
+                        &mut new_secret,
+                    )?;
+                    AuthMethod::KeyFile {
+                        path: path.into(),
+                        passphrase,
+                    }
                 }
+                AuthKind::Agent => AuthMethod::Agent,
+                AuthKind::KeyboardInteractive => AuthMethod::KeyboardInteractive,
+                AuthKind::InstanceConnect => AuthMethod::Ec2InstanceConnect,
             }
-            AuthKind::Agent => AuthMethod::Agent,
-            AuthKind::KeyboardInteractive => AuthMethod::KeyboardInteractive,
-            AuthKind::InstanceConnect => AuthMethod::Ec2InstanceConnect,
         };
 
         let mut profile = match &self.existing {
@@ -343,9 +360,17 @@ impl ProfileForm {
             None => Profile::new("", "", ""),
         };
         profile.name = self.name.trim().to_string();
-        profile.host = self.host.trim().to_string();
+        profile.host = if local {
+            String::new()
+        } else {
+            self.host.trim().to_string()
+        };
         profile.port = port;
-        profile.username = self.username.trim().to_string();
+        profile.username = if local {
+            String::new()
+        } else {
+            self.username.trim().to_string()
+        };
         profile.auth = auth;
         profile.tags = parse_tags(&self.tags);
         profile.favorite = self.favorite;
@@ -354,8 +379,11 @@ impl ProfileForm {
         // SSM é sempre o primeiro salto: a linha de jump host fica oculta e não vale.
         profile.jump = match self.transport {
             TransportKind::Direct => self.jump,
-            TransportKind::AwsSsm => None,
+            TransportKind::AwsSsm | TransportKind::Local => None,
         };
+        if local {
+            profile.agent_forwarding = false;
+        }
         profile.theme = self.theme.clone();
         profile.keepalive_secs = keepalive;
         profile.connect_timeout_secs = timeout;

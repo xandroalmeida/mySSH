@@ -516,10 +516,10 @@ impl SplitBody {
         let (environment, info, accent) = match &self.panes[idx].kind {
             TabKind::Terminal { profile, .. } => (
                 profile.environment,
-                Some(format!("{}@{}", profile.username, profile.host)),
+                Some(crate::logic::profile_target(profile)),
                 theming::resolve(&profile.theme, env.dark, env.font_size).accent,
             ),
-            TabKind::Welcome | TabKind::Local { .. } => (Environment::None, None, None),
+            TabKind::Welcome => (Environment::None, None, None),
         };
         let est = env::style(environment)
             .filter(|_| environment != Environment::Production || env.prod_warning);

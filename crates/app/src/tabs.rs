@@ -15,7 +15,6 @@ use crate::terminal_tab::TerminalTab;
 #[derive(Debug, Clone)]
 pub enum TabKind {
     Terminal { profile: Box<Profile>, saved: bool },
-    Local { shell: crate::local_shell::Shell },
     Welcome,
 }
 
@@ -23,7 +22,7 @@ impl TabKind {
     pub fn environment(&self) -> Environment {
         match self {
             Self::Terminal { profile, .. } => profile.environment,
-            Self::Welcome | Self::Local { .. } => Environment::None,
+            Self::Welcome => Environment::None,
         }
     }
 }
@@ -182,12 +181,15 @@ pub struct Tab {
 /// Cria o corpo da aba.
 pub fn make_body(kind: &TabKind, jump_name: Option<String>) -> Box<dyn TabBody> {
     match kind {
-        TabKind::Terminal { profile, saved } => {
-            Box::new(TerminalTab::new((**profile).clone(), *saved, jump_name))
-        }
-        TabKind::Local { shell } => {
-            Box::new(crate::local_console::LocalConsole::new(shell.clone()))
-        }
+        TabKind::Terminal { profile, saved } => match &profile.transport {
+            myssh_core::Transport::Local { shell } => {
+                Box::new(crate::local_console::LocalConsole::new(
+                    profile.name.clone(),
+                    crate::local_shell::Shell::from_path(shell.clone()),
+                ))
+            }
+            _ => Box::new(TerminalTab::new((**profile).clone(), *saved, jump_name)),
+        },
         TabKind::Welcome => Box::new(WelcomeBody),
     }
 }

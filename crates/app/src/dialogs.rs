@@ -24,7 +24,6 @@ pub(crate) enum Next {
     ConfirmCloseTab(u64),
     ConfirmQuit,
     Quick(String),
-    Local(crate::local_shell::Shell),
     /// Volta às Configurações (após cancelar o "esquecer host").
     OpenSettings,
     AskForget(HostEndpoint),
@@ -64,10 +63,6 @@ impl App {
             Dialog::Settings => {
                 let next = self.settings_dialog(ctx);
                 (Dialog::Settings, next)
-            }
-            Dialog::Local(mut d) => {
-                let next = d.ui(ctx);
-                (Dialog::Local(d), next)
             }
             Dialog::Quick(mut q) => {
                 let next = quick_dialog(ctx, &mut q);
@@ -198,10 +193,6 @@ impl App {
         };
         self.dialog = dialog;
         match next {
-            Next::Local(shell) => {
-                self.close_dialog();
-                self.open_tab(crate::tabs::TabKind::Local { shell });
-            }
             Next::Keep => {}
             Next::Close => self.close_dialog(),
             Next::Save => self.submit_profile_dialog(ctx),
@@ -334,7 +325,6 @@ impl App {
         let f = &mut d.form;
         let aws_profiles = &d.aws_profiles;
         let own_id = f.existing.as_ref().map(|p| p.id);
-        let ssm = f.transport == TransportKind::AwsSsm;
         egui::Grid::new("profile-grid")
             .num_columns(2)
             .spacing([10.0, 8.0])
@@ -346,6 +336,11 @@ impl App {
                 ui.label(i18n::F_CONNECTION());
                 ui.horizontal_wrapped(|ui| {
                     ui.radio_value(&mut f.transport, TransportKind::Direct, i18n::CONN_DIRECT());
+                    ui.radio_value(
+                        &mut f.transport,
+                        TransportKind::Local,
+                        i18n::LOCAL_CONSOLE(),
+                    );
                     let to_ssm = ui
                         .radio_value(&mut f.transport, TransportKind::AwsSsm, i18n::CONN_SSM())
                         .clicked();
@@ -367,126 +362,151 @@ impl App {
                 });
                 ui.end_row();
 
-                ui.label(if ssm {
-                    i18n::F_INSTANCE()
+                let local = f.transport == TransportKind::Local;
+                let ssm = f.transport == TransportKind::AwsSsm;
+                if local {
+                    ui.label(i18n::LOCAL_SHELL());
+                    ui.vertical(|ui| d.local_shells.ui(ui, self.rt.handle(), &mut f.local_shell));
+                    ui.end_row();
                 } else {
-                    i18n::F_HOST()
-                });
-                ui.horizontal(|ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(&mut f.host)
-                            .hint_text(if ssm { "i-0123456789abcdef0" } else { "" })
-                            .desired_width(250.0),
-                    );
-                    ui.label(i18n::F_PORT());
-                    ui.add(egui::TextEdit::singleline(&mut f.port).desired_width(60.0));
-                });
-                ui.end_row();
+                    ui.label(if ssm {
+                        i18n::F_INSTANCE()
+                    } else {
+                        i18n::F_HOST()
+                    });
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut f.host)
+                                .hint_text(if ssm { "i-0123456789abcdef0" } else { "" })
+                                .desired_width(250.0),
+                        );
+                        ui.label(i18n::F_PORT());
+                        ui.add(egui::TextEdit::singleline(&mut f.port).desired_width(60.0));
+                    });
+                    ui.end_row();
 
-                ui.label(i18n::F_USER());
-                ui.add(egui::TextEdit::singleline(&mut f.username).desired_width(250.0));
-                ui.end_row();
+                    ui.label(i18n::F_USER());
+                    ui.add(egui::TextEdit::singleline(&mut f.username).desired_width(250.0));
+                    ui.end_row();
 
-                if ssm {
-                    aws_rows(ui, f, aws_profiles);
-                }
-
-                ui.label(i18n::F_AUTH());
-                ui.horizontal_wrapped(|ui| {
-                    ui.radio_value(&mut f.auth, AuthKind::Password, i18n::AUTH_PASSWORD());
-                    ui.radio_value(&mut f.auth, AuthKind::Key, i18n::AUTH_KEY());
-                    ui.radio_value(&mut f.auth, AuthKind::Agent, i18n::AUTH_AGENT());
-                    ui.radio_value(&mut f.auth, AuthKind::KeyboardInteractive, i18n::AUTH_KI());
-                    if ssm || f.auth == AuthKind::InstanceConnect {
-                        ui.radio_value(&mut f.auth, AuthKind::InstanceConnect, i18n::AUTH_EIC());
+                    if ssm {
+                        aws_rows(ui, f, aws_profiles);
                     }
-                });
-                ui.end_row();
 
-                match f.auth {
-                    AuthKind::Password => {
-                        ui.label("");
-                        ui.vertical(|ui| {
-                            ui.radio_value(&mut f.password_mode, SecretMode::Ask, i18n::PW_ASK());
-                            ui.radio_value(&mut f.password_mode, SecretMode::Save, i18n::PW_SAVE());
-                        });
-                        ui.end_row();
-                        if f.password_mode == SecretMode::Save {
-                            ui.label(i18n::F_PASSWORD());
-                            let keeps = editing
-                                && f.existing.as_ref().is_some_and(|p| {
-                                    matches!(
-                                        p.auth,
-                                        myssh_core::AuthMethod::Password {
-                                            credential: Some(_)
-                                        }
-                                    )
-                                });
-                            ui.add(
-                                egui::TextEdit::singleline(&mut f.password)
-                                    .password(true)
-                                    .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
-                                    .desired_width(250.0),
-                            );
-                            ui.end_row();
-                        }
-                    }
-                    AuthKind::Key => {
-                        ui.label(i18n::F_KEY_PATH());
-                        ui.horizontal(|ui| {
-                            ui.add(
-                                egui::TextEdit::singleline(&mut f.key_path).desired_width(250.0),
-                            );
-                            if ui.button(i18n::BROWSE()).clicked() {
-                                *next = Next::PickKey;
-                            }
-                        });
-                        ui.end_row();
-                        ui.label(i18n::F_PASSPHRASE());
-                        ui.vertical(|ui| {
-                            ui.radio_value(&mut f.passphrase_mode, SecretMode::Ask, i18n::PP_ASK());
+                    ui.label(i18n::F_AUTH());
+                    ui.horizontal_wrapped(|ui| {
+                        ui.radio_value(&mut f.auth, AuthKind::Password, i18n::AUTH_PASSWORD());
+                        ui.radio_value(&mut f.auth, AuthKind::Key, i18n::AUTH_KEY());
+                        ui.radio_value(&mut f.auth, AuthKind::Agent, i18n::AUTH_AGENT());
+                        ui.radio_value(&mut f.auth, AuthKind::KeyboardInteractive, i18n::AUTH_KI());
+                        if ssm || f.auth == AuthKind::InstanceConnect {
                             ui.radio_value(
-                                &mut f.passphrase_mode,
-                                SecretMode::Save,
-                                i18n::PP_SAVE(),
+                                &mut f.auth,
+                                AuthKind::InstanceConnect,
+                                i18n::AUTH_EIC(),
                             );
-                        });
-                        ui.end_row();
-                        if f.passphrase_mode == SecretMode::Save {
+                        }
+                    });
+                    ui.end_row();
+
+                    match f.auth {
+                        AuthKind::Password => {
                             ui.label("");
-                            let keeps = editing
-                                && f.existing.as_ref().is_some_and(|p| {
-                                    matches!(
-                                        p.auth,
-                                        myssh_core::AuthMethod::KeyFile {
-                                            passphrase: Some(_),
-                                            ..
-                                        }
-                                    )
-                                });
-                            ui.add(
-                                egui::TextEdit::singleline(&mut f.passphrase)
-                                    .password(true)
-                                    .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
-                                    .desired_width(250.0),
-                            );
+                            ui.vertical(|ui| {
+                                ui.radio_value(
+                                    &mut f.password_mode,
+                                    SecretMode::Ask,
+                                    i18n::PW_ASK(),
+                                );
+                                ui.radio_value(
+                                    &mut f.password_mode,
+                                    SecretMode::Save,
+                                    i18n::PW_SAVE(),
+                                );
+                            });
+                            ui.end_row();
+                            if f.password_mode == SecretMode::Save {
+                                ui.label(i18n::F_PASSWORD());
+                                let keeps = editing
+                                    && f.existing.as_ref().is_some_and(|p| {
+                                        matches!(
+                                            p.auth,
+                                            myssh_core::AuthMethod::Password {
+                                                credential: Some(_)
+                                            }
+                                        )
+                                    });
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut f.password)
+                                        .password(true)
+                                        .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
+                                        .desired_width(250.0),
+                                );
+                                ui.end_row();
+                            }
+                        }
+                        AuthKind::Key => {
+                            ui.label(i18n::F_KEY_PATH());
+                            ui.horizontal(|ui| {
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut f.key_path)
+                                        .desired_width(250.0),
+                                );
+                                if ui.button(i18n::BROWSE()).clicked() {
+                                    *next = Next::PickKey;
+                                }
+                            });
+                            ui.end_row();
+                            ui.label(i18n::F_PASSPHRASE());
+                            ui.vertical(|ui| {
+                                ui.radio_value(
+                                    &mut f.passphrase_mode,
+                                    SecretMode::Ask,
+                                    i18n::PP_ASK(),
+                                );
+                                ui.radio_value(
+                                    &mut f.passphrase_mode,
+                                    SecretMode::Save,
+                                    i18n::PP_SAVE(),
+                                );
+                            });
+                            ui.end_row();
+                            if f.passphrase_mode == SecretMode::Save {
+                                ui.label("");
+                                let keeps = editing
+                                    && f.existing.as_ref().is_some_and(|p| {
+                                        matches!(
+                                            p.auth,
+                                            myssh_core::AuthMethod::KeyFile {
+                                                passphrase: Some(_),
+                                                ..
+                                            }
+                                        )
+                                    });
+                                ui.add(
+                                    egui::TextEdit::singleline(&mut f.passphrase)
+                                        .password(true)
+                                        .hint_text(if keeps { i18n::KEEP_SAVED() } else { "" })
+                                        .desired_width(250.0),
+                                );
+                                ui.end_row();
+                            }
+                        }
+                        AuthKind::Agent => {
+                            ui.label("");
+                            help_text(ui, i18n::AGENT_HELP());
                             ui.end_row();
                         }
-                    }
-                    AuthKind::Agent => {
-                        ui.label("");
-                        help_text(ui, i18n::AGENT_HELP());
-                        ui.end_row();
-                    }
-                    AuthKind::KeyboardInteractive => {
-                        ui.label("");
-                        help_text(ui, i18n::KI_HELP());
-                        ui.end_row();
-                    }
-                    AuthKind::InstanceConnect => {
-                        ui.label("");
-                        help_text(ui, i18n::AUTH_EIC_HELP());
-                        ui.end_row();
+                        AuthKind::KeyboardInteractive => {
+                            ui.label("");
+                            help_text(ui, i18n::KI_HELP());
+                            ui.end_row();
+                        }
+                        AuthKind::InstanceConnect => {
+                            ui.label("");
+                            help_text(ui, i18n::AUTH_EIC_HELP());
+                            ui.end_row();
+                        }
                     }
                 }
 
@@ -540,7 +560,7 @@ impl App {
                 ui.end_row();
 
                 // SSM é sempre o primeiro salto: sem jump host.
-                if !ssm {
+                if !local && !ssm {
                     ui.label(i18n::F_JUMP());
                     let cur = f
                         .jump
@@ -550,24 +570,29 @@ impl App {
                         .selected_text(cur)
                         .show_ui(ui, |ui| {
                             ui.selectable_value(&mut f.jump, None, i18n::NO_JUMP());
-                            for p in self.profiles.iter().filter(|p| Some(p.id) != own_id) {
+                            for p in self.profiles.iter().filter(|p| {
+                                Some(p.id) != own_id
+                                    && !matches!(p.transport, myssh_core::Transport::Local { .. })
+                            }) {
                                 ui.selectable_value(&mut f.jump, Some(p.id), &p.name);
                             }
                         });
                     ui.end_row();
                 }
 
-                ui.label(i18n::F_KEEPALIVE());
-                ui.horizontal(|ui| {
-                    ui.add(
-                        egui::TextEdit::singleline(&mut f.keepalive)
-                            .hint_text(i18n::KEEPALIVE_OFF())
-                            .desired_width(70.0),
-                    );
-                    ui.label(i18n::F_TIMEOUT());
-                    ui.add(egui::TextEdit::singleline(&mut f.timeout).desired_width(50.0));
-                });
-                ui.end_row();
+                if !local {
+                    ui.label(i18n::F_KEEPALIVE());
+                    ui.horizontal(|ui| {
+                        ui.add(
+                            egui::TextEdit::singleline(&mut f.keepalive)
+                                .hint_text(i18n::KEEPALIVE_OFF())
+                                .desired_width(70.0),
+                        );
+                        ui.label(i18n::F_TIMEOUT());
+                        ui.add(egui::TextEdit::singleline(&mut f.timeout).desired_width(50.0));
+                    });
+                    ui.end_row();
+                }
             });
         ui.add_space(6.0);
         let font = self.settings.terminal_font_size;

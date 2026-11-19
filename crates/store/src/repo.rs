@@ -90,14 +90,22 @@ pub(crate) fn check_jump_cycle(
         if c == id || !visited.insert(c) {
             return Err(StoreError::JumpCycle);
         }
-        let next: Option<Option<String>> = conn
+        let next: Option<(Option<String>, String)> = conn
             .query_row(
-                "SELECT jump_id FROM profiles WHERE id = ?1",
+                "SELECT jump_id, transport_json FROM profiles WHERE id = ?1",
                 [c.to_string()],
-                |r| r.get(0),
+                |r| Ok((r.get(0)?, r.get(1)?)),
             )
             .optional()?;
-        cur = match next.flatten() {
+        if let Some((_, transport)) = &next
+            && matches!(
+                serde_json::from_str::<Transport>(transport)?,
+                Transport::Local { .. }
+            )
+        {
+            return Err(myssh_core::ProfileError::LocalSshSettings.into());
+        }
+        cur = match next.and_then(|(jump, _)| jump) {
             Some(s) => Some(ProfileId(parse_uuid(&s)?)),
             None => None,
         };
@@ -108,6 +116,16 @@ pub(crate) fn check_jump_cycle(
 pub(crate) fn save_profile(conn: &Connection, p: &Profile, mode: WriteMode) -> Result<()> {
     p.validate()?;
     check_jump_cycle(conn, p.id, p.jump)?;
+    if matches!(p.transport, Transport::Local { .. }) {
+        let referenced: bool = conn.query_row(
+            "SELECT EXISTS(SELECT 1 FROM profiles WHERE jump_id = ?1)",
+            [p.id.to_string()],
+            |r| r.get(0),
+        )?;
+        if referenced {
+            return Err(myssh_core::ProfileError::LocalSshSettings.into());
+        }
+    }
     let (cred, pass) = auth_refs(&p.auth);
     let auth_json = serde_json::to_string(&p.auth)?;
     let theme_json = serde_json::to_string(&p.theme)?;

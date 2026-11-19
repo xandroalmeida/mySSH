@@ -86,12 +86,6 @@ impl App {
                         error: None,
                     });
                 }
-                if ui.button(i18n::LOCAL_CONSOLE()).clicked() {
-                    self.dialog = Dialog::Local(crate::local_console::ConsoleDialog::load(
-                        self.rt.handle(),
-                        ui.ctx(),
-                    ));
-                }
                 ui.add_enabled_ui(can_split, |ui| {
                     ui.menu_button(i18n::SPLIT(), |ui| self.split_menu(ui, splitting));
                 });
@@ -492,10 +486,10 @@ impl App {
                     let tab_env = env_services.with_profile_theme(&t.kind);
                     let (profile_info, environment) = match &t.kind {
                         TabKind::Terminal { profile, .. } => (
-                            Some(format!("{}@{}", profile.username, profile.host)),
+                            Some(crate::logic::profile_target(profile)),
                             profile.environment,
                         ),
-                        TabKind::Welcome | TabKind::Local { .. } => (None, Environment::None),
+                        TabKind::Welcome => (None, Environment::None),
                     };
                     let st = env::style(environment)
                         .filter(|_| environment != Environment::Production || prod_warning);
@@ -571,7 +565,7 @@ fn tab_accent(kind: &TabKind) -> Option<Color32> {
             .theme
             .accent
             .map(|[r, g, b]| Color32::from_rgb(r, g, b)),
-        TabKind::Welcome | TabKind::Local { .. } => None,
+        TabKind::Welcome => None,
     }
 }
 
@@ -613,7 +607,13 @@ fn row_job(ui: &egui::Ui, p: &Profile) -> LayoutJob {
         );
     }
     job.append(
-        &format!("\n{}@{}:{}", p.username, p.host, p.port),
+        &format!(
+            "\n{}",
+            match &p.transport {
+                myssh_core::Transport::Local { .. } => crate::logic::profile_target(p),
+                _ => format!("{}:{}", crate::logic::profile_target(p), p.port),
+            }
+        ),
         0.0,
         TextFormat {
             font_id: small,

@@ -40,6 +40,9 @@ fn editar_tema_mostra_previa_e_salva() {
     let id = h.state().profiles[0].id;
     h.state_mut().edit_profile_dialog(id);
     h.run_steps(3);
+    // Deixa o hit testing acompanhar o layout do formulário antes do clique.
+    h.get_by_label_contains("Tema deste perfil").hover();
+    h.run_steps(3);
     // seção recolhida (perfil herda tudo): abrir
     h.get_by_label_contains("Tema deste perfil").click();
     h.run_steps(3);

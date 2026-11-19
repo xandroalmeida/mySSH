@@ -73,6 +73,7 @@ pub struct ProfileDialog {
     pub aws_help: bool,
     /// A política IAM de exemplo foi copiada (feedback no botão).
     pub aws_help_copied: bool,
+    pub local_shells: crate::local_console::ShellPicker,
 }
 
 impl ProfileDialog {
@@ -86,6 +87,7 @@ impl ProfileDialog {
             aws_profiles: myssh_aws::list_profiles(),
             aws_help: false,
             aws_help_copied: false,
+            local_shells: crate::local_console::ShellPicker::default(),
         }
     }
 }
@@ -100,7 +102,6 @@ pub enum Dialog {
     Profile(Box<ProfileDialog>),
     Settings,
     Quick(QuickDialog),
-    Local(crate::local_console::ConsoleDialog),
     ConfirmDelete(ProfileId),
     ConfirmCloseTab(u64),
     ConfirmQuit,
@@ -583,7 +584,7 @@ impl App {
                 .jump
                 .and_then(|j| self.profile(j))
                 .map(|j| j.name.clone()),
-            TabKind::Welcome | TabKind::Local { .. } => None,
+            TabKind::Welcome => None,
         };
         make_body(kind, jump_name)
     }

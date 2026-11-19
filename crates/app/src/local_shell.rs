@@ -18,6 +18,17 @@ pub struct Shell {
     pub name: String,
 }
 
+impl Shell {
+    pub fn from_path(path: PathBuf) -> Self {
+        let name = path
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .into_owned();
+        Self { path, name }
+    }
+}
+
 fn executable(path: &Path) -> bool {
     let Ok(meta) = path.metadata() else {
         return false;

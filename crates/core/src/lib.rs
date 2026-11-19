@@ -87,7 +87,7 @@ pub enum CredentialKind {
     KeyPassphrase,
 }
 
-/// Como o cliente alcança a porta SSH do perfil.
+/// Tipo de sessão do perfil e transporte das conexões SSH.
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize)]
 pub enum Transport {
     /// TCP direto para `host:port` (ou via jump host).
@@ -96,6 +96,8 @@ pub enum Transport {
     /// Túnel AWS SSM Session Manager até a porta `port` da instância `host` (`i-…`/`mi-…`).
     /// Só no início da cadeia: um perfil SSM não tem jump host (mas pode ser o jump de outro).
     AwsSsm(AwsSsm),
+    /// Console do sistema operacional, sem conexão de rede ou autenticação SSH.
+    Local { shell: std::path::PathBuf },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -183,6 +185,15 @@ impl Profile {
         if self.name.trim().is_empty() {
             return Err(ProfileError::EmptyName);
         }
+        if let Transport::Local { shell } = &self.transport {
+            if !shell.is_absolute() || shell.to_string_lossy().chars().any(char::is_control) {
+                return Err(ProfileError::InvalidLocalShell);
+            }
+            if self.jump.is_some() || self.agent_forwarding || self.auth != AuthMethod::Agent {
+                return Err(ProfileError::LocalSshSettings);
+            }
+            return Ok(());
+        }
         if self.host.trim().is_empty()
             || self
                 .host
@@ -266,6 +277,10 @@ impl Profile {
 pub enum ProfileError {
     #[error("{}", myssh_i18n::tr!("O nome do perfil é obrigatório.", "The profile name is required.", "El nombre del perfil es obligatorio."))]
     EmptyName,
+    #[error("{}", myssh_i18n::tr!("Selecione um terminal local válido.", "Select a valid local shell.", "Selecciona un terminal local válido."))]
+    InvalidLocalShell,
+    #[error("{}", myssh_i18n::tr!("Um console local não pode participar de uma cadeia SSH nem usar credenciais SSH ou encaminhamento de agente.", "A local console cannot be part of an SSH chain or use SSH credentials or agent forwarding.", "Una consola local no puede formar parte de una cadena SSH ni usar credenciales SSH o reenvío de agente."))]
+    LocalSshSettings,
     #[error("{}", myssh_i18n::tr!("Host inválido.", "Invalid host.", "Host no válido."))]
     InvalidHost,
     #[error("{}", myssh_i18n::tr!("Porta inválida.", "Invalid port.", "Puerto no válido."))]
@@ -409,5 +424,45 @@ mod i18n_tests {
         myssh_i18n::with_lang(myssh_i18n::Lang::Es, || {
             assert_eq!(ProfileError::InvalidPort.to_string(), "Puerto no válido.");
         });
+    }
+}
+
+#[cfg(test)]
+mod local_profile_tests {
+    use super::*;
+
+    fn local() -> Profile {
+        let mut p = Profile::new("Local console", "", "");
+        p.transport = Transport::Local {
+            shell: std::env::current_exe().unwrap(),
+        };
+        p.auth = AuthMethod::Agent;
+        p
+    }
+
+    #[test]
+    fn perfil_local_dispensa_host_usuario_e_credenciais() {
+        let p = local();
+        assert_eq!(p.validate(), Ok(()));
+        let json = serde_json::to_string(&p).unwrap();
+        assert_eq!(serde_json::from_str::<Profile>(&json).unwrap(), p);
+    }
+
+    #[test]
+    fn perfil_local_rejeita_shell_invalido_e_configuracao_ssh() {
+        let mut p = local();
+        p.transport = Transport::Local { shell: "sh".into() };
+        assert_eq!(p.validate(), Err(ProfileError::InvalidLocalShell));
+        let mut p = local();
+        p.jump = Some(ProfileId::new());
+        assert_eq!(p.validate(), Err(ProfileError::LocalSshSettings));
+        p.jump = None;
+        p.auth = AuthMethod::Password {
+            credential: Some(CredentialId::new()),
+        };
+        assert_eq!(p.validate(), Err(ProfileError::LocalSshSettings));
+        p.auth = AuthMethod::Agent;
+        p.agent_forwarding = true;
+        assert_eq!(p.validate(), Err(ProfileError::LocalSshSettings));
     }
 }

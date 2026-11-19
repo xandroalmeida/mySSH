@@ -205,7 +205,7 @@ impl App {
         let mut next = Next::Keep;
         let base = self.focused_kind().and_then(|k| match k {
             TabKind::Terminal { profile, .. } => Some(profile.name.clone()),
-            TabKind::Welcome | TabKind::Local { .. } => None,
+            TabKind::Welcome => None,
         });
         let title = match d.dir {
             Dir::Vertical => i18n::SPLIT_PICK_TITLE_SIDE(),
@@ -231,7 +231,7 @@ impl App {
                         let r = ui.selectable_value(
                             &mut d.choice,
                             Some(p.id),
-                            format!("{}  ({}@{})", p.name, p.username, p.host),
+                            format!("{}  ({})", p.name, crate::logic::profile_target(p)),
                         );
                         if r.double_clicked() {
                             next = Next::SplitConfirm(d.dir, Some(p.id));

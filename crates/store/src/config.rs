@@ -321,6 +321,12 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
             )));
         }
     }
+    let local_profiles: HashSet<ProfileId> = cfg
+        .profiles
+        .iter()
+        .filter(|p| matches!(p.transport, Transport::Local { .. }))
+        .map(|p| p.id)
+        .collect();
     let jumps: HashMap<ProfileId, Option<ProfileId>> =
         cfg.profiles.iter().map(|p| (p.id, p.jump)).collect();
     for ep in &cfg.profiles {
@@ -344,6 +350,9 @@ fn validate(cfg: &ExportedConfig) -> Result<()> {
         let mut seen = HashSet::from([ep.id]);
         let mut cur = ep.jump;
         while let Some(j) = cur {
+            if local_profiles.contains(&j) {
+                return Err(myssh_core::ProfileError::LocalSshSettings.into());
+            }
             if !profile_ids.contains(&j) {
                 return Err(bad(myssh_i18n::tr!(
                     "perfil referencia jump host inexistente.",
