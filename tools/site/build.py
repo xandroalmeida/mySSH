@@ -52,7 +52,9 @@ def fetch_release(tag: str) -> dict:
 def classify(name: str):
     """(sistema, chave do tipo, chave da arquitetura) de um binário; None se não for pacote."""
     low = name.lower()
-    arch = next((a for a in ("aarch64", "arm64", "x86_64", "amd64") if a in low), None)
+    arch = next((a for a in ("aarch64", "arm64", "x86_64", "amd64", "x64") if a in low), None)
+    if arch == "x64":  # instalador NSIS do cargo-packager: myssh_X.Y.Z_x64-setup.exe
+        arch = "x86_64"
     if low.endswith(".dmg"):
         return "mac", "kind_dmg", arch
     if low.endswith(".deb"):
