@@ -15,6 +15,11 @@
       "size": 22439446
     },
     {
+      "name": "myssh_0.4.0_x64-setup.exe",
+      "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.4.0/myssh_0.4.0_x64-setup.exe",
+      "size": 12559761
+    },
+    {
       "name": "myssh_0.4.0_x86_64.AppImage",
       "url": "https://github.com/xandroalmeida/mySSH/releases/download/v0.4.0/myssh_0.4.0_x86_64.AppImage",
       "size": 21215736
